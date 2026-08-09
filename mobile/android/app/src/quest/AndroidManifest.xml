@@ -6,14 +6,10 @@
       android:required="true"
       android:version="1" />
 
-  <application>
-    <activity android:name="org.love2d.android.GameActivity">
-      <!-- Keep the ordinary Android launcher filter from the base manifest,
-           and additionally expose this flavor to the Quest VR launcher. -->
-      <intent-filter>
-        <action android:name="android.intent.action.MAIN" />
-        <category android:name="com.oculus.intent.category.VR" />
-      </intent-filter>
-    </activity>
-  </application>
+  <!-- Deliberately retain the base manifest's ordinary LAUNCHER category.
+       Gen1Recomp must present its ROM/mod importer before an XR session can
+       exist. Marking this Activity as com.oculus.intent.category.VR makes
+       Horizon enter immersive mode before that workflow and stops SDL's
+       surface when no OpenXR frames are submitted yet. The mod transitions
+       to OpenXR only after the player enables its VR setting. -->
 </manifest>
