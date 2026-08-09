@@ -2,6 +2,9 @@
 
 Last updated: 2026-08-09
 
+Published repository:
+`https://github.com/HimioneGranger/Gen1recomp-Quest-Standalone`
+
 ## Goal and legal boundary
 
 This branch ports Gen1Recomp plus the separately installed Dramatic Shape
@@ -98,6 +101,7 @@ Gen1Recomp `quest-openxr`:
 - `05c1d77` — stable non-flashing launcher panel
 - `37a1fcd` — device-debug documentation
 - `f9a26ca` — Touch input and launcher-to-voxel OpenXR handoff
+- `989b174` — documented public Quest standalone checkpoint and `.envignore`
 
 Dramatic Shape `quest-openxr`:
 

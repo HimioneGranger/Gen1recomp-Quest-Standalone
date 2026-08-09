@@ -240,3 +240,12 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   published to the standalone repository as `quest-openxr` and
   `dramatic-shape-quest-openxr`, respectively; neither upstream `origin`
   remote is replaced.
+- Publication completed to
+  `https://github.com/HimioneGranger/Gen1recomp-Quest-Standalone`.
+- Remote branch tips at publication:
+  - Gen1Recomp `quest-openxr`: `989b1741e024e7001d1e0c432c5e2886b2a6e647`
+  - Dramatic Shape `dramatic-shape-quest-openxr`:
+    `cc02738aa6e315164a7777a9df69213dd4d191f4`
+- The user's initial one-line `main` commit was preserved. `quest-openxr` was
+  set as GitHub's default branch so the complete project status and safety
+  documentation appear on the repository landing page.
