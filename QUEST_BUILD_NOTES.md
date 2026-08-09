@@ -133,6 +133,36 @@ Both variants passed in the same invocation. Verification results:
 The ARM64 `liblove.so` dynamic symbol table was also checked for all six bridge
 exports, including the JNI Activity setter and the EGL/context accessors.
 
+## Quest package handoff
+
+The Quest manifest merge was validated after adding the required VR
+head-tracking feature and Quest launcher category. The merged manifest also
+contains the OpenXR runtime broker permission/queries contributed by the
+Khronos loader AAR.
+
+The Android backend is maintained on the Dramatic Shape `quest-openxr` branch
+at commit `80f2251`. It keeps the Windows DLL/WGL path intact and adds Android
+loader initialization, `XR_KHR_android_create_instance`,
+`XR_KHR_opengl_es_enable`, EGL graphics binding, and OpenGL ES swapchain image
+handling. All modified Lua files passed a Lua 5.1 syntax parse (with the
+existing LuaJIT `LL`/`ULL` numeric suffixes normalized for that parser).
+
+Final handoff artifacts:
+
+| Artifact | Size | SHA-256 |
+|---|---:|---|
+| `gen1recomp-quest-openxr-debug.apk` | 52,654,343 bytes | `cc2957ff2864a9efc27ea54a79b6ac61da777d9b77e7378310bfad111111b227` |
+| `DRAMATIC_SHAPE-1.8.2-quest-openxr.zip` | 8,363,093 bytes | `60d6a32e103f610e49f5c8c54ff8bc6c9445d44bd9fff3b594e1d321cc95494a` |
+
+The mod remains a separate importable ZIP by design. This preserves the stock
+Android mod installer and avoids fusing writable mod state into `game.love`.
+The APK and mod contain no Pokémon ROM or generated ROM data.
+
+Physical Quest validation is pending. `adb devices -l` successfully started
+the Android debug bridge but reported no attached device. The next step
+requires a Quest 3 with developer mode enabled, a data-capable USB cable, and
+the in-headset USB debugging authorization accepted.
+
 ## Known host-specific issue investigated
 
 The checkout path contains spaces. `scripts/build_android.sh` already handles this for ndk-build by making an incremental, space-free shadow copy with `rsync`. The packaging step itself works from the spaced source path. On this managed Windows workspace, Unix directory creation was restricted even where files were writable; existing directories and small local wrappers were used only to reproduce packaging. This is an execution-environment constraint, not a source defect.
