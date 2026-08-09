@@ -338,3 +338,11 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   generated ROM data was included.
 - All ARM64 `questVrNoRecordDebug` builds after these corrections completed
   successfully and installed with `adb install -t -r`.
+
+### Milestone commits
+
+- Gen1Recomp `quest-openxr`: `87a0026` — launcher controller debounce, native
+  green focus overlay, room anchor/recenter, yaw-only leveling, and updated
+  status/build/debug documentation.
+- Dramatic Shape `quest-openxr`: `889c9a7` — Quest gameplay controls, automatic
+  VR startup, framebuffer-region helpers, and verified Pokédex alignment.

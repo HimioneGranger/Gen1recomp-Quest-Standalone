@@ -108,12 +108,16 @@ Gen1Recomp `quest-openxr`:
 - `37a1fcd` — device-debug documentation
 - `f9a26ca` — Touch input and launcher-to-voxel OpenXR handoff
 - `989b174` — documented public Quest standalone checkpoint and `.envignore`
+- `87a0026` — stable native focus, controller debounce, room anchor/recenter,
+  and current device-debug documentation
 
 Dramatic Shape `quest-openxr`:
 
 - `80f2251` — Android OpenXR EGL/GLES backend
 - `c5eba44` — Android OpenXR startup tracing
 - `cc02738` — release launcher session and assume gameplay ownership
+- `889c9a7` — automatic Quest VR, gameplay input tracing, isolated Pokédex
+  capture/alignment, and Android framebuffer helpers
 
 ## Build output
 
