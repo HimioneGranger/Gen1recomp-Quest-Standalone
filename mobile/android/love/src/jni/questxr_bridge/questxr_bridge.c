@@ -11,6 +11,11 @@
 static JavaVM *questxr_vm;
 static jobject questxr_activity;
 
+QUESTXR_EXPORT void questxr_log(const char *message) {
+    __android_log_print(ANDROID_LOG_INFO, "QuestXR",
+                        "%s", message != NULL ? message : "(null)");
+}
+
 JNIEXPORT void JNICALL
 Java_org_love2d_android_GameActivity_nativeQuestXrSetActivity(
     JNIEnv *env, jclass clazz, jobject activity) {
