@@ -142,7 +142,6 @@ public class GameActivity extends SDLActivity {
     public int safeAreaRight = 0;
 
     private static native void nativeSetDefaultStreamValues(int sampleRate, int framesPerBurst);
-
     /**
      * Native libraries required by an optional Android host extension.
      *

@@ -22,6 +22,8 @@ LOCAL_C_INCLUDES  :=  \
 	${LOCAL_PATH}/src/libraries/physfs \
 	${LOCAL_PATH}/src/libraries/glslang/glslang/Include
 
+LOCAL_C_INCLUDES += ${LOCAL_PATH}/../questxr_bridge/third_party/prefab/modules/headers/include
+
 LOCAL_SRC_FILES := \
 	../questxr_bridge/questxr_bridge.c \
 	$(filter-out \

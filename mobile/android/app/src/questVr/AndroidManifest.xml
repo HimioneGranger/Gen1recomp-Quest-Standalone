@@ -7,6 +7,8 @@
 
   <application>
     <activity android:name="org.love2d.android.GameActivity">
+      <meta-data android:name="org.gen1recomp.QUEST_XR_BOOTSTRAP"
+          android:value="true" />
       <!-- Validation flavor: enter Meta immersive mode immediately after the
            panel flavor has imported a ROM/mod and persisted VR=ON. -->
       <intent-filter>
