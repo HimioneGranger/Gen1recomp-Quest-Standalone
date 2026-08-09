@@ -23,6 +23,7 @@ LOCAL_C_INCLUDES  :=  \
 	${LOCAL_PATH}/src/libraries/glslang/glslang/Include
 
 LOCAL_SRC_FILES := \
+	../questxr_bridge/questxr_bridge.c \
 	$(filter-out \
 	  src/libraries/luasocket/libluasocket/wsocket.c \
 	,$(subst $(LOCAL_PATH)/,,\
@@ -103,7 +104,7 @@ LOCAL_STATIC_LIBRARIES := libvorbis libogg libtheora libmodplug libfreetype libl
 # $(info liblove: include dirs $(LOCAL_C_INCLUDES))
 # $(info liblove: src files $(LOCAL_SRC_FILES))
 
-LOCAL_LDLIBS := -lz -lGLESv1_CM -lGLESv2 -ldl -landroid
+LOCAL_LDLIBS := -lz -lGLESv1_CM -lGLESv2 -lEGL -ldl -landroid -llog
 LOCAL_LDFLAGS := -Wl,--allow-multiple-definition
 
 include $(BUILD_SHARED_LIBRARY)

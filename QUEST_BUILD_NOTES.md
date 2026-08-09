@@ -107,6 +107,32 @@ APK verification:
 
 This is a stock Android debug APK, not a Quest/OpenXR APK. Its successful ARM64 build establishes the required pre-XR baseline.
 
+## First Quest build seam
+
+A separate `quest` Android product flavor now inherits the ROM-free embedded
+payload while raising only that flavor's `minSdk` to 24. It depends on Khronos'
+official `openxr_loader_for_android:1.1.60` AAR; the stock `embed` flavor does
+not. A small JNI bridge, linked into the existing `liblove.so`, exposes the
+Java VM, Activity/application context, and current EGL display/context/config
+needed by an Android OpenXR backend. No rendering loop or speculative engine
+rewrite is included in this milestone.
+
+Reproduction command:
+
+```bat
+gradlew.bat --no-daemon :love:externalNativeBuildEmbedDebug assembleQuestNoRecordDebug assembleEmbedNoRecordDebug --rerun-tasks
+```
+
+Both variants passed in the same invocation. Verification results:
+
+| Variant | ARM64 LÖVE | ARM64 OpenXR loader | Size | SHA-256 |
+|---|---:|---:|---:|---|
+| Quest debug | yes | yes | 52,652,180 bytes | `a808aa05d52fa813f8cac0c86118dae39baa46122aeffe745a28bbd17b2f6866` |
+| Stock embed debug | yes | no | 21,753,987 bytes | `33d9954ef933efa2f1f9f62c3ec09cc6c040c8a1a776be8d636016840086be38` |
+
+The ARM64 `liblove.so` dynamic symbol table was also checked for all six bridge
+exports, including the JNI Activity setter and the EGL/context accessors.
+
 ## Known host-specific issue investigated
 
 The checkout path contains spaces. `scripts/build_android.sh` already handles this for ndk-build by making an incremental, space-free shadow copy with `rsync`. The packaging step itself works from the spaced source path. On this managed Windows workspace, Unix directory creation was restricted even where files were writable; existing directories and small local wrappers were used only to reproduce packaging. This is an execution-environment constraint, not a source defect.

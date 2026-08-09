@@ -142,6 +142,7 @@ public class GameActivity extends SDLActivity {
     public int safeAreaRight = 0;
 
     private static native void nativeSetDefaultStreamValues(int sampleRate, int framesPerBurst);
+    private static native void nativeQuestXrSetActivity(GameActivity activity);
 
     @Override
     protected String[] getLibraries() {
@@ -193,6 +194,10 @@ public class GameActivity extends SDLActivity {
         }
 
         super.onCreate(savedInstanceState);
+        // OpenXR's Android loader initialization needs the JavaVM and an
+        // application Context. Keep that JNI-only detail behind a tiny bridge;
+        // desktop and ordinary Android runs otherwise retain SDL's lifecycle.
+        nativeQuestXrSetActivity(this);
         if (savedInstanceState != null) {
             // Restore the in-flight SAF destinations, so a pick that returns to
             // a recreated activity still lands under the basename it asked for.
