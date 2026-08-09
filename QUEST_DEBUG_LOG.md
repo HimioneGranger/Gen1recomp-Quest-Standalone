@@ -346,3 +346,47 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   status/build/debug documentation.
 - Dramatic Shape `quest-openxr`: `889c9a7` — Quest gameplay controls, automatic
   VR startup, framebuffer-region helpers, and verified Pokédex alignment.
+
+## 2026-08-09 — Initial-load evidence and PotatoVoxel audit
+
+### Quest recording
+
+- Retrieved `/sdcard/Oculus/VideoShots/com.oculus.vrshell-20260809-183916-0.mp4`
+  into the untracked local evidence folder `E:\Gen1QuestVR\quest-recordings`.
+- Duration: 88.976 seconds; 1920x1080 HEVC at 30 fps with AAC audio.
+- A four-second contact sheet shows launcher, Yellow intro, temporary 2D
+  overworld, then progressively populated voxel frames. The visible delay is
+  therefore partly asynchronous geometry population, not one monolithic
+  blocked loader. The recording and extracted frames remain excluded from Git.
+
+### Additional launch-block cause
+
+- A clean ADB-start profile at 18:54:59 never entered the application. Meta's
+  system logged `common_system_dialog_app_launch_blocked_controller_required`.
+- This is a distinct pre-process failure: an ADB/Monkey launch can be blocked
+  when no tracked controller is awake. It explains some apparent immersive
+  loading failures but not the SDL/OpenAL suspend crashes or in-game voxel
+  population delay.
+- Future timing runs must begin with an awake tracked controller or a manual
+  library launch; otherwise they do not measure application startup.
+
+### PotatoVoxel checked-source comparison
+
+- Audited `ShaneMcGovernIE/potato_voxel` main at `bbbe877` (v1.3.0). It is a
+  fork of Dramatic Shape 1.6.2, declares conflicts with `DRAMATIC_SHAPE`, and
+  omits VR/OpenXR. The two mods must not be enabled together.
+- The repository contains no software license and states its upstream also
+  carries no license. Performance concepts may be independently implemented,
+  but source must not be copied into this public project without permission.
+- Current Dramatic Shape 1.8.2 already has cooperative coroutine meshing,
+  per-frame urgent/idle/covered budgets, neighbor prefetch, live-map eviction,
+  Android-reduced forest atmosphere, and shared VR shadow work. Re-adding
+  PotatoVoxel's older versions of these would be a regression risk.
+- Potato-only candidates not present in current Dramatic Shape:
+  persistent fingerprinted disk mesh cache and cache prebuild; indexed mesh
+  payloads; 75/50/33% internal render scales; cheaper distant-tree geometry;
+  conservative low-power effect presets and extra diagnostics.
+- Ranked plan: (1) independently design a cache compatible with the current
+  1.8.2 mesher and Android save root; (2) profile Quest eye rendering before
+  adding an optional internal render scale; (3) evaluate cheaper distant
+  forests only after the unconfirmed missing-building observation is resolved.

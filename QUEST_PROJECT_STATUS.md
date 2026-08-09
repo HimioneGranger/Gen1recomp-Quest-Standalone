@@ -90,6 +90,9 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
   logs and needs a deliberate suspend/resume fix.
 - Initial Yellow/mod/voxel loading is visibly slow and is awaiting a timed
   device profile to separate asset, shader, and map-mesh work.
+- Quest video evidence shows a 2D-to-partial-to-complete voxel population
+  sequence. Current Dramatic Shape already builds meshes cooperatively; the
+  leading improvement candidate is a new persistent disk mesh cache.
 - Some distant buildings were missing during the first verified voxel test.
 - Possible stereo/world offset in first person still needs a controlled
   two-eye validation; screenshots alone are left-eye views.
