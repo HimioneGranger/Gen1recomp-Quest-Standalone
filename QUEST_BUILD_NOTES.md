@@ -178,3 +178,51 @@ Milestone `05c1d77` is a local commit on `quest-openxr`; it has not been pushed
 to the configured upstream remote. The ABI-injected APK is emitted under
 `app/build/intermediates/apk/questVrNoRecord/debug/` and must be installed with
 `adb install -t -r`.
+
+## Quest Touch and gameplay-session handoff build
+
+The controller/gameplay milestone uses the same ARM64-only debug command:
+
+```powershell
+$env:JAVA_HOME='E:\Gen1QuestVR\jdk-17.0.20+8'
+$env:ANDROID_HOME='F:\CodexProjects\Gen1RecompQuest3-work\toolchain\android-sdk'
+$env:ANDROID_SDK_ROOT=$env:ANDROID_HOME
+$env:GRADLE_USER_HOME='F:\CodexProjects\Gen1RecompQuest3-work\toolchain\.gradle'
+Set-Location E:\Gen1QuestVR\gen1recomp\mobile\android
+.\gradlew.bat --no-daemon '-Pandroid.injected.build.abi=arm64-v8a' assembleQuestVrNoRecordDebug
+```
+
+Before Gradle, Lua changes must be written into
+`app/src/embed/assets/game.love`. This build also places the matched Dramatic
+Shape `lib/VRXR.lua` transport in that payload. At Android startup it refreshes
+only the installed mod's VR transport so the native launcher bridge and mod
+use the same handoff contract. The mod remains separately installed and its
+manifest/assets/settings remain outside the APK.
+
+Relevant versions and packaging properties remain:
+
+| Property | Value |
+|---|---|
+| Build variant | `questVrNoRecordDebug` |
+| Injected ABI | `arm64-v8a` |
+| Java | Temurin/OpenJDK 17.0.20+8 |
+| Android SDK | Existing command-line SDK on `F:` |
+| NDK | 25.2.9519653 |
+| Gradle | Wrapper 8.1 |
+| compileSdk / targetSdk | 34 / 34 |
+| Quest minSdk | 24 |
+| XR graphics API | OpenGL ES via EGL and `XR_KHR_opengl_es_enable` |
+| XR runtime | Khronos Android OpenXR loader 1.1.60 / Meta runtime |
+
+The launcher session uses a private GLES context for its quad. On gameplay
+start it fully releases its session, swapchain, spaces, and instance. Dramatic
+Shape then creates the gameplay session against LÖVE's EGL/GLES context. A
+second simultaneous session is not supported by this design.
+
+Physical Quest verification on 2026-08-09:
+
+- Touch input selected and launched Yellow.
+- Yellow displayed its main menu.
+- Continuing entered Dramatic Shape voxel rendering.
+- Known defects: launcher focus highlight is not visibly moving, voxel output
+  is overexposed, and some distant buildings were absent.

@@ -144,3 +144,70 @@ does not infer changes in source files outside that already-zipped payload.
 Add Quest Touch input for launcher navigation/activation, then verify launching
 the legally imported Yellow ROM and transitioning into Dramatic Shape VR.
 Touch/mobile and desktop input paths must remain intact.
+
+## 2026-08-09 — Touch input and gameplay OpenXR handoff
+
+### Quest Touch input
+
+- Added an OpenXR action set for the Oculus Touch interaction profile.
+- Either thumbstick emits directional launcher navigation events.
+- A, X, and either trigger emit Select; B and Y emit Back.
+- The OpenXR thread writes edge-triggered events into a mutex-protected
+  bitmask. LÖVE polls that bitmask on its own update thread and routes events
+  through the existing keyboard handlers. No Lua callback crosses threads.
+- Device logs verified native detection and Lua dispatch for directions,
+  Select, and Back.
+- Physical result: controller input successfully selected and launched Yellow.
+- Remaining launcher issue: the user cannot see the keyboard-focus highlight
+  move. Navigation/activation works, so this is a focus-ring visibility or
+  captured-frame presentation defect rather than a missing input event.
+
+### Frozen launcher after Yellow launch
+
+- Initial symptom: Yellow audio and gameplay started, but the VR quad retained
+  a still launcher image.
+- The first suspected cause was the blank-frame guard sampling only the left
+  edge. It was replaced with a grid across the full 1024x768 capture.
+- Logs then proved the game backbuffer was genuinely blank while Dramatic
+  Shape reported `xrInitializeLoaderKHR` failure.
+- Root cause: the floating launcher and Dramatic Shape attempted to own
+  independent OpenXR sessions in the same Android process. The launcher
+  session remained active when the mod tried to initialize its gameplay path.
+
+### Explicit session handoff
+
+- Added exported native shutdown/request status functions for the launcher
+  OpenXR loop.
+- Dramatic Shape now requests launcher shutdown, waits for complete native
+  cleanup, reuses the process's initialized Android loader, then creates its
+  gameplay session bound to LÖVE's EGL/GLES context.
+- The Quest payload refreshes only
+  `mods/DRAMATIC_SHAPE/lib/VRXR.lua` from the matched embedded transport file.
+  ROMs, saves, settings, manifest, and all other mod files remain untouched.
+- Dramatic Shape milestone commit: `cc02738` on its local `quest-openxr`
+  branch. It has not been pushed.
+- Physical result: Yellow reaches its main menu and, after continuing, loads
+  into the voxel renderer. This is the first verified end-to-end transition
+  from the floating VR launcher into Dramatic Shape gameplay.
+
+### Newly observed rendering defects
+
+- Yellow appears overexposed in voxel rendering.
+- Some distant buildings did not load or render.
+- These are recorded as gameplay-rendering defects; neither is treated as a
+  successful final visual result.
+
+### Current verified state
+
+- Stable, non-flashing, head-relative floating launcher.
+- Quest Touch events reach the existing launcher input path.
+- Yellow can be launched without touch-screen controls.
+- Launcher OpenXR session shuts down and Dramatic Shape takes ownership.
+- Yellow main menu displays and gameplay enters voxel rendering.
+- No ROM or commercial game asset is packaged or committed.
+
+### Next milestone
+
+Make the launcher focus highlight visibly track controller navigation, then
+diagnose voxel exposure and distance/building population independently. Keep
+the verified OpenXR handoff unchanged while isolating those rendering issues.

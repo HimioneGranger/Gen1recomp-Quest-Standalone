@@ -24,7 +24,11 @@ static JavaVM *questxr_vm;
 static jobject questxr_activity;
 static pthread_t questxr_bootstrap_thread;
 static int questxr_bootstrap_started;
+static volatile int questxr_bootstrap_shutdown_requested;
+static volatile int questxr_bootstrap_stopped = 1;
 static pthread_mutex_t questxr_panel_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t questxr_input_mutex = PTHREAD_MUTEX_INITIALIZER;
+static uint32_t questxr_input_events;
 static unsigned char *questxr_panel_rgba;
 static unsigned char *questxr_panel_spare;
 static uint64_t questxr_panel_generation;
@@ -34,6 +38,22 @@ static GLuint questxr_capture_fbo;
 typedef void (GL_APIENTRYP QuestxrBlitFramebufferProc)(
     GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum);
 static QuestxrBlitFramebufferProc questxr_gl_blit_framebuffer;
+
+enum {
+    QUESTXR_INPUT_UP = 1u << 0,
+    QUESTXR_INPUT_DOWN = 1u << 1,
+    QUESTXR_INPUT_LEFT = 1u << 2,
+    QUESTXR_INPUT_RIGHT = 1u << 3,
+    QUESTXR_INPUT_SELECT = 1u << 4,
+    QUESTXR_INPUT_BACK = 1u << 5,
+};
+
+static void questxr_queue_input(uint32_t events) {
+    if (!events) return;
+    pthread_mutex_lock(&questxr_input_mutex);
+    questxr_input_events |= events;
+    pthread_mutex_unlock(&questxr_input_mutex);
+}
 
 #define XR_LOG(...) __android_log_print(ANDROID_LOG_INFO, "QuestXR", __VA_ARGS__)
 #define XR_FAIL(message) do { XR_LOG("native bootstrap failed: %s", message); goto done; } while (0)
@@ -95,6 +115,7 @@ static XrPosef questxr_compose_poses(XrPosef parent, XrPosef child) {
 
 static void *questxr_native_bootstrap(void *unused) {
     (void) unused;
+    questxr_bootstrap_stopped = 0;
     JNIEnv *env = NULL;
     int attached = 0;
     EGLDisplay display = EGL_NO_DISPLAY;
@@ -106,6 +127,11 @@ static void *questxr_native_bootstrap(void *unused) {
     XrSpace space = XR_NULL_HANDLE;
     XrSpace view_space = XR_NULL_HANDLE;
     XrSwapchain quad_swapchain = XR_NULL_HANDLE;
+    XrActionSet action_set = XR_NULL_HANDLE;
+    XrAction left_stick_action = XR_NULL_HANDLE;
+    XrAction right_stick_action = XR_NULL_HANDLE;
+    XrAction select_action = XR_NULL_HANDLE;
+    XrAction back_action = XR_NULL_HANDLE;
     XrSwapchainImageOpenGLESKHR *quad_images = NULL;
     uint32_t quad_image_count = 0;
     GLuint quad_fbo = 0;
@@ -139,6 +165,15 @@ static void *questxr_native_bootstrap(void *unused) {
     PFN_xrWaitSwapchainImage xrWaitSwapchainImage = NULL;
     PFN_xrReleaseSwapchainImage xrReleaseSwapchainImage = NULL;
     PFN_xrDestroySwapchain xrDestroySwapchain = NULL;
+    PFN_xrStringToPath xrStringToPath = NULL;
+    PFN_xrCreateActionSet xrCreateActionSet = NULL;
+    PFN_xrCreateAction xrCreateAction = NULL;
+    PFN_xrSuggestInteractionProfileBindings xrSuggestInteractionProfileBindings = NULL;
+    PFN_xrAttachSessionActionSets xrAttachSessionActionSets = NULL;
+    PFN_xrSyncActions xrSyncActions = NULL;
+    PFN_xrGetActionStateBoolean xrGetActionStateBoolean = NULL;
+    PFN_xrGetActionStateVector2f xrGetActionStateVector2f = NULL;
+    PFN_xrDestroyActionSet xrDestroyActionSet = NULL;
 
     if (!questxr_vm || !questxr_activity) XR_FAIL("Android context unavailable");
     if ((*questxr_vm)->GetEnv(questxr_vm, (void **) &env, JNI_VERSION_1_6) != JNI_OK) {
@@ -224,6 +259,15 @@ static void *questxr_native_bootstrap(void *unused) {
     XR_PROC(instance, xrWaitSwapchainImage);
     XR_PROC(instance, xrReleaseSwapchainImage);
     XR_PROC(instance, xrDestroySwapchain);
+    XR_PROC(instance, xrStringToPath);
+    XR_PROC(instance, xrCreateActionSet);
+    XR_PROC(instance, xrCreateAction);
+    XR_PROC(instance, xrSuggestInteractionProfileBindings);
+    XR_PROC(instance, xrAttachSessionActionSets);
+    XR_PROC(instance, xrSyncActions);
+    XR_PROC(instance, xrGetActionStateBoolean);
+    XR_PROC(instance, xrGetActionStateVector2f);
+    XR_PROC(instance, xrDestroyActionSet);
 
     XrSystemGetInfo system_info = { XR_TYPE_SYSTEM_GET_INFO };
     system_info.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
@@ -234,6 +278,63 @@ static void *questxr_native_bootstrap(void *unused) {
     };
     if (XR_FAILED(xrGetOpenGLESGraphicsRequirementsKHR(instance, system_id, &requirements)))
         XR_FAIL("xrGetOpenGLESGraphicsRequirementsKHR");
+
+    XrActionSetCreateInfo action_set_info = { XR_TYPE_ACTION_SET_CREATE_INFO };
+    strcpy(action_set_info.actionSetName, "launcher");
+    strcpy(action_set_info.localizedActionSetName, "Launcher controls");
+    action_set_info.priority = 0;
+    if (XR_FAILED(xrCreateActionSet(instance, &action_set_info, &action_set)))
+        XR_FAIL("xrCreateActionSet");
+#define CREATE_ACTION(handle, internal_name, label, action_type) do { \
+    XrActionCreateInfo info = { XR_TYPE_ACTION_CREATE_INFO }; \
+    info.actionType = action_type; \
+    strcpy(info.actionName, internal_name); \
+    strcpy(info.localizedActionName, label); \
+    if (XR_FAILED(xrCreateAction(action_set, &info, &handle))) \
+        XR_FAIL("xrCreateAction(" internal_name ")"); \
+} while (0)
+    CREATE_ACTION(left_stick_action, "left_stick", "Left stick", XR_ACTION_TYPE_VECTOR2F_INPUT);
+    CREATE_ACTION(right_stick_action, "right_stick", "Right stick", XR_ACTION_TYPE_VECTOR2F_INPUT);
+    CREATE_ACTION(select_action, "select", "Select", XR_ACTION_TYPE_BOOLEAN_INPUT);
+    CREATE_ACTION(back_action, "back", "Back", XR_ACTION_TYPE_BOOLEAN_INPUT);
+#undef CREATE_ACTION
+    XrPath touch_profile = XR_NULL_PATH;
+    XrPath binding_paths[8] = {0};
+    const char *binding_names[8] = {
+        "/user/hand/left/input/thumbstick",
+        "/user/hand/right/input/thumbstick",
+        "/user/hand/left/input/x/click",
+        "/user/hand/right/input/a/click",
+        "/user/hand/left/input/trigger/value",
+        "/user/hand/right/input/trigger/value",
+        "/user/hand/left/input/y/click",
+        "/user/hand/right/input/b/click",
+    };
+    if (XR_FAILED(xrStringToPath(instance,
+            "/interaction_profiles/oculus/touch_controller", &touch_profile)))
+        XR_FAIL("xrStringToPath(touch profile)");
+    for (uint32_t i = 0; i < 8; i++) {
+        if (XR_FAILED(xrStringToPath(instance, binding_names[i], &binding_paths[i])))
+            XR_FAIL("xrStringToPath(binding)");
+    }
+    XrActionSuggestedBinding bindings[] = {
+        { left_stick_action, binding_paths[0] },
+        { right_stick_action, binding_paths[1] },
+        { select_action, binding_paths[2] },
+        { select_action, binding_paths[3] },
+        { select_action, binding_paths[4] },
+        { select_action, binding_paths[5] },
+        { back_action, binding_paths[6] },
+        { back_action, binding_paths[7] },
+    };
+    XrInteractionProfileSuggestedBinding suggested = {
+        XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING
+    };
+    suggested.interactionProfile = touch_profile;
+    suggested.countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]);
+    suggested.suggestedBindings = bindings;
+    if (XR_FAILED(xrSuggestInteractionProfileBindings(instance, &suggested)))
+        XR_FAIL("xrSuggestInteractionProfileBindings");
 
     XrGraphicsBindingOpenGLESAndroidKHR binding = {
         XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR
@@ -246,6 +347,14 @@ static void *questxr_native_bootstrap(void *unused) {
     session_info.systemId = system_id;
     if (XR_FAILED(xrCreateSession(instance, &session_info, &session)))
         XR_FAIL("xrCreateSession");
+    XrSessionActionSetsAttachInfo attach_info = {
+        XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO
+    };
+    attach_info.countActionSets = 1;
+    attach_info.actionSets = &action_set;
+    if (XR_FAILED(xrAttachSessionActionSets(session, &attach_info)))
+        XR_FAIL("xrAttachSessionActionSets");
+    XR_LOG("Quest Touch launcher actions attached");
     XrReferenceSpaceCreateInfo space_info = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
     space_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
     space_info.poseInReferenceSpace.orientation.w = 1.0f;
@@ -348,6 +457,10 @@ static void *questxr_native_bootstrap(void *unused) {
     const int room_anchor_enabled = 0;
 
     for (;;) {
+        if (questxr_bootstrap_shutdown_requested) {
+            XR_LOG("launcher OpenXR handoff requested");
+            goto done;
+        }
         XrEventDataBuffer event = { XR_TYPE_EVENT_DATA_BUFFER };
         while (xrPollEvent(instance, &event) == XR_SUCCESS) {
             if (event.type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED) {
@@ -383,6 +496,50 @@ static void *questxr_native_bootstrap(void *unused) {
         if (XR_FAILED(frame_result)) {
             XR_LOG("xrBeginFrame failed: %d", frame_result);
             break;
+        }
+        XrActiveActionSet active_action_set = { action_set, XR_NULL_PATH };
+        XrActionsSyncInfo sync_info = { XR_TYPE_ACTIONS_SYNC_INFO };
+        sync_info.countActiveActionSets = 1;
+        sync_info.activeActionSets = &active_action_set;
+        if (XR_SUCCEEDED(xrSyncActions(session, &sync_info))) {
+            uint32_t input_events = 0;
+            XrActionStateGetInfo state_info = { XR_TYPE_ACTION_STATE_GET_INFO };
+            XrActionStateVector2f left_stick = { XR_TYPE_ACTION_STATE_VECTOR2F };
+            XrActionStateVector2f right_stick = { XR_TYPE_ACTION_STATE_VECTOR2F };
+            state_info.action = left_stick_action;
+            xrGetActionStateVector2f(session, &state_info, &left_stick);
+            state_info.action = right_stick_action;
+            xrGetActionStateVector2f(session, &state_info, &right_stick);
+            static int stick_direction = 0;
+            float x = left_stick.currentState.x;
+            float y = left_stick.currentState.y;
+            if (right_stick.currentState.x * right_stick.currentState.x +
+                    right_stick.currentState.y * right_stick.currentState.y > x * x + y * y) {
+                x = right_stick.currentState.x;
+                y = right_stick.currentState.y;
+            }
+            int new_direction = 0;
+            if (x > 0.65f) new_direction = QUESTXR_INPUT_RIGHT;
+            else if (x < -0.65f) new_direction = QUESTXR_INPUT_LEFT;
+            else if (y > 0.65f) new_direction = QUESTXR_INPUT_UP;
+            else if (y < -0.65f) new_direction = QUESTXR_INPUT_DOWN;
+            if (new_direction && new_direction != stick_direction)
+                input_events |= (uint32_t) new_direction;
+            stick_direction = new_direction;
+            XrActionStateBoolean button = { XR_TYPE_ACTION_STATE_BOOLEAN };
+            state_info.action = select_action;
+            if (XR_SUCCEEDED(xrGetActionStateBoolean(session, &state_info, &button)) &&
+                    button.isActive && button.changedSinceLastSync && button.currentState)
+                input_events |= QUESTXR_INPUT_SELECT;
+            button = (XrActionStateBoolean) { XR_TYPE_ACTION_STATE_BOOLEAN };
+            state_info.action = back_action;
+            if (XR_SUCCEEDED(xrGetActionStateBoolean(session, &state_info, &button)) &&
+                    button.isActive && button.changedSinceLastSync && button.currentState)
+                input_events |= QUESTXR_INPUT_BACK;
+            if (input_events) {
+                questxr_queue_input(input_events);
+                XR_LOG("Quest Touch input events=0x%x", input_events);
+            }
         }
         // Quest may recenter LOCAL space during the first focused frames. Keep
         // the panel in VIEW space briefly, then capture the settled head pose
@@ -526,6 +683,8 @@ done:
     if (view_space != XR_NULL_HANDLE && xrDestroySpace) xrDestroySpace(view_space);
     if (space != XR_NULL_HANDLE && xrDestroySpace) xrDestroySpace(space);
     if (session != XR_NULL_HANDLE && xrDestroySession) xrDestroySession(session);
+    if (action_set != XR_NULL_HANDLE && xrDestroyActionSet)
+        xrDestroyActionSet(action_set);
     if (instance != XR_NULL_HANDLE && xrDestroyInstance) xrDestroyInstance(instance);
     if (loader) dlclose(loader);
     if (display != EGL_NO_DISPLAY) {
@@ -535,6 +694,8 @@ done:
         eglTerminate(display);
     }
     if (attached) (*questxr_vm)->DetachCurrentThread(questxr_vm);
+    questxr_bootstrap_stopped = 1;
+    questxr_bootstrap_started = 0;
     XR_LOG("native bootstrap stopped");
     return NULL;
 }
@@ -542,6 +703,22 @@ done:
 QUESTXR_EXPORT void questxr_log(const char *message) {
     __android_log_print(ANDROID_LOG_INFO, "QuestXR",
                         "%s", message != NULL ? message : "(null)");
+}
+
+QUESTXR_EXPORT uint32_t questxr_poll_input(void) {
+    pthread_mutex_lock(&questxr_input_mutex);
+    uint32_t events = questxr_input_events;
+    questxr_input_events = 0;
+    pthread_mutex_unlock(&questxr_input_mutex);
+    return events;
+}
+
+QUESTXR_EXPORT void questxr_request_launcher_shutdown(void) {
+    questxr_bootstrap_shutdown_requested = 1;
+}
+
+QUESTXR_EXPORT int questxr_launcher_stopped(void) {
+    return questxr_bootstrap_stopped;
 }
 
 // Scale LÖVE's completed back buffer on its own GLES context and read only the
@@ -609,12 +786,18 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
     // transitions. Never replace a valid VR panel with one of those frames.
     uint64_t brightness = 0;
     uint32_t samples = 0;
-    for (size_t pixel = 0; pixel < 1024u * 768u; pixel += 1024u) {
-        const unsigned char *sample = questxr_panel_spare + pixel * 4u;
-        brightness += sample[0] + sample[1] + sample[2];
-        samples++;
+    // Sample a grid across the image. The old first-column-only check treated
+    // Yellow's black game border as an empty SDL frame and froze the last
+    // launcher image forever.
+    for (uint32_t y = 16; y < 768; y += 32) {
+        for (uint32_t x = 16; x < 1024; x += 32) {
+            const unsigned char *sample = questxr_panel_spare +
+                ((size_t) y * 1024u + x) * 4u;
+            brightness += sample[0] + sample[1] + sample[2];
+            samples++;
+        }
     }
-    if (samples && brightness / samples < 6u) {
+    if (samples && brightness / samples < 2u) {
         static uint32_t rejected_frames = 0;
         rejected_frames++;
         if (rejected_frames == 1 || rejected_frames % 60 == 0)
@@ -652,6 +835,7 @@ Java_org_love2d_android_GameActivity_nativeQuestXrStartBootstrap(
     (void) env;
     (void) clazz;
     if (questxr_bootstrap_started) return;
+    questxr_bootstrap_shutdown_requested = 0;
     questxr_bootstrap_started = 1;
     if (pthread_create(&questxr_bootstrap_thread, NULL,
                        questxr_native_bootstrap, NULL) != 0) {
