@@ -166,3 +166,15 @@ the in-headset USB debugging authorization accepted.
 ## Known host-specific issue investigated
 
 The checkout path contains spaces. `scripts/build_android.sh` already handles this for ndk-build by making an incremental, space-free shadow copy with `rsync`. The packaging step itself works from the spaced source path. On this managed Windows workspace, Unix directory creation was restricted even where files were writable; existing directories and small local wrappers were used only to reproduce packaging. This is an execution-environment constraint, not a source defect.
+
+## Current Quest device workspace
+
+The active Quest checkout was copied to `E:\Gen1QuestVR\gen1recomp` to keep
+continuing source and build output on the selected drive. The earlier `F:`
+checkout was not deleted. Current device-debug milestones and evidence are in
+`QUEST_DEBUG_LOG.md`.
+
+Milestone `05c1d77` is a local commit on `quest-openxr`; it has not been pushed
+to the configured upstream remote. The ABI-injected APK is emitted under
+`app/build/intermediates/apk/questVrNoRecord/debug/` and must be installed with
+`adb install -t -r`.
