@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- A Quest/OpenXR build is meaningful only on a stereoscopic headset. -->
+  <uses-feature
+      android:name="android.hardware.vr.headtracking"
+      android:required="true"
+      android:version="1" />
+
+  <application>
+    <activity android:name="org.love2d.android.GameActivity">
+      <!-- Keep the ordinary Android launcher filter from the base manifest,
+           and additionally expose this flavor to the Quest VR launcher. -->
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="com.oculus.intent.category.VR" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>
