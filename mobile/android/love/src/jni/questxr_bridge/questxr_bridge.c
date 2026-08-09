@@ -38,6 +38,61 @@ static QuestxrBlitFramebufferProc questxr_gl_blit_framebuffer;
 #define XR_LOG(...) __android_log_print(ANDROID_LOG_INFO, "QuestXR", __VA_ARGS__)
 #define XR_FAIL(message) do { XR_LOG("native bootstrap failed: %s", message); goto done; } while (0)
 
+static GLuint questxr_compile_shader(GLenum type, const char *source) {
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &source, NULL);
+    glCompileShader(shader);
+    GLint compiled = GL_FALSE;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+    if (!compiled) {
+        char log[512] = {0};
+        glGetShaderInfoLog(shader, sizeof(log), NULL, log);
+        XR_LOG("panel shader compile failed: %s", log);
+        glDeleteShader(shader);
+        return 0;
+    }
+    return shader;
+}
+
+static XrVector3f questxr_rotate_vector(XrQuaternionf q, XrVector3f v) {
+    XrVector3f t = {
+        2.0f * (q.y * v.z - q.z * v.y),
+        2.0f * (q.z * v.x - q.x * v.z),
+        2.0f * (q.x * v.y - q.y * v.x),
+    };
+    XrVector3f result = {
+        v.x + q.w * t.x + (q.y * t.z - q.z * t.y),
+        v.y + q.w * t.y + (q.z * t.x - q.x * t.z),
+        v.z + q.w * t.z + (q.x * t.y - q.y * t.x),
+    };
+    return result;
+}
+
+static XrQuaternionf questxr_multiply_quaternions(
+    XrQuaternionf a, XrQuaternionf b) {
+    XrQuaternionf result = {
+        a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+        a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+        a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+        a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+    };
+    return result;
+}
+
+static XrPosef questxr_compose_poses(XrPosef parent, XrPosef child) {
+    XrVector3f offset = questxr_rotate_vector(
+        parent.orientation, child.position);
+    XrPosef result = {
+        questxr_multiply_quaternions(parent.orientation, child.orientation),
+        {
+            parent.position.x + offset.x,
+            parent.position.y + offset.y,
+            parent.position.z + offset.z,
+        },
+    };
+    return result;
+}
+
 static void *questxr_native_bootstrap(void *unused) {
     (void) unused;
     JNIEnv *env = NULL;
@@ -49,10 +104,15 @@ static void *questxr_native_bootstrap(void *unused) {
     XrInstance instance = XR_NULL_HANDLE;
     XrSession session = XR_NULL_HANDLE;
     XrSpace space = XR_NULL_HANDLE;
+    XrSpace view_space = XR_NULL_HANDLE;
     XrSwapchain quad_swapchain = XR_NULL_HANDLE;
     XrSwapchainImageOpenGLESKHR *quad_images = NULL;
     uint32_t quad_image_count = 0;
     GLuint quad_fbo = 0;
+    GLuint panel_texture = 0;
+    GLuint panel_program = 0;
+    GLuint panel_vbo = 0;
+    uint64_t uploaded_panel_generation = 0;
     int running = 0;
     uint64_t submitted_frames = 0;
     PFN_xrGetInstanceProcAddr get_proc = NULL;
@@ -62,6 +122,7 @@ static void *questxr_native_bootstrap(void *unused) {
     PFN_xrGetOpenGLESGraphicsRequirementsKHR xrGetOpenGLESGraphicsRequirementsKHR = NULL;
     PFN_xrCreateSession xrCreateSession = NULL;
     PFN_xrCreateReferenceSpace xrCreateReferenceSpace = NULL;
+    PFN_xrLocateSpace xrLocateSpace = NULL;
     PFN_xrPollEvent xrPollEvent = NULL;
     PFN_xrBeginSession xrBeginSession = NULL;
     PFN_xrEndSession xrEndSession = NULL;
@@ -146,6 +207,7 @@ static void *questxr_native_bootstrap(void *unused) {
     XR_PROC(instance, xrGetOpenGLESGraphicsRequirementsKHR);
     XR_PROC(instance, xrCreateSession);
     XR_PROC(instance, xrCreateReferenceSpace);
+    XR_PROC(instance, xrLocateSpace);
     XR_PROC(instance, xrPollEvent);
     XR_PROC(instance, xrBeginSession);
     XR_PROC(instance, xrEndSession);
@@ -188,7 +250,10 @@ static void *questxr_native_bootstrap(void *unused) {
     space_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
     space_info.poseInReferenceSpace.orientation.w = 1.0f;
     if (XR_FAILED(xrCreateReferenceSpace(session, &space_info, &space)))
-        XR_FAIL("xrCreateReferenceSpace");
+        XR_FAIL("xrCreateReferenceSpace(local)");
+    space_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
+    if (XR_FAILED(xrCreateReferenceSpace(session, &space_info, &view_space)))
+        XR_FAIL("xrCreateReferenceSpace(view)");
 
     uint32_t format_count = 0;
     if (XR_FAILED(xrEnumerateSwapchainFormats(session, 0, &format_count, NULL))
@@ -233,7 +298,54 @@ static void *questxr_native_bootstrap(void *unused) {
             (XrSwapchainImageBaseHeader *) quad_images)))
         XR_FAIL("xrEnumerateSwapchainImages values");
     glGenFramebuffers(1, &quad_fbo);
+    glGenTextures(1, &panel_texture);
+    glBindTexture(GL_TEXTURE_2D, panel_texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1024, 768, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    const char *vertex_source =
+        "#version 300 es\n"
+        "layout(location=0) in vec2 position;\n"
+        "layout(location=1) in vec2 uv;\n"
+        "out vec2 texcoord;\n"
+        "void main(){ gl_Position=vec4(position,0.0,1.0); texcoord=uv; }\n";
+    const char *fragment_source =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "in vec2 texcoord; layout(location=0) out vec4 color;\n"
+        "uniform sampler2D panel;\n"
+        "void main(){ color=texture(panel,texcoord); }\n";
+    GLuint vertex_shader = questxr_compile_shader(GL_VERTEX_SHADER, vertex_source);
+    GLuint fragment_shader = questxr_compile_shader(GL_FRAGMENT_SHADER, fragment_source);
+    if (!vertex_shader || !fragment_shader) XR_FAIL("panel shaders");
+    panel_program = glCreateProgram();
+    glAttachShader(panel_program, vertex_shader);
+    glAttachShader(panel_program, fragment_shader);
+    glLinkProgram(panel_program);
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+    GLint linked = GL_FALSE;
+    glGetProgramiv(panel_program, GL_LINK_STATUS, &linked);
+    if (!linked) XR_FAIL("panel shader link");
+    glUseProgram(panel_program);
+    glUniform1i(glGetUniformLocation(panel_program, "panel"), 0);
+    const GLfloat panel_vertices[] = {
+        -1.f, -1.f, 0.f, 0.f,  1.f, -1.f, 1.f, 0.f,
+        -1.f,  1.f, 0.f, 1.f,  1.f,  1.f, 1.f, 1.f,
+    };
+    glGenBuffers(1, &panel_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, panel_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(panel_vertices), panel_vertices, GL_STATIC_DRAW);
     XR_LOG("native bootstrap session created");
+
+    XrPosef panel_pose = {0};
+    panel_pose.orientation.w = 1.0f;
+    panel_pose.position.z = -1.35f;
+    int panel_anchored = 0;
+    const int room_anchor_enabled = 0;
 
     for (;;) {
         XrEventDataBuffer event = { XR_TYPE_EVENT_DATA_BUFFER };
@@ -272,6 +384,26 @@ static void *questxr_native_bootstrap(void *unused) {
             XR_LOG("xrBeginFrame failed: %d", frame_result);
             break;
         }
+        // Quest may recenter LOCAL space during the first focused frames. Keep
+        // the panel in VIEW space briefly, then capture the settled head pose
+        // so the room-space anchor does not jump out of view after startup.
+        if (room_anchor_enabled && !panel_anchored && submitted_frames >= 450) {
+            XrSpaceLocation head = { XR_TYPE_SPACE_LOCATION };
+            if (XR_SUCCEEDED(xrLocateSpace(view_space, space,
+                                           frame.predictedDisplayTime, &head)) &&
+                    (head.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) &&
+                    (head.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT)) {
+                panel_pose = head.pose;
+                XrVector3f forward = {0.0f, 0.0f, -1.35f};
+                XrVector3f offset = questxr_rotate_vector(
+                    head.pose.orientation, forward);
+                panel_pose.position.x += offset.x;
+                panel_pose.position.y += offset.y;
+                panel_pose.position.z += offset.z;
+                panel_anchored = 1;
+                XR_LOG("launcher panel anchored in local space");
+            }
+        }
         if (submitted_frames == 0) XR_LOG("native first frame begun");
         uint32_t image_index = 0;
         XrSwapchainImageAcquireInfo acquire = {
@@ -294,17 +426,33 @@ static void *questxr_native_bootstrap(void *unused) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                                GL_TEXTURE_2D, quad_images[image_index].image, 0);
         glViewport(0, 0, 1024, 768);
-        glClearColor(0.04f, 0.08f, 0.22f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
         pthread_mutex_lock(&questxr_panel_mutex);
-        if (questxr_panel_rgba) {
-            glBindTexture(GL_TEXTURE_2D, quad_images[image_index].image);
+        uint64_t panel_generation = questxr_panel_generation;
+        if (questxr_panel_rgba && uploaded_panel_generation != panel_generation) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, panel_texture);
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1024, 768,
                             GL_RGBA, GL_UNSIGNED_BYTE, questxr_panel_rgba);
-            glBindTexture(GL_TEXTURE_2D, 0);
+            uploaded_panel_generation = panel_generation;
         }
-        uint64_t panel_generation = questxr_panel_generation;
         pthread_mutex_unlock(&questxr_panel_mutex);
+        if (uploaded_panel_generation) {
+            glUseProgram(panel_program);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, panel_texture);
+            glBindBuffer(GL_ARRAY_BUFFER, panel_vbo);
+            glEnableVertexAttribArray(0);
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
+                                  4 * sizeof(GLfloat), (const void *) 0);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE,
+                                  4 * sizeof(GLfloat),
+                                  (const void *) (2 * sizeof(GLfloat)));
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        } else {
+            glClearColor(0.04f, 0.08f, 0.22f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
         if (submitted_frames == 0)
             XR_LOG("native quad framebuffer status=0x%x glError=0x%x",
                    glCheckFramebufferStatus(GL_FRAMEBUFFER), glGetError());
@@ -319,11 +467,27 @@ static void *questxr_native_bootstrap(void *unused) {
             break;
         }
 
+        XrPosef submitted_panel_pose = panel_pose;
+        if (panel_anchored) {
+            // Quest's compositor intermittently drops LOCAL-space quad layers.
+            // Express the fixed local anchor in VIEW coordinates each frame so
+            // presentation stays on its stable path without following the head.
+            XrSpaceLocation local_in_view = { XR_TYPE_SPACE_LOCATION };
+            if (XR_SUCCEEDED(xrLocateSpace(space, view_space,
+                                           frame.predictedDisplayTime,
+                                           &local_in_view)) &&
+                    (local_in_view.locationFlags &
+                     XR_SPACE_LOCATION_POSITION_VALID_BIT) &&
+                    (local_in_view.locationFlags &
+                     XR_SPACE_LOCATION_ORIENTATION_VALID_BIT)) {
+                submitted_panel_pose = questxr_compose_poses(
+                    local_in_view.pose, panel_pose);
+            }
+        }
         XrCompositionLayerQuad layer = { XR_TYPE_COMPOSITION_LAYER_QUAD };
-        layer.space = space;
+        layer.space = view_space;
         layer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
-        layer.pose.orientation.w = 1.0f;
-        layer.pose.position.z = -1.35f;
+        layer.pose = submitted_panel_pose;
         layer.size.width = 1.55f;
         layer.size.height = 1.1625f;
         layer.subImage.swapchain = quad_swapchain;
@@ -352,10 +516,14 @@ static void *questxr_native_bootstrap(void *unused) {
     }
 
 done:
+    if (panel_vbo) glDeleteBuffers(1, &panel_vbo);
+    if (panel_program) glDeleteProgram(panel_program);
+    if (panel_texture) glDeleteTextures(1, &panel_texture);
     if (quad_fbo) glDeleteFramebuffers(1, &quad_fbo);
     if (quad_images) free(quad_images);
     if (quad_swapchain != XR_NULL_HANDLE && xrDestroySwapchain)
         xrDestroySwapchain(quad_swapchain);
+    if (view_space != XR_NULL_HANDLE && xrDestroySpace) xrDestroySpace(view_space);
     if (space != XR_NULL_HANDLE && xrDestroySpace) xrDestroySpace(space);
     if (session != XR_NULL_HANDLE && xrDestroySession) xrDestroySession(session);
     if (instance != XR_NULL_HANDLE && xrDestroyInstance) xrDestroyInstance(instance);
@@ -436,6 +604,23 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
     glPixelStorei(GL_PACK_ALIGNMENT, old_pack);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint) old_read);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint) old_draw);
+
+    // SDL's Android back buffer can briefly be empty between surface/present
+    // transitions. Never replace a valid VR panel with one of those frames.
+    uint64_t brightness = 0;
+    uint32_t samples = 0;
+    for (size_t pixel = 0; pixel < 1024u * 768u; pixel += 1024u) {
+        const unsigned char *sample = questxr_panel_spare + pixel * 4u;
+        brightness += sample[0] + sample[1] + sample[2];
+        samples++;
+    }
+    if (samples && brightness / samples < 6u) {
+        static uint32_t rejected_frames = 0;
+        rejected_frames++;
+        if (rejected_frames == 1 || rejected_frames % 60 == 0)
+            XR_LOG("rejected blank launcher capture count=%u", rejected_frames);
+        return;
+    }
 
     pthread_mutex_lock(&questxr_panel_mutex);
     unsigned char *old_front = questxr_panel_rgba;
