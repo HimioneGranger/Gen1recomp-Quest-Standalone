@@ -143,6 +143,18 @@ public class GameActivity extends SDLActivity {
 
     private static native void nativeSetDefaultStreamValues(int sampleRate, int framesPerBurst);
     private static native void nativeQuestXrSetActivity(GameActivity activity);
+    private static native void nativeQuestXrStartBootstrap();
+
+    private boolean questXrBootstrapEnabled() {
+        try {
+            ActivityInfo info = getPackageManager().getActivityInfo(
+                getComponentName(), PackageManager.GET_META_DATA);
+            return info.metaData != null && info.metaData.getBoolean(
+                "org.gen1recomp.QUEST_XR_BOOTSTRAP", false);
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return false;
+        }
+    }
 
     @Override
     protected String[] getLibraries() {
@@ -198,6 +210,7 @@ public class GameActivity extends SDLActivity {
         // application Context. Keep that JNI-only detail behind a tiny bridge;
         // desktop and ordinary Android runs otherwise retain SDL's lifecycle.
         nativeQuestXrSetActivity(this);
+        if (questXrBootstrapEnabled()) nativeQuestXrStartBootstrap();
         if (savedInstanceState != null) {
             // Restore the in-flight SAF destinations, so a pick that returns to
             // a recreated activity still lands under the basename it asked for.
