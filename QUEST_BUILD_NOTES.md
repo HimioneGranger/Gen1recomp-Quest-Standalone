@@ -65,7 +65,7 @@ Result: **PASS**. It produced a roughly 3 MiB `app/src/embed/assets/game.love`, 
 
 ## Build reproduction status
 
-The host initially had neither Java nor an Android SDK/NDK. Full Gradle compilation has therefore not yet run. The required Android SDK components are:
+**PASS.** After the user accepted Google's Android SDK license, a portable toolchain was installed in the workspace and the unmodified stock APK was compiled successfully. Installed components:
 
 ```text
 platforms;android-34
@@ -74,7 +74,38 @@ platform-tools
 ndk;25.2.9519653
 ```
 
-JDK 17 and Android command-line tools can be installed portably. However, installing SDK/NDK packages with `sdkmanager` requires the human SDK license acceptance. That is a genuine user-interaction checkpoint and cannot be recorded as accepted by an automated agent. After acceptance, rerun the stock command above, inspect the APK with `apkanalyzer`/`unzip` for `lib/arm64-v8a`, and record the exact APK filename, size and checksums here before any XR code change.
+Host JDK: Microsoft OpenJDK `17.0.20+8`. Google command-line tools archive: `commandlinetools-win-15859902_latest.zip`, verified against Google's published SHA-256 `90ae805d20434428bffcb699c290860f19bb5f66a67e6b330067e3de801fb04a`.
+
+The successful native build used a temporary `Q:` mapping of the workspace so Gradle and ndk-build saw space-free source and SDK paths:
+
+```bat
+subst Q: C:\Users\I5 Gaming\Documents\Codex\2026-08-09\referenced-chatgpt-conversation-this-is-an
+set JAVA_HOME=Q:\work\toolchain\jdk\jdk-17.0.20+8
+set ANDROID_SDK_ROOT=Q:\work\toolchain\android-sdk
+Q:
+cd \work\gen1recomp\mobile\android
+gradlew.bat --no-daemon assembleEmbedNoRecordDebug
+```
+
+Result: `BUILD SUCCESSFUL in 7m 22s` (56 tasks). Warnings were deprecations and warnings from vendored SDL/LÖVE third-party sources; no source modification was required.
+
+APK verification:
+
+| Property | Verified value |
+|---|---|
+| Filename | `app-embed-noRecord-debug.apk` |
+| Size | 21,751,653 bytes |
+| SHA-256 | `df7fb9aa4f49b636c56e2f64a5c9eec4c2cf592c70c0060ff91139a863f432ea` |
+| Package | `com.theboisclub.pokemonred` |
+| Version | `11.5a` / code 32 |
+| minSdk / targetSdk / compileSdk | 16 / 34 / 34 |
+| GLES declaration | OpenGL ES 2.0 (`0x20000`) |
+| Native ABIs in APK | `arm64-v8a`, `armeabi-v7a`, `x86_64` |
+| ARM64 libraries | `liblove.so`, `libopenal.so`, `libmpg123.so`, `libc++_shared.so` |
+| Embedded payload | `assets/game.love` present |
+| Signing | Valid debug signing; APK Signature Scheme v1 and v2 verified |
+
+This is a stock Android debug APK, not a Quest/OpenXR APK. Its successful ARM64 build establishes the required pre-XR baseline.
 
 ## Known host-specific issue investigated
 
