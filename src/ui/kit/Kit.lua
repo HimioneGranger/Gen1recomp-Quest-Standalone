@@ -413,12 +413,25 @@ function Kit.drawFocusCursor()
     end
   end
   if not target then return end
+  G.push("all")
+  G.origin()
+  G.setScissor()
   local x, y, w, h = target.x - 5, target.y - 5,
     target.w + 10, target.h + 10
-  Theme.strokeRounded(x - 2, y - 2, w + 4, h + 4,
-    PAL.bg, 1, 8, Theme.radius() + 7)
+  Theme.strokeRounded(x - 3, y - 3, w + 6, h + 6,
+    PAL.bg, 1, 10, Theme.radius() + 8)
   Theme.strokeRounded(x, y, w, h,
-    PAL.yellow, 1, 5, Theme.radius() + 5)
+    PAL.yellow, 1, 7, Theme.radius() + 5)
+  -- A solid pointer remains readable after the 1024x768 launcher is filtered
+  -- into a headset quad; unlike a translucent fill it cannot be confused with
+  -- the Play button's own cartridge colour.
+  local cy = target.y + target.h / 2
+  G.setColor(PAL.yellow)
+  G.polygon("fill", x - 18, cy - 12, x - 18, cy + 12, x - 2, cy)
+  G.setColor(PAL.bg)
+  G.setLineWidth(3)
+  G.polygon("line", x - 18, cy - 12, x - 18, cy + 12, x - 2, cy)
+  G.pop()
 end
 
 -- Pick the nearest focusable in `dir` from the current one.  Candidates must
@@ -431,8 +444,12 @@ function Kit._resolveNav()
   local n = Kit._navPrevN or 0
   if not dir or n == 0 then return end
   local cur
+  local curIndex
   for i = 1, n do
-    if Kit._nav[i].id == Kit.focusId then cur = Kit._nav[i] break end
+    if Kit._nav[i].id == Kit.focusId then
+      cur, curIndex = Kit._nav[i], i
+      break
+    end
   end
   if not cur then
     Kit.focusId = Kit._nav[1].id

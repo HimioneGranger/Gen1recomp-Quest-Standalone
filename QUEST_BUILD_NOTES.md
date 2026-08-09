@@ -224,5 +224,26 @@ Physical Quest verification on 2026-08-09:
 - Touch input selected and launched Yellow.
 - Yellow displayed its main menu.
 - Continuing entered Dramatic Shape voxel rendering.
-- Known defects: launcher focus highlight is not visibly moving, voxel output
-  is overexposed, and some distant buildings were absent.
+- Subsequent verification resolved launcher focus visibility, controller
+  oscillation, room anchoring/recenter, and Pokédex left-edge alignment.
+- Overexposure was a Dramatic Shape color-mode setting, not a renderer defect.
+- Open defects are intermittent immersive-loading startup, suspend/resume
+  lifecycle crashes, slow first load, and an unconfirmed distant-building
+  observation. See `QUEST_DEBUG_LOG.md`.
+
+## Current Windows packaging fallback
+
+The canonical source packaging command remains:
+
+```powershell
+$env:PYTHONUTF8='1'
+& 'C:\Program Files\Git\bin\bash.exe' scripts/build_android.sh --package-only
+```
+
+On this host, Git Bash has no `zip` executable. For the current development
+build a clean staging tree was assembled from the same audited payload list and
+archived with JDK 17 `jar`. Both `data/generated` and `assets/generated` were
+excluded and archive inspection returned no generated-data entries. Only the
+three matched Dramatic Shape Quest transport files (`VRXR.lua`, `VR.lua`, and
+`VRGL.lua`) are embedded for startup refresh; user ROMs, saves, mod manifests,
+settings, and assets remain external.

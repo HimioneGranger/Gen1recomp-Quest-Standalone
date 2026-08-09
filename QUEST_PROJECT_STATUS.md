@@ -68,25 +68,31 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 
 - The APK installs and launches as an immersive Quest application.
 - The floating launcher is visible in both eyes, stable, and non-flashing.
-- It is currently VIEW/head-relative; reliable room-stationary placement is
-  not complete.
+- The launcher is room-anchored after startup. Quest Meta-button recenter
+  repositions it ahead, and yaw-only anchoring prevents permanent head tilt.
 - Touch controller events reach the existing launcher input handlers and can
   launch the imported Yellow ROM.
+- A thin green native OpenXR focus border is steady and visibly follows one
+  controller-navigation step per centered thumbstick flick.
 - Yellow displays its main menu and transitions into voxel gameplay.
+- A/X, B/Y, triggers/Start, and left-stick movement are device-verified.
 - The launcher-to-gameplay OpenXR session handoff succeeds.
 - The process no longer reproduces the earlier launcher memory kill.
+- The first-person Pokédex screen is readable and its left-edge misalignment
+  has been physically verified fixed.
 
-## Open defects and unverified change
+## Open defects
 
-- The ordinary thin launcher focus outline was not visible in the headset.
-  A thick yellow controller cursor with a black contrast border has now been
-  built and installed, but awaits physical confirmation before being called
-  verified.
-- Voxel gameplay appears overexposed on Quest.
+- Intermittently after install, restart, or sleep, the app remains on Quest's
+  immersive loading screen with no OpenXR controller events. A force-stop and
+  relaunch usually recovers. This is the current highest-priority defect.
+- Sleep/background lifecycle has produced destroyed-mutex and AudioTrack abort
+  logs and needs a deliberate suspend/resume fix.
+- Initial Yellow/mod/voxel loading is visibly slow and is awaiting a timed
+  device profile to separate asset, shader, and map-mesh work.
 - Some distant buildings were missing during the first verified voxel test.
-- The launcher remains fixed to head movement instead of a room-space anchor.
-- Controller bindings are sufficient for launcher navigation; complete
-  gameplay mapping and comfort/interaction validation remain unfinished.
+- Possible stereo/world offset in first person still needs a controlled
+  two-eye validation; screenshots alone are left-eye views.
 - Performance, thermals, long-session stability, save/load, suspend/resume,
   and broad map coverage have not yet passed a release test matrix.
 
@@ -130,9 +136,10 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Physically verify the high-visibility yellow launcher focus cursor.
-2. Diagnose Quest exposure without altering the verified session handoff.
+1. Profile and fix intermittent startup and slow initial Yellow/voxel loading.
+2. Fix SDL/OpenAL suspend/resume lifecycle crashes.
 3. Determine whether missing distant buildings are culling, asset population,
    shader failure, or a distance/LOD configuration issue.
-4. Commit only device-verified fixes as separate milestones and keep the debug
+4. Run a controlled stereo alignment and long-session/thermal test.
+5. Commit only device-verified fixes as separate milestones and keep the debug
    log current.

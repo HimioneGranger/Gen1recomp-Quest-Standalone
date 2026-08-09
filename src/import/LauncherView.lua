@@ -2496,6 +2496,12 @@ function LauncherView.draw(imp)
   imp._pageScroll, imp._pageScrollMax = scroll, scrollMax
 
   Kit.beginFrame(mx, my, click ~= nil, imp._wheelY or 0)
+  if rawget(_G, "QUEST_PANEL_ACTIVE") and not imp._questFocusInitialized then
+    imp._questFocusInitialized = true
+    local tab = imp.tab or "yellow"
+    Kit.setFocus((imp.ready and imp.ready[tab]) and ("play-" .. tab)
+      or ("tab-" .. tab))
+  end
   imp._clickPt = nil
   imp._wheelY = 0
 
@@ -2542,7 +2548,8 @@ function LauncherView.draw(imp)
     end
   end
 
-  if imp._ringArmed and not spec and not modalUp(imp) then
+  if imp._ringArmed and not rawget(_G, "QUEST_PANEL_ACTIVE")
+      and not spec and not modalUp(imp) then
     Kit.drawFocusCursor()
   end
   Kit.endFrame()

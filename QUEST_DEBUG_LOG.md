@@ -249,3 +249,92 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - The user's initial one-line `main` commit was preserved. `quest-openxr` was
   set as GitHub's default branch so the complete project status and safety
   documentation appear on the repository landing page.
+
+## 2026-08-09 — Controller, launcher presentation, anchoring, and Pokédex
+
+### Gameplay input and automatic VR transition
+
+- Verified in the headset that A/X act as Game Boy A, B/Y act as Game Boy B,
+  the left stick walks, and triggers reach the title screen as Start. Yellow
+  reaches its main menu and continuing enters voxel gameplay.
+- Quest startup now selects Dramatic Shape's STANDARD VR mode automatically
+  when the native launcher is active. Existing diorama choices remain
+  available; desktop behavior is unchanged.
+- Corrected launcher-to-gameplay shutdown to request session exit, wait for
+  `XR_SESSION_STATE_STOPPING`, call `xrEndSession`, and then destroy resources.
+  The shared EGL display is deliberately not terminated during handoff.
+
+### Focus input oscillation and invisible selector
+
+- Physical symptom: the launcher selector appeared not to move and flashed
+  irregularly. Logs proved `Kit.focusId` did move, sometimes many times in a
+  second.
+- Root input cause: both Touch thumbsticks could alternately win a per-frame
+  magnitude comparison. Diagonal gestures also favored X before considering
+  the dominant axis.
+- Native input now locks to the first stick moved until that stick returns to
+  center, emits one event per flick, and resolves diagonals by dominant axis.
+- Root visual cause: Android back-buffer capture intermittently returned blank
+  or previous frames. A selector drawn into the LÖVE window therefore could
+  disappear even while focus state changed correctly.
+- Final solution: LÖVE sends the current normalized focus rectangle to the
+  native bridge. The OpenXR quad shader draws the selector independently of
+  panel capture. User verification: a thin bright-green border is steady and
+  moves exactly with controller navigation. This issue is **resolved**.
+
+### Room anchor and Quest recenter
+
+- Re-enabled a room-stationary launcher after a short startup stabilization
+  window. The reliable compositor path is retained: the local anchor is
+  transformed into VIEW coordinates for quad submission each frame.
+- Added handling for `XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING`.
+  Holding the Meta button now discards the old anchor and places the launcher
+  ahead in the newly centered reference space.
+- First recenter test permanently copied a small head roll into the panel.
+  Screenshots `20260809-181913` and `20260809-181925` documented the difference.
+  Anchoring now extracts yaw only and discards pitch/roll. User verification:
+  room anchoring and Meta-button recenter both work; the level correction is
+  installed and passed startup after one clean relaunch.
+
+### Pokédex screen alignment
+
+- Replaced the wide mirror/UV approximation with a dedicated 320x288,
+  `dpiscale=1` canvas populated from the isolated 160x144 framebuffer region.
+  This removed right-eye/unused framebuffer leakage and made menus readable.
+- A remaining narrow dark strip at the Pokédex screen's left edge was measured
+  from screenshot `20260809-182952`. The device pose and stereo cameras were
+  left unchanged; only the display UV was trimmed by 5.5% on the left.
+- User verification: **Pokédex screen is fixed**.
+
+### Rendering observations corrected
+
+- The earlier overexposure report was caused by a user-selected Dramatic Shape
+  color mode, not the Quest renderer. It is removed from the defect list.
+- A distant building appeared missing in one early test. It has not been
+  reproduced or cleared and remains an observation requiring map coverage.
+
+### Intermittent startup/loading failure
+
+- Repeated symptom after install, relaunch, or sleep: Quest remains on its
+  immersive loading screen while the process and native OpenXR frame loop are
+  alive. In affected runs no controller events arrive. A force-stop followed
+  by a launcher start usually recovers immediately.
+- Separate background/sleep logs previously captured
+  `pthread_mutex_lock called on a destroyed mutex` and AudioTrack `SIGABRT`.
+  This points to an SDL/OpenAL/activity-lifecycle problem distinct from panel
+  rendering.
+- This issue is **open** and is now the highest-priority reliability defect.
+  It must be profiled by OpenXR session state, Android activity focus, audio
+  lifecycle, mod loading, and first voxel-map construction timings.
+
+### Packaging/build incidents during this milestone
+
+- The packaging helper required UTF-8 mode under Python 3.8; without it the
+  Yellow metadata manifest failed decoding under Windows cp1252.
+- Git for Windows lacked the `zip` utility in this host environment. The old
+  `game.love` had already been removed before that failure, so a clean staging
+  payload was rebuilt and archived with JDK `jar`, explicitly excluding
+  `data/generated` and `assets/generated`. Archive inspection confirmed no
+  generated ROM data was included.
+- All ARM64 `questVrNoRecordDebug` builds after these corrections completed
+  successfully and installed with `adb install -t -r`.
