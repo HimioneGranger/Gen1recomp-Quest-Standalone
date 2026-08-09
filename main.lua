@@ -13,6 +13,7 @@ local editorMode = os.getenv("POKEPORT_EDITOR") == "1" or POKEPORT_EDITOR_MODE =
 local SwitchDiagnostics = require("src.debug.SwitchDiagnostics")
 local LaunchOptions = require("src.core.LaunchOptions")
 local NxDisplay = require("src.core.NxDisplay")
+local QuestPanel = require("src.quest.PanelBridge")
 
 -- Lua errors: persist a redacted trace in the save dir and surface a hint.
 do
@@ -387,6 +388,7 @@ function love.load(args)
 end
 
 function love.update(dt)
+  QuestPanel.update(dt)
   SwitchDiagnostics.maybeFlush(false)
   -- NX only (no-op elsewhere): follow dock/undock without waiting for SDL.
   NxDisplay.sync()
@@ -430,9 +432,18 @@ function love.update(dt)
 end
 
 function love.draw()
-  if editorMode then return EditorApp.draw() end
-  if TouchEditor then return TouchEditor.draw() end
-  if Importer then return Importer:draw() end
+  if editorMode then
+    EditorApp.draw()
+    return QuestPanel.capture()
+  end
+  if TouchEditor then
+    TouchEditor.draw()
+    return QuestPanel.capture()
+  end
+  if Importer then
+    Importer:draw()
+    return QuestPanel.capture()
+  end
 
   Game:draw()
   -- frame capture requested by a driver
@@ -448,6 +459,7 @@ function love.draw()
       end
     end)
   end
+  QuestPanel.capture()
 end
 
 function love.keypressed(key, scancode, isrepeat)

@@ -24,6 +24,16 @@ static JavaVM *questxr_vm;
 static jobject questxr_activity;
 static pthread_t questxr_bootstrap_thread;
 static int questxr_bootstrap_started;
+static pthread_mutex_t questxr_panel_mutex = PTHREAD_MUTEX_INITIALIZER;
+static unsigned char *questxr_panel_rgba;
+static unsigned char *questxr_panel_spare;
+static uint64_t questxr_panel_generation;
+static EGLContext questxr_capture_context = EGL_NO_CONTEXT;
+static GLuint questxr_capture_texture;
+static GLuint questxr_capture_fbo;
+typedef void (GL_APIENTRYP QuestxrBlitFramebufferProc)(
+    GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum);
+static QuestxrBlitFramebufferProc questxr_gl_blit_framebuffer;
 
 #define XR_LOG(...) __android_log_print(ANDROID_LOG_INFO, "QuestXR", __VA_ARGS__)
 #define XR_FAIL(message) do { XR_LOG("native bootstrap failed: %s", message); goto done; } while (0)
@@ -286,6 +296,15 @@ static void *questxr_native_bootstrap(void *unused) {
         glViewport(0, 0, 1024, 768);
         glClearColor(0.04f, 0.08f, 0.22f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
+        pthread_mutex_lock(&questxr_panel_mutex);
+        if (questxr_panel_rgba) {
+            glBindTexture(GL_TEXTURE_2D, quad_images[image_index].image);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1024, 768,
+                            GL_RGBA, GL_UNSIGNED_BYTE, questxr_panel_rgba);
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+        uint64_t panel_generation = questxr_panel_generation;
+        pthread_mutex_unlock(&questxr_panel_mutex);
         if (submitted_frames == 0)
             XR_LOG("native quad framebuffer status=0x%x glError=0x%x",
                    glCheckFramebufferStatus(GL_FRAMEBUFFER), glGetError());
@@ -327,6 +346,9 @@ static void *questxr_native_bootstrap(void *unused) {
         submitted_frames++;
         if (submitted_frames == 1)
             XR_LOG("native bootstrap submitted first frame");
+        if (panel_generation && submitted_frames % 180 == 0)
+            XR_LOG("native panel live generation=%llu",
+                   (unsigned long long) panel_generation);
     }
 
 done:
@@ -352,6 +374,75 @@ done:
 QUESTXR_EXPORT void questxr_log(const char *message) {
     __android_log_print(ANDROID_LOG_INFO, "QuestXR",
                         "%s", message != NULL ? message : "(null)");
+}
+
+// Scale LÖVE's completed back buffer on its own GLES context and read only the
+// 1024x768 panel. Two fixed buffers avoid full-resolution screenshots and
+// allocation churn on the Quest's memory-constrained foreground process.
+QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
+    if (width <= 0 || height <= 0 || !questxr_bootstrap_started) return;
+    EGLContext current_context = eglGetCurrentContext();
+    if (current_context == EGL_NO_CONTEXT) return;
+    const size_t size = 1024u * 768u * 4u;
+    if (!questxr_panel_spare) questxr_panel_spare = (unsigned char *) malloc(size);
+    if (!questxr_panel_spare) return;
+
+    if (questxr_capture_context != current_context) {
+        questxr_capture_context = current_context;
+        questxr_capture_texture = 0;
+        questxr_capture_fbo = 0;
+    }
+    if (!questxr_capture_texture) {
+        if (!questxr_gl_blit_framebuffer) {
+            questxr_gl_blit_framebuffer = (QuestxrBlitFramebufferProc)
+                eglGetProcAddress("glBlitFramebuffer");
+        }
+        if (!questxr_gl_blit_framebuffer) {
+            XR_LOG("panel capture glBlitFramebuffer unavailable");
+            return;
+        }
+        glGenTextures(1, &questxr_capture_texture);
+        glBindTexture(GL_TEXTURE_2D, questxr_capture_texture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1024, 768, 0,
+                     GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glGenFramebuffers(1, &questxr_capture_fbo);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, questxr_capture_fbo);
+        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               GL_TEXTURE_2D, questxr_capture_texture, 0);
+        if (glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            XR_LOG("panel capture framebuffer incomplete");
+            questxr_capture_texture = 0;
+            questxr_capture_fbo = 0;
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            return;
+        }
+        XR_LOG("native fixed-buffer panel capture ready");
+    }
+
+    GLint old_read = 0, old_draw = 0, old_pack = 4;
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &old_read);
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &old_draw);
+    glGetIntegerv(GL_PACK_ALIGNMENT, &old_pack);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, questxr_capture_fbo);
+    questxr_gl_blit_framebuffer(0, 0, width, height, 0, 0, 1024, 768,
+                                GL_COLOR_BUFFER_BIT, GL_LINEAR);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, questxr_capture_fbo);
+    glPixelStorei(GL_PACK_ALIGNMENT, 4);
+    glReadPixels(0, 0, 1024, 768, GL_RGBA, GL_UNSIGNED_BYTE,
+                 questxr_panel_spare);
+    glPixelStorei(GL_PACK_ALIGNMENT, old_pack);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint) old_read);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint) old_draw);
+
+    pthread_mutex_lock(&questxr_panel_mutex);
+    unsigned char *old_front = questxr_panel_rgba;
+    questxr_panel_rgba = questxr_panel_spare;
+    questxr_panel_spare = old_front;
+    questxr_panel_generation++;
+    pthread_mutex_unlock(&questxr_panel_mutex);
 }
 
 JNIEXPORT void JNICALL
