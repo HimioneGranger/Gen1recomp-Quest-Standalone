@@ -398,6 +398,29 @@ function Kit.setFocus(id)
   Kit.focusId = id
 end
 
+-- Draw an unmistakable controller/keyboard cursor after the immediate-mode
+-- screen has finished painting. Individual controls retain their normal
+-- hover styling; this high-contrast outer ring is opt-in for hosts such as
+-- the Quest launcher where a thin white ring is lost after panel scaling.
+function Kit.drawFocusCursor()
+  if not G or not Kit.focusId or Kit.blockClicks then return end
+  local target
+  for i = 1, Kit._navN or 0 do
+    local candidate = Kit._nav[i]
+    if candidate and candidate.id == Kit.focusId then
+      target = candidate
+      break
+    end
+  end
+  if not target then return end
+  local x, y, w, h = target.x - 5, target.y - 5,
+    target.w + 10, target.h + 10
+  Theme.strokeRounded(x - 2, y - 2, w + 4, h + 4,
+    PAL.bg, 1, 8, Theme.radius() + 7)
+  Theme.strokeRounded(x, y, w, h,
+    PAL.yellow, 1, 5, Theme.radius() + 5)
+end
+
 -- Pick the nearest focusable in `dir` from the current one.  Candidates must
 -- lie in the half-plane of the direction; the score prefers a small step
 -- along the axis of travel and penalises drift across it, which keeps a

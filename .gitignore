@@ -16,6 +16,7 @@ __pycache__/
 .*
 !.github/
 !.gitignore
+!.envignore
 !.luacheckrc
 
 # Android build outputs / local SDK path / packaged payload (keep love-android sources)

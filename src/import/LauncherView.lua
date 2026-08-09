@@ -2542,6 +2542,9 @@ function LauncherView.draw(imp)
     end
   end
 
+  if imp._ringArmed and not spec and not modalUp(imp) then
+    Kit.drawFocusCursor()
+  end
   Kit.endFrame()
   drawPadCursor(imp)
 end

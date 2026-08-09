@@ -1,5 +1,14 @@
 # Gen1Recomp
 
+> **Quest standalone development branch:** `quest-openxr` contains an
+> in-progress Meta Quest 3 standalone OpenXR port. Start with
+> [QUEST_PROJECT_STATUS.md](QUEST_PROJECT_STATUS.md), then see
+> [QUEST_PORT_AUDIT.md](QUEST_PORT_AUDIT.md),
+> [QUEST_BUILD_NOTES.md](QUEST_BUILD_NOTES.md), and
+> [QUEST_DEBUG_LOG.md](QUEST_DEBUG_LOG.md). This is a development build with
+> known rendering and interaction defects; it contains no ROM or extracted
+> Pokémon game data.
+
 A native LÖVE2D recreation of Poke Red, Blue and Yellow. The engine and map
 behavior are hand-written Lua; game data and graphics are decoded from a ROM
 supplied by the player.

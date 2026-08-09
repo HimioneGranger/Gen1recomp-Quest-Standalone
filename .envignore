@@ -1,0 +1,37 @@
+# Environment and secret-bearing files that must never be published or copied
+# into build/deployment contexts. This supplements .gitignore.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+local.properties
+mobile/android/local.properties
+
+# User-owned game data and local device output.
+*.gb
+*.gbc
+*.rom
+*.sav
+*.state
+data/generated/
+assets/generated/
+save/
+dist/
+mobile/android/**/build/
+mobile/android/app/src/embed/assets/game.love
+*.apk
+*.aab
+
+# Local toolchains, caches, and editor/agent state.
+.gradle/
+.venv/
+__pycache__/
+.codex/
+.agents/
+.idea/
+.vscode/

@@ -211,3 +211,32 @@ Touch/mobile and desktop input paths must remain intact.
 Make the launcher focus highlight visibly track controller navigation, then
 diagnose voxel exposure and distance/building population independently. Keep
 the verified OpenXR handoff unchanged while isolating those rendering issues.
+
+## 2026-08-09 — High-visibility launcher focus candidate
+
+- Root UI behavior: controller directions changed `Kit.focusId`, and Select
+  activated the focused control, but the existing 1-2 px white focus outline
+  was not perceptible after the launcher was scaled into the Quest quad.
+- Added an opt-in post-render focus cursor: a 5 px yellow rounded outline with
+  an 8 px black contrast border around the current focus rectangle.
+- It appears only after launcher keyboard/controller navigation is armed.
+  Touch, mouse, modals, loader overlays, and gameplay paths are unchanged.
+- ARM64 `questVrNoRecordDebug` build completed and installed successfully.
+- Status: awaiting physical headset verification; do not mark this visual fix
+  complete until the user confirms the yellow cursor appears and moves.
+
+## Publication checkpoint
+
+- Prepared the source for the user-owned GitHub repository
+  `HimioneGranger/Gen1recomp-Quest-Standalone`.
+- Added `QUEST_PROJECT_STATUS.md` as the concise status/documentation index.
+- Added `.envignore` and explicitly kept ROMs, generated game data, saves,
+  packaged LÖVE payloads, APKs, signing material, environment files, local
+  toolchains, and caches outside publication scope.
+- A tracked-file and secret-pattern audit found no tracked ROM, save, APK,
+  keystore, or environment file. No ROM or generated commercial game data is
+  authorized for commit or push.
+- Gen1Recomp and Dramatic Shape retain separate Git histories. They are
+  published to the standalone repository as `quest-openxr` and
+  `dramatic-shape-quest-openxr`, respectively; neither upstream `origin`
+  remote is replaced.
