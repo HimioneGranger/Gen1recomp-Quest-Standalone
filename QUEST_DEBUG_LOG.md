@@ -883,6 +883,11 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   left/right edges. Battle now widens the centred live source rectangle by 50%
   (clamped to the framebuffer), with no bezel trim, effectively zooming out the
   fixed battle feed. Dialog/menu capture retains its verified crop unchanged.
+- Follow-up screenshot `com.theboisclub.pokemonred-20260810-044549.jpg` showed
+  that the 150% battle source remained too tight even though it was centred.
+  Increased battle-only source width to 250% of the normal UI frame (another
+  100 percentage points), still framebuffer-clamped. Device size and all
+  non-battle UI framing remain unchanged pending headset validation.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 

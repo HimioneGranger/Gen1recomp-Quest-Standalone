@@ -247,7 +247,7 @@ local function dexScreen(isBattle)
     -- the classic 160px UI frame even when Renderer still reports 160x144.
     -- Widen only the live battle source, like zooming out its fixed feed
     -- camera, so both combatants fit instead of being cut at opposite edges.
-    if isBattle then frameW = math.min(ww, math.floor(frameW * 1.5)) end
+    if isBattle then frameW = math.min(ww, math.floor(frameW * 2.5)) end
     local lx = math.floor((ww - frameW) / 2)
     local ly = math.floor((wh - frameH) / 2)
     -- Trim the narrow black columns that remain inside the live mirror source.
