@@ -230,7 +230,6 @@ end
 -- What the device in the hand shows: the completed previous framebuffer,
 -- cropped to the engine's active UI rectangle. This keeps palette/composite
 -- effects that are not baked into Renderer.canvas itself.
-local dexCapture = nil
 local dexCanvas = nil
 local lastDexMetrics = nil
 
@@ -240,61 +239,36 @@ local function dexScreen()
     if not (ww and ww > 0 and wh and wh > 0) then return nil end
     local Renderer = require("src.render.Renderer")
     local uiW, uiH = Renderer:uiSize()
-    local Game = require("src.core.Game")
-    local TextBox = require("src.render.TextBox")
-    local top = Game.stack and Game.stack:top()
-    local dialog = top and getmetatable(top) == TextBox or false
     local s = Renderer:uiScale()
     if Renderer.uiFill then s = math.min(wh / uiH, ww / uiW) end
     local frameW = math.max(1, math.ceil(uiW * s))
     local frameH = math.max(1, math.ceil(uiH * s))
     local lx = math.floor((ww - frameW) / 2)
     local ly = math.floor((wh - frameH) / 2)
-    -- Only overworld dialog retains the narrow side columns seen on-headset.
-    -- Load Report and other classic screens already fit, so leave them alone.
-    local sideTrim = dialog and uiW <= 160 and math.floor(frameW * 0.04) or 0
+    -- Trim the narrow black columns that remain inside the live mirror source.
+    -- This changes the source rectangle only; no intermediate presentation
+    -- canvas is used, so battle remains a continuously updating feed.
+    local sideTrim = math.floor(frameW * 0.03)
     frameW = frameW - sideTrim * 2
     lx = lx + sideTrim
-    local captureW, captureH = uiW * 2, uiH * 2
-    if not (dexCapture and dexCapture:getWidth() == captureW
-            and dexCapture:getHeight() == captureH) then
-      dexCapture = love.graphics.newCanvas(captureW, captureH, { dpiscale = 1 })
-      pcall(dexCapture.setFilter, dexCapture, "nearest", "nearest")
-    end
-    local fbo = fboCache[dexCapture]
-    if not fbo then
-      fbo = VRGL.canvasFBO(dexCapture)
-      fboCache[dexCapture] = fbo
-    end
-    local sx = math.max(0, lx)
-    local sy = math.max(0, math.floor(wh - ly - frameH))
-    if not (fbo and VRGL.copyFrontRegionToCanvas(
-        fbo, sx, sy, frameW, frameH, captureW, captureH)) then return nil end
-
-    -- The physical screen is 10:9. Classic 160x144 fills it exactly; the
-    -- 304x144 battle surface must be fitted inside it instead of squeezed or
-    -- cropped. Its unused height remains the Pokedex's dark screen colour.
-    local outW, outH = 320, 288
+    local outW, outH = uiW * 2, uiH * 2
     if not (dexCanvas and dexCanvas:getWidth() == outW
             and dexCanvas:getHeight() == outH) then
       dexCanvas = love.graphics.newCanvas(outW, outH, { dpiscale = 1 })
       pcall(dexCanvas.setFilter, dexCanvas, "nearest", "nearest")
     end
-    local fit = math.min(outW / captureW, outH / captureH)
-    local dx = math.floor((outW - captureW * fit) / 2)
-    local dy = math.floor((outH - captureH * fit) / 2)
-    pcall(love.graphics.flushBatch)
-    love.graphics.push("all")
-    love.graphics.setCanvas(dexCanvas)
-    love.graphics.clear(24 / 255, 24 / 255, 30 / 255, 1)
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(dexCapture, dx, dy, 0, fit, fit)
-    love.graphics.pop()
-
-    local metrics = ("fb=%dx%d ui=%dx%d scale=%.3f rect=%d,%d %dx%d trim=%d dialog=%s fit=%.3f fill=%s")
+    local fbo = fboCache[dexCanvas]
+    if not fbo then
+      fbo = VRGL.canvasFBO(dexCanvas)
+      fboCache[dexCanvas] = fbo
+    end
+    local sx = math.max(0, lx)
+    local sy = math.max(0, math.floor(wh - ly - frameH))
+    if not (fbo and VRGL.copyFrontRegionToCanvas(
+        fbo, sx, sy, frameW, frameH, outW, outH)) then return nil end
+    local metrics = ("fb=%dx%d ui=%dx%d scale=%.3f rect=%d,%d %dx%d trim=%d live=true fill=%s")
       :format(ww, wh, uiW, uiH, s, sx, sy, frameW, frameH,
-              sideTrim, tostring(dialog), fit,
-              tostring(Renderer.uiFill and true or false))
+              sideTrim, tostring(Renderer.uiFill and true or false))
     if metrics ~= lastDexMetrics then
       lastDexMetrics = metrics
       local log = rawget(_G, "QUEST_XR_LOG")

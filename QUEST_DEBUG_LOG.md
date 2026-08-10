@@ -871,6 +871,13 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   only while `uiShowing()` is true (menus, dialog/text, battle UI, and
   transitions). Ordinary exploration draws the dark-screen prop and performs
   no handheld capture.
+- Clarification: battle must show the same continuously updating composed mirror
+  feed as menus/dialog, not an aspect-fitted intermediate image. Removed the
+  two-canvas presentation pass that raised UI-active canvas switches to 16-18
+  and could look static. Lit states now blit the framebuffer region directly
+  into the device texture every frame; a 3% symmetric source trim removes the
+  remaining inner black bezels. Exploration still keeps the physical device
+  with its screen dark and performs no capture.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 
