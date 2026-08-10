@@ -507,6 +507,14 @@ function love.draw()
   end
 
   Game:draw()
+  -- Quest VR's handheld display needs the completed flat game composition,
+  -- not the previous frame's OpenXR eye buffer.  The Dramaless conductor
+  -- installs this optional callback while its session is active.  Calling it
+  -- here preserves palette/GBC effects and every menu overlay, after Game has
+  -- finished presenting them but before the native launcher bridge captures
+  -- or the next update renders stereo eyes.  Desktop builds never install it.
+  local capturePokedex = rawget(_G, "QUEST_POKEDEX_CAPTURE")
+  if type(capturePokedex) == "function" then pcall(capturePokedex) end
   -- frame capture requested by a driver
   if Game.capturePath then
     local path = Game.capturePath

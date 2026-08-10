@@ -93,6 +93,8 @@ local savedVsync = nil
 local fboCache = setmetatable({}, { __mode = "k" })   -- canvas -> GL FBO id
 local mirrorSrc = nil           -- last left-eye canvas, for the window
 local mirrorCanvas = nil
+local dexCanvas = nil           -- physical-device presentation texture
+local dexSource = nil           -- completed flat UI captured after Game:draw
 local status = "off"
 
 -- the diorama's live adjustments: the right stick's zoom (a multiplier on
@@ -204,6 +206,11 @@ local function shutdown(reason)
   BattleCam.still = false
   VoxelScene.spriteLean = nil
   Pokedex.clear()
+  if rawget(_G, "QUEST_POKEDEX_CAPTURE_OWNER") == VR then
+    _G.QUEST_POKEDEX_CAPTURE = nil
+    _G.QUEST_POKEDEX_CAPTURE_OWNER = nil
+  end
+  dexSource, dexCanvas = nil, nil
   zoom, heightOff = 1, 0
   fpYawOff, snapArmed = 0, true
   camMode, fadeAlpha = "explore", 0
@@ -230,11 +237,15 @@ end
 -- What the device in the hand shows: the completed previous framebuffer,
 -- cropped to the engine's active UI rectangle. This keeps palette/composite
 -- effects that are not baked into Renderer.canvas itself.
-local dexCanvas = nil
 local lastDexMetrics = nil
 
-local function dexScreen(isBattle)
+-- Capture is deliberately performed by main.lua immediately after Game:draw.
+-- VR.update runs before that draw; copying the framebuffer from here used to
+-- photograph the previous OpenXR left eye and could never reproduce the flat
+-- battle composition, no matter how far its source rectangle was widened.
+local function captureDexFrame()
   local ok, out = pcall(function()
+    if not (VR.active() and uiShowing()) then return nil end
     local ww, wh = love.graphics.getPixelDimensions()
     if not (ww and ww > 0 and wh and wh > 0) then return nil end
     local Renderer = require("src.render.Renderer")
@@ -243,44 +254,32 @@ local function dexScreen(isBattle)
     if Renderer.uiFill then s = math.min(wh / uiH, ww / uiW) end
     local frameW = math.max(1, math.ceil(uiW * s))
     local frameH = math.max(1, math.ceil(uiH * s))
-    -- Kanto First Person's staged battle scene extends substantially beyond
-    -- the classic 160px UI frame even when Renderer still reports 160x144.
-    -- Widen only the live battle source, like zooming out its fixed feed
-    -- camera, so both combatants fit instead of being cut at opposite edges.
-    if isBattle then frameW = math.min(ww, math.floor(frameW * 1.5)) end
     local lx = math.floor((ww - frameW) / 2)
     local ly = math.floor((wh - frameH) / 2)
-    -- Trim the narrow black columns that remain inside the live mirror source.
-    -- This changes the source rectangle only; no intermediate presentation
-    -- canvas is used, so battle remains a continuously updating feed.
-    local sideTrim = isBattle and 0 or math.floor(frameW * 0.03)
-    frameW = frameW - sideTrim * 2
-    lx = lx + sideTrim
     local outW, outH = uiW * 2, uiH * 2
-    if not (dexCanvas and dexCanvas:getWidth() == outW
-            and dexCanvas:getHeight() == outH) then
-      dexCanvas = love.graphics.newCanvas(outW, outH, { dpiscale = 1 })
-      pcall(dexCanvas.setFilter, dexCanvas, "nearest", "nearest")
+    if not (dexSource and dexSource:getWidth() == outW
+            and dexSource:getHeight() == outH) then
+      dexSource = love.graphics.newCanvas(outW, outH, { dpiscale = 1 })
+      pcall(dexSource.setFilter, dexSource, "nearest", "nearest")
     end
-    local fbo = fboCache[dexCanvas]
+    local fbo = fboCache[dexSource]
     if not fbo then
-      fbo = VRGL.canvasFBO(dexCanvas)
-      fboCache[dexCanvas] = fbo
+      fbo = VRGL.canvasFBO(dexSource)
+      fboCache[dexSource] = fbo
     end
     local sx = math.max(0, lx)
     local sy = math.max(0, math.floor(wh - ly - frameH))
     if not (fbo and VRGL.copyFrontRegionToCanvas(
         fbo, sx, sy, frameW, frameH, outW, outH)) then return nil end
-    local metrics = ("fb=%dx%d ui=%dx%d scale=%.3f rect=%d,%d %dx%d trim=%d battle=%s live=true fill=%s")
+    local metrics = ("Pokedex post-draw fb=%dx%d ui=%dx%d scale=%.3f rect=%d,%d %dx%d fill=%s")
       :format(ww, wh, uiW, uiH, s, sx, sy, frameW, frameH,
-              sideTrim, tostring(isBattle and true or false),
               tostring(Renderer.uiFill and true or false))
     if metrics ~= lastDexMetrics then
       lastDexMetrics = metrics
       local log = rawget(_G, "QUEST_XR_LOG")
       if log then log("Pokedex capture " .. metrics) end
     end
-    return { dexCanvas, 0, 0, 1, 1 }
+    return true
   end)
   if not ok then
     local log = rawget(_G, "QUEST_XR_LOG")
@@ -288,6 +287,43 @@ local function dexScreen(isBattle)
   end
   return ok and out or nil
 end
+
+local function dexScreen()
+  if not dexSource then return nil end
+  local sw, sh = dexSource:getDimensions()
+  -- Classic 160x144 UI already has the physical screen's 10:9 aspect and can
+  -- be used directly.  Wide 304x144 battles cannot fill that same rectangle
+  -- without either losing both combatants or distorting them; fit the complete
+  -- live frame into a fixed device texture.  This is one small canvas pass,
+  -- not another world/eye render.
+  if math.abs(sw / sh - 10 / 9) < 0.02 then
+    return { dexSource, 0, 0, 1, 1 }
+  end
+  if not (dexCanvas and dexCanvas:getWidth() == 320
+          and dexCanvas:getHeight() == 288) then
+    dexCanvas = love.graphics.newCanvas(320, 288, { dpiscale = 1 })
+    pcall(dexCanvas.setFilter, dexCanvas, "nearest", "nearest")
+  end
+  local ok = pcall(function()
+    love.graphics.push("all")
+    love.graphics.setCanvas(dexCanvas)
+    love.graphics.origin()
+    love.graphics.clear(0.035, 0.035, 0.045, 1)
+    local fit = math.min(320 / sw, 288 / sh)
+    local dw, dh = sw * fit, sh * fit
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.draw(dexSource, (320 - dw) / 2, (288 - dh) / 2,
+                       0, fit, fit)
+    love.graphics.pop()
+  end)
+  return ok and { dexCanvas, 0, 0, 1, 1 } or nil
+end
+
+-- main.lua calls this at the only point where the completed flat composition
+-- is guaranteed to be bound. Ownership prevents an old hot-reloaded module
+-- from clearing a newer conductor's callback during shutdown.
+_G.QUEST_POKEDEX_CAPTURE = captureDexFrame
+_G.QUEST_POKEDEX_CAPTURE_OWNER = VR
 
 -- ------- the world, once per eye
 
@@ -360,7 +396,7 @@ local function renderWorld(views, ctl)
   if hand and (battle or fp) then
     Pokedex.place(hand, pivot, anchor, scale, mountYaw)
     if showing then
-      local scr = dexScreen(battle ~= nil)
+      local scr = dexScreen()
       if scr then
         Pokedex.screen(scr[1], scr[2], scr[3], scr[4], scr[5])
       end
@@ -695,6 +731,9 @@ function VR.update(dt)
     wasOn = false
     return
   end
+
+  _G.QUEST_POKEDEX_CAPTURE = captureDexFrame
+  _G.QUEST_POKEDEX_CAPTURE_OWNER = VR
 
   if not wasOn then failed = nil end   -- a fresh toggle earns a fresh try
   wasOn = true
