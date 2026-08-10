@@ -1037,3 +1037,31 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   one-time rollback that restores Dramaless's standard neighbor request loop.
   Next design target is an independently implemented persistent indexed-mesh
   cache, so construction cost is paid once rather than rescheduled.
+
+## 2026-08-10 - Persistent indexed terrain cache rejected
+
+- Milestone `8f2bf13` added a versioned raw indexed-buffer cache and passed its
+  initial cold/warm integrity checks. Five cold misses stored successfully and
+  the warm run hit all five entries. Warm mesh-job time changed from 1858.55 to
+  1047.91 ms for Pallet, 1515.06 to 996.58 ms for Route 1, 2343.61 to 328.43 ms
+  for Route 21, 7047.37 to 2602.40 ms for Viridian, and 1310.76 to 856.78 ms for
+  Cinnabar. GPU upload of Viridian's 1,268,780 vertices remained expensive.
+- Hardware visual inspection then found that Pallet Town's tree trunks were
+  absent on the warm run. A cache hit bypassed the complete Dramaless geometry
+  pass; that pass has side effects beyond returning terrain/water buffers, so
+  replaying only those buffers is not semantically complete for Kanto First
+  Person scenery.
+- Reverted milestone `8f2bf13` in `e80b609`. Do not restore this whole-pass
+  cache unless every side output/object hook is identified and either replayed
+  or separated from the terrain builder. The known-complete indexed mesher and
+  standard neighbor policy remain the playable baseline.
+- Repacked the reverted source, explicitly restored `lib/VRXR.lua` and
+  `lib/VRGL.lua`, validated the built APK contained neither `MeshCache.lua` nor
+  generated ROM data, and installed it as an update without clearing app data.
+  ARM64 `questVrNoRecordDebug` build passed; installed APK SHA-256:
+  `24983D47562BE203480C7C8F3D0899C53E6E7C0CC1D10EC8F2FF348E43587A0E`.
+- The automated restart used for the warm test also reproduced the existing
+  immersive loading-screen/input race: OpenXR rendered zero game draws while
+  controller profiles repeatedly disconnected/reconnected. Restarting while a
+  controller was actively tracked restored the launcher. This was independent
+  of the missing-trunk cache regression.
