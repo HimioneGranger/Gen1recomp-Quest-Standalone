@@ -180,3 +180,25 @@ caps, reduced off-screen AI/pathfinding frequency, animation throttling, object
 pooling, and Performance/Balanced/Full presets using the Quest PERF10 route.
 Keep this work in a separate fork/branch and do not bundle it into the core APK
 until independently profiled and validated.
+
+## 2026-08-10 combined-candidate headset route
+
+The user recorded a 371-second run covering launcher/startup, Pallet/Route 1,
+Viridian, interiors, battle UI, forest scenery, settings, and additional extreme
+voxel viewing angles. Sampled frames show no missing, scrambled, or corrupt
+terrain, providing the first visual headset validation of the indexed Dramaless
+geometry candidate across multiple scene types and a map transition.
+
+Only the final two PERF10 windows remained in logcat:
+
+- 18.28 ms average, 16.77 ms p50, 26.48 ms p95, 41.64 ms p99, 55.86 ms worst;
+  352 draws, 257.1 MB textures.
+- 19.10 ms average, 17.17 ms p50, 25.59 ms p95, 42.54 ms p99, 57.05 ms worst;
+  372 draws, 257.1 MB textures.
+
+Every sampled frame missed the 13.89 ms 72 Hz budget. This is approximately
+52-55 application frames per second by average interval, with long-tail spikes
+above 40 ms. Indexed terrain is therefore visually safe in this run but is not
+sufficient on its own. The next performance pass should target draw-call-heavy
+Kanto First Person flora/horizon groups while retaining connected-map scenery,
+and should persist the complete PERF10 stream before the next route.

@@ -902,3 +902,11 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   of Wilds of Kanto (`YoDrehDenSwagAuf/overworld-spawn-mod`). Preserve its MIT
   notice and audit/exclude separately licensed third-party sprites and assets.
   Keep it isolated from the current Dramaless/Pokedex performance pass.
+- Combined indexed-terrain/Pokedex candidate headset validation used a
+  371-second Pallet-to-Viridian route plus interiors, battle, forest scenery,
+  settings, and extra voxel viewing angles. Sampled video frames showed no
+  indexed-mesh corruption or missing terrain. The final retained PERF10 windows
+  averaged 18.28 ms and 19.10 ms with 352-372 draws and 257.1 MB of textures;
+  all sampled frames remained outside the 13.89 ms 72 Hz budget. Indexed terrain
+  is retained, but Kanto First Person draw/feature cost needs the next isolated
+  optimization pass. Preserve the full PERF10 stream before the next route.
