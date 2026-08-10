@@ -240,9 +240,14 @@ local function dexScreen()
   local ok, out = pcall(function()
     local ww, wh = love.graphics.getPixelDimensions()
     if not (ww and ww > 0 and wh and wh > 0) then return nil end
-    if not (dexCanvas and dexCanvas:getWidth() == ww
-            and dexCanvas:getHeight() == wh) then
-      dexCanvas = love.graphics.newCanvas(ww, wh)
+    local BattleScene = V.require("BattleScene")
+    local lx, ly, s = BattleScene.letterbox()
+    local frameW = math.max(1, math.ceil(BattleScene.GB_W * s))
+    local frameH = math.max(1, math.ceil(BattleScene.GB_H * s))
+    local outW, outH = BattleScene.GB_W * 2, BattleScene.GB_H * 2
+    if not (dexCanvas and dexCanvas:getWidth() == outW
+            and dexCanvas:getHeight() == outH) then
+      dexCanvas = love.graphics.newCanvas(outW, outH, { dpiscale = 1 })
       pcall(dexCanvas.setFilter, dexCanvas, "nearest", "nearest")
     end
     local fbo = fboCache[dexCanvas]
@@ -250,13 +255,13 @@ local function dexScreen()
       fbo = VRGL.canvasFBO(dexCanvas)
       fboCache[dexCanvas] = fbo
     end
-    if not (fbo and VRGL.copyFrontToCanvas(fbo, ww, wh)) then return nil end
-    local BattleScene = V.require("BattleScene")
-    local lx, ly, s = BattleScene.letterbox()
-    return { dexCanvas,
-             lx / ww, ly / wh,
-             (lx + BattleScene.GB_W * s) / ww,
-             (ly + BattleScene.GB_H * s) / wh }
+    local sx = math.max(0, math.floor(lx))
+    local sy = math.max(0, math.floor(wh - ly - frameH))
+    if not (fbo and VRGL.copyFrontRegionToCanvas(
+        fbo, sx, sy, frameW, frameH, outW, outH)) then return nil end
+    -- Android's mirror capture has a narrow unused strip at the left edge.
+    -- Crop only that padding; do not offset the model or either eye camera.
+    return { dexCanvas, 0.055, 0, 1, 1 }
   end)
   return ok and out or nil
 end

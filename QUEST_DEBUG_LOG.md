@@ -820,3 +820,9 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   testing. Its most expensive effects (forest canopy, weather, particles,
   extended terrain, and fast chunk building) require Quest-specific performance
   profiling after basic three-mod startup and VR handoff are verified.
+- First Dramaless 1.6.4 headset run successfully entered gameplay VR in
+  Viridian, confirming the Android OpenXR handoff. Its stock Pokedex capture
+  sampled the full wide Android mirror, shifting the GB image left and leaving
+  a dark strip on the right. Restored the verified Quest region-copy path and
+  narrow left-padding UV crop in the 1.6.4-based conductor; physical placement
+  and stereo eye cameras remain unchanged.
