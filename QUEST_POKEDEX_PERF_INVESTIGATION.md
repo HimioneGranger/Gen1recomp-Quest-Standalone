@@ -86,6 +86,51 @@ The safest optimization order is therefore:
 5. Preserve the last playable APK and make every visual/performance experiment
    independently revertible.
 
+### Indexed Dramaless candidate
+
+Static inspection confirmed that Dramaless 1.6.4 did **not** inherit the
+indexed terrain sink previously validated in Dramatic Shape. Its Android FFI
+path still emits six complete vertices per quad. The earlier full-view Quest
+trial demonstrated that four vertices plus six indices reduced Route 2 terrain
+vertices from 3,820,770 to 2,547,180 and Viridian Forest from 3,750,006 to
+2,500,004, while preserving the visible connected maps. Directional extended-
+run memory fell by roughly 200MB, although the traversed cache sets differed.
+
+Branch `quest-perf-indexed-dramaless` contains a fresh, source-guarded adapter
+for the Dramaless 1.6.4 FFI sink. It:
+
+- Leaves the table/headless geometry path unchanged.
+- Stores four unique vertices and the normal 0,1,2,0,2,3 uint32 indices.
+- Retains sliced vertex uploads and their cooperative budget checks.
+- Refuses changed/ambiguous source and preserves any foreign implementation
+  that already uses `setVertexMap`.
+- Changes neither visibility nor render resolution.
+
+The adapter was tested against the exact local Dramaless 1.6.4 source: every
+anchor matched exactly once and the transformed Lua parsed successfully. This
+candidate is intentionally not considered headset-validated until it rebuilds
+the active maps without corruption and PERF10/memory logs are collected on the
+same route.
+
+Kanto First Person static complexity supports profiling it separately rather
+than guessing: `payload_flora.lua` alone is about 4,681 lines with 36 explicit
+draw sites, 17 mesh-construction sites and 260 loops; ceiling, sky and backdrop
+are much smaller. Forest canopy was already disabled by the user. Flora's
+world-apron, tall-tree/mountain, grass and particle groups remain the best
+feature-level ablation targets after indexed terrain, but none is force-disabled
+by this branch.
+
+Compile-only artifact (not installed automatically):
+
+`E:/Gen1QuestVR/dist/Gen1Recomp-Quest-PokedexPostDraw-IndexedDramaless-candidate.apk`
+
+SHA-256: `54C6AAFABDE2DCB61DBBDBBB107B0E799675F41568429B9D6719A7A3CEAD67D5`
+
+The Quest was left on the earlier `86e2c2d` post-draw-Pokedex-only APK while
+unattended. The indexed candidate was deliberately preserved but not installed,
+because first launch rewrites the writable Dramaless mesher shadow and requires
+an awake-controller/headset test to verify map rebuilds.
+
 Headset validation remains required for visual decisions. The computer can
 compile, inspect sources, compare logs, and reject structural errors unattended,
 but it cannot infer perceived stereo alignment or readability from desktop

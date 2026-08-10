@@ -59,9 +59,29 @@ do
       "mods/DRAMALESS_SHAPE/lib/VR.lua", questVR)
     local okVRGL = love.filesystem.write(
       "mods/DRAMALESS_SHAPE/lib/VRGL.lua", questVRGL)
+    -- Dramaless 1.6.4 still uploads six complete vertices per terrain quad.
+    -- Apply the isolated, source-guarded Quest index adapter to the installed
+    -- writable shadow. Kanto First Person can continue patching that normal
+    -- Dramaless module afterward; no renderer module is replaced wholesale.
+    local okIndexed, indexedNote = false, "mesher unavailable"
+    local okPatch, IndexMesherPatch = pcall(
+      require, "src.quest.dramaless.IndexMesherPatch")
+    local mesherPath = "mods/DRAMALESS_SHAPE/lib/ChunkMesher.lua"
+    local mesher = love.filesystem.read(mesherPath)
+    if okPatch and IndexMesherPatch and mesher then
+      local indexed, note = IndexMesherPatch.apply(mesher)
+      indexedNote = note or "unknown"
+      if indexed then
+        okIndexed = indexed == mesher
+          or love.filesystem.write(mesherPath, indexed)
+      end
+    end
     pcall(C.questxr_log, okXR and okVR and okVRGL and
       "Dramaless Shape Quest OpenXR transport installed" or
       "Dramaless Shape Quest transport install failed")
+    pcall(C.questxr_log, okIndexed
+      and ("Dramaless " .. indexedNote .. " mesher ready")
+      or ("Dramaless indexed mesher skipped: " .. tostring(indexedNote)))
   end
 end
 
