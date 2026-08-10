@@ -372,17 +372,14 @@ local function renderWorld(views, ctl)
     scale = VRRig.dioramaScale(vh, Voxel.FOCAL) / zoom
   end
 
-  -- The pokedex, on the tracked left hand, under this very mapping --
-  -- but only where it earns its keep: FIRST PERSON, where its screen is
-  -- every menu, dialog and wipe the flat screen shows (and the floating
-  -- billboard is retired outright -- see updateQuad), and the BATTLE
-  -- seat, where its screen is the fight's own 2D scene. The diorama
-  -- does without: a hand-sized device hovering over a tabletop town is
-  -- clutter, and the panel serves there. No hand tracked, no device.
+  -- Keep the physical Pokedex in the tracked hand during first-person and
+  -- battle exploration, but leave its screen dark until the game has UI the
+  -- 3D world cannot show: menu, dialog/text, battle UI, or transition.
   local hand = ctl and ctl.handl or nil
+  local showing = uiShowing()
   if hand and (battle or fp) then
     Pokedex.place(hand, pivot, anchor, scale, mountYaw)
-    if uiShowing() then
+    if showing then
       local scr = dexScreen()
       if scr then
         Pokedex.screen(scr[1], scr[2], scr[3], scr[4], scr[5])

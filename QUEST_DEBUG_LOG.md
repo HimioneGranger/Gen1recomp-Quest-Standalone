@@ -864,6 +864,13 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   state-specific: only a top-of-stack `TextBox` trims 4% per side; Load Report
   remains untouched; 304x144 battle capture is aspect-fitted into the 320x288
   device texture with dark top/bottom padding rather than stretched or cropped.
+- Product decision: the Pokedex screen is contextual UI rather than a permanent
+  exploration prop. The clean-eye mirror experiments (`ea5b8a7`, `69d12e9`)
+  were reverted after showing inversion, missing 2D UI, and extra GPU/memory
+  cost. The physical device remains in the tracked hand, but its screen lights
+  only while `uiShowing()` is true (menus, dialog/text, battle UI, and
+  transitions). Ordinary exploration draws the dark-screen prop and performs
+  no handheld capture.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 
