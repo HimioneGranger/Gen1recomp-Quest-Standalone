@@ -858,6 +858,12 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `updateQuad` now uses `Renderer:uiSize()` and `Renderer:uiScale()` instead of
   Dramaless's fixed `BattleScene.letterbox()`: this follows stepped-down classic
   UI scale and the 304x144 wide-battle surface without arbitrary zoom.
+- Full-device screenshots verified Load Report as correctly framed, dialog as
+  correct except for narrow symmetric side columns, and wide battle as readable
+  but horizontally forced against the device edges. Pokedex presentation is now
+  state-specific: only a top-of-stack `TextBox` trims 4% per side; Load Report
+  remains untouched; 304x144 battle capture is aspect-fitted into the 320x288
+  device texture with dark top/bottom padding rather than stretched or cropped.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 
