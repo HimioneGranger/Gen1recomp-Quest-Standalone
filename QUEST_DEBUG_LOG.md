@@ -1037,36 +1037,3 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   one-time rollback that restores Dramaless's standard neighbor request loop.
   Next design target is an independently implemented persistent indexed-mesh
   cache, so construction cost is paid once rather than rescheduled.
-
-## 2026-08-10 - Persistent indexed terrain cache candidate
-
-- Added a Quest-only cache module integrated through the existing exact-source
-  Dramaless mesher adapter. It stores terrain and separated-water indexed
-  vertex/index buffers under the LÖVE save root; ROM data, saves, mod archives,
-  textures, grass, flowers, and figure meshes are not stored.
-- Cache format `QMC1` records four explicit counts followed by GPU-neutral
-  float vertex and uint32 index bytes. Reads validate magic, total length,
-  count relationships, and upload success. Unknown, corrupt, or incompatible
-  files are misses and fall back to the existing asynchronous builder.
-- Keys include a cache/code version, map id, body/full slot, dimensions,
-  border block, tileset id, every current map block, and full-mesh connection
-  masks. Cut trees, scripted block replacement, and door stamps therefore use
-  a different entry; future geometry changes require a cache-version bump.
-- Both cache upload and first-build writes operate in bounded chunks with the
-  existing coroutine budget checks. `MESHCACHE` miss/store/hit/reject events
-  provide cold-versus-warm hardware evidence.
-- ARM64 Quest validation passed. Cold load produced five clean misses and stores;
-  warm reload produced five hits with no rejected/corrupt entries and no visual
-  regression reported. Active mesh-job time changed as follows:
-  `PALLET_TOWN` 1858.55 -> 1047.91 ms, `ROUTE_1` 1515.06 -> 996.58 ms,
-  `ROUTE_21` 2343.61 -> 328.43 ms, `VIRIDIAN_CITY` 7047.37 -> 2602.40 ms,
-  and `CINNABAR_ISLAND` 1310.76 -> 856.78 ms.
-- The cache removes geometry reconstruction but cached buffers must still be
-  uploaded to GPU meshes. Viridian's 1,268,780 vertices therefore remain a
-  2.60-second warm-load cost. Retain this candidate; investigate reducing GPU
-  upload/mesh size independently rather than restoring distance pop-in.
-- The first automated warm restart again remained on the immersive loading
-  screen with zero game draws while controller interaction profiles repeatedly
-  disconnected/reconnected. Restarting while a controller was actively tracked
-  restored the launcher. This reproduces the pre-existing OpenXR startup/input
-  race and is not a mesh-cache crash.
