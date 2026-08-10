@@ -826,3 +826,6 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   a dark strip on the right. Restored the verified Quest region-copy path and
   narrow left-padding UV crop in the 1.6.4-based conductor; physical placement
   and stereo eye cameras remain unchanged.
+- Headset follow-up found the corrected screen slightly oversized at its left
+  edge. Reduced the UV crop from 5.5% to 3.5%; this retains the Android padding
+  correction while restoring more of the source image and reducing its scale.

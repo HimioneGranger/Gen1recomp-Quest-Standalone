@@ -261,7 +261,7 @@ local function dexScreen()
         fbo, sx, sy, frameW, frameH, outW, outH)) then return nil end
     -- Android's mirror capture has a narrow unused strip at the left edge.
     -- Crop only that padding; do not offset the model or either eye camera.
-    return { dexCanvas, 0.055, 0, 1, 1 }
+    return { dexCanvas, 0.035, 0, 1, 1 }
   end)
   return ok and out or nil
 end
