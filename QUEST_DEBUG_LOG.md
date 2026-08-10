@@ -850,6 +850,12 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   fallback and added change-only logs for framebuffer size, active UI size,
   final UI scale/fill state, and the exact GL source rectangle. Capture errors
   are now surfaced to QuestXR logcat rather than swallowed by `pcall`.
+- Live diagnostics identified the framebuffer as `4128x2208`: two
+  `2064x2208` eye views side by side. The previous UI-centred crop crossed the
+  stereo seam, explaining the black strip and eye-offset image. Pokedex capture
+  now selects only the left eye and centre-crops it to the device's 10:9 screen
+  (`2064x1857` before downsampling to `320x288`), removing the separator without
+  stretching the rendered view.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 
