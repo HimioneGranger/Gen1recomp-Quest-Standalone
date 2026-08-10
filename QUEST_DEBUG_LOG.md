@@ -898,3 +898,7 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   FAST CHUNKS, particles/weather, extended terrain and mountain/tree geometry,
   clouds/sky, and forest canopy/vines/shafts. Preserve interiors, horizon art,
   and first-person presentation unless measurements specifically implicate them.
+- Deferred follow-up: assess an attributed MIT-licensed Quest performance fork
+  of Wilds of Kanto (`YoDrehDenSwagAuf/overworld-spawn-mod`). Preserve its MIT
+  notice and audit/exclude separately licensed third-party sprites and assets.
+  Keep it isolated from the current Dramaless/Pokedex performance pass.

@@ -164,3 +164,19 @@ Headset validation remains required for visual decisions. The computer can
 compile, inspect sources, compare logs, and reject structural errors unattended,
 but it cannot infer perceived stereo alignment or readability from desktop
 mirror output alone.
+
+## Deferred: Wilds of Kanto Quest performance fork
+
+The current `YoDrehDenSwagAuf/overworld-spawn-mod` repository is MIT-licensed
+for its original source and original project assets, so a clearly attributed
+Quest optimization fork is permitted while retaining the copyright and license
+notice. Its third-party sprite and game-adjacent assets are explicitly outside
+that MIT grant and must remain governed by their own notices; questionable
+assets should be excluded from a distributable fork or imported separately.
+
+This is deliberately deferred until the current Dramaless terrain candidate and
+Pokedex presentation are stable. When resumed, investigate distance-based spawn
+caps, reduced off-screen AI/pathfinding frequency, animation throttling, object
+pooling, and Performance/Balanced/Full presets using the Quest PERF10 route.
+Keep this work in a separate fork/branch and do not bundle it into the core APK
+until independently profiled and validated.
