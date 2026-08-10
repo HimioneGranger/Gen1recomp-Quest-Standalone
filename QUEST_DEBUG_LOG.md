@@ -935,9 +935,9 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   samples while keeping replay safely bounded. No broad storage permission was
   added.
 - Completed the first fully persistent controlled baseline. The 133.978-second
-  video actually covers Viridian, a battle, the northward gate/loading seam,
-  entry into Viridian Forest, and multiple canopy angles (not the originally
-  planned Pallet-to-Viridian label). Settled forest windows averaged
+  video covers Pallet Town, Route 1, a battle, Viridian, the northward
+  gate/loading seam, entry into Viridian Forest, and multiple canopy angles.
+  Settled forest windows averaged
   24.42-28.04 ms with 340-392 draws and 273.0 MB textures; battle/load windows
   averaged 35.28-78.98 ms and contained worst frames up to 903.37 ms. The next
   isolated comparison disables only optional forest canopy/vines/sun-shaft/

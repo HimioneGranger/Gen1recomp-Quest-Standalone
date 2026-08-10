@@ -205,16 +205,15 @@ and should persist the complete PERF10 stream before the next route.
 
 ## Controlled baseline with persistent capture
 
-The first fully recoverable baseline video is 133.978 seconds. Although planned
-as Pallet-to-Viridian, the captured route actually begins in Viridian, includes
-a wild battle, walks north, crosses the gate/loading seam, enters Viridian
-Forest, and finishes with repeated views into the canopy. This route is retained
-as the comparison baseline rather than relabelled.
+The first fully recoverable baseline video is 133.978 seconds. The captured
+route begins in Pallet Town as instructed, crosses Route 1, includes a wild
+battle, passes through Viridian, crosses the north gate/loading seam, enters
+Viridian Forest, and finishes with repeated views into the canopy.
 
 Video start aligns with approximately session window 16. The expensive windows
 were:
 
-- Battle/load activity: windows 17-22 averaged 35.28-78.98 ms, with individual
+- Route/battle/load activity: windows 17-22 averaged 35.28-78.98 ms, with individual
   worst frames from 70.39 to 903.37 ms.
 - The forest transition window retained a 751.95 ms worst frame while its
   median recovered to 16.64 ms.
