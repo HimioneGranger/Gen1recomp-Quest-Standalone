@@ -576,30 +576,22 @@ static void *questxr_native_bootstrap(void *unused) {
             xrGetActionStateVector2f(session, &state_info, &left_stick);
             state_info.action = right_stick_action;
             xrGetActionStateVector2f(session, &state_info, &right_stick);
-            /* Lock navigation to the first stick moved until that same stick
-             * returns to centre.  Without this, two Touch controllers can
-             * alternately win the magnitude comparison and turn one gesture
-             * into a rapid left/right focus oscillation. */
-            static int active_stick = 0;
+            /* The left stick owns launcher and emulated d-pad movement.  The
+             * right stick is reserved for VR camera controls; allowing either
+             * stick to win here made small right-stick motion intermittently
+             * steal movement during gameplay. */
             static bool stick_emitted = false;
             float left_x = left_stick.currentState.x;
             float left_y = left_stick.currentState.y;
-            float right_x = right_stick.currentState.x;
-            float right_y = right_stick.currentState.y;
             float left_magnitude2 = left_x * left_x + left_y * left_y;
-            float right_magnitude2 = right_x * right_x + right_y * right_y;
-            if (active_stick == 0) {
-                if (left_magnitude2 > 0.1225f || right_magnitude2 > 0.1225f)
-                    active_stick = left_magnitude2 >= right_magnitude2 ? 1 : 2;
-            }
-            float x = active_stick == 2 ? right_x : left_x;
-            float y = active_stick == 2 ? right_y : left_y;
+            float x = left_x;
+            float y = left_y;
             int new_direction = 0;
             uint32_t held_direction = 0;
             // Quest's launcher should respond before the stick reaches its
             // outer gate. Gameplay can use analogue values; menu navigation
             // needs only an intentional deflection and one event per flick.
-            if (active_stick != 0 && !stick_emitted) {
+            if (left_magnitude2 > 0.1225f && !stick_emitted) {
                 /* Resolve diagonals by their dominant axis. */
                 if (fabsf(x) >= fabsf(y)) {
                     if (x > 0.35f) new_direction = QUESTXR_INPUT_RIGHT;
@@ -609,7 +601,7 @@ static void *questxr_native_bootstrap(void *unused) {
                     else if (y < -0.35f) new_direction = QUESTXR_INPUT_DOWN;
                 }
             }
-            if (active_stick != 0) {
+            if (left_magnitude2 > 0.1225f) {
                 if (fabsf(x) >= fabsf(y)) {
                     if (x > 0.35f) held_direction = QUESTXR_INPUT_RIGHT;
                     else if (x < -0.35f) held_direction = QUESTXR_INPUT_LEFT;
@@ -621,18 +613,12 @@ static void *questxr_native_bootstrap(void *unused) {
             questxr_set_held(held_direction);
             if (new_direction) {
                 input_events |= (uint32_t) new_direction;
-                XR_LOG("Quest stick=%s x=%.3f y=%.3f direction=0x%x",
-                       active_stick == 2 ? "right" : "left", x, y,
-                       new_direction);
+                XR_LOG("Quest stick=left x=%.3f y=%.3f direction=0x%x",
+                       x, y, new_direction);
                 /* A held stick emits exactly once. */
                 stick_emitted = true;
-            } else if (active_stick != 0) {
-                float held_magnitude2 = active_stick == 2
-                    ? right_magnitude2 : left_magnitude2;
-                if (held_magnitude2 < 0.04f) {
-                    active_stick = 0;
-                    stick_emitted = false;
-                }
+            } else if (left_magnitude2 < 0.04f) {
+                stick_emitted = false;
             }
             XrActionStateBoolean button = { XR_TYPE_ACTION_STATE_BOOLEAN };
             state_info.action = select_action;

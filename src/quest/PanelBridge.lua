@@ -46,7 +46,10 @@ do
   -- quality policy, assets, and settings; do not overwrite those with files
   -- from the older Dramatic Shape integration.
   local replacement = love.filesystem.read("lib/VRXR.lua")
-  local questVR = love.filesystem.read("lib/VR.lua")
+  -- Use the conductor from the Dramaless 1.6.4 base. The older Quest
+  -- conductor references later modules (including Diorama.lua) that do not
+  -- exist in 1.6.4 and therefore cannot be mixed into this installation.
+  local questVR = love.filesystem.read("src/quest/dramaless/VR.lua")
   local questVRGL = love.filesystem.read("lib/VRGL.lua")
   if C and replacement and questVR and questVRGL
       and replacement:find("questxr_request_launcher_shutdown", 1, true) then

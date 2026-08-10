@@ -790,3 +790,17 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `DRAMALESS_SHAPE/` directory. Replaced it with the publisher's official
   `DRAMALESS_SHAPE_1-6-4-hotfix.zip`, whose `manifest.json` is at archive root
   (SHA-256 `8B073FE0A97DB8EEB10CFA0A3B9F7D52767217780BD251F885326745C838CFB9`).
+- The official archive subsequently installed and reached both Yellow's menus
+  and overworld, but controls degraded during play. Input traces showed the
+  original native arbitration releasing one stick and then allowing the other
+  to become the emulated d-pad owner. Small right-stick movements could
+  therefore steal movement from the left controller. Launcher and gameplay
+  d-pad input are now left-stick-only; the right stick remains available to
+  Dramaless for VR camera/look controls.
+- The repeated `lib/Diorama.lua is missing` error was not a damaged official
+  archive. Startup was overwriting Dramaless 1.6.4's `VR.lua` with the previous
+  1.8.2-era Quest conductor, which requires later Diorama/Horde modules absent
+  from 1.6.4. The Quest override is now based directly on Dramaless 1.6.4's
+  conductor, with only Android support and immersive-launch defaults added;
+  the Android `VRXR.lua` and `VRGL.lua` transports remain separate overrides.
+  The Dramaless license is retained beside the adapted source.
