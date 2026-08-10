@@ -15,6 +15,7 @@ local Patch = {}
 Patch.MARKER = "quest indexed FFI sink"
 Patch.TRACE_MARKER = "quest transition mesh trace"
 Patch.PACING_MARKER = "quest paced neighbour meshing"
+Patch.REJECTED_CACHE_MARKER = "quest persistent indexed mesh cache"
 
 local function replaceOnce(source, before, after, label)
   local first, last = source:find(before, 1, true)
@@ -31,6 +32,61 @@ function Patch.apply(source)
   local alreadyIndexed = source:find(Patch.MARKER, 1, true) ~= nil
   local alreadyTraced = source:find(Patch.TRACE_MARKER, 1, true) ~= nil
   local alreadyPaced = source:find(Patch.PACING_MARKER, 1, true) ~= nil
+  local rejectedCache = source:find(Patch.REJECTED_CACHE_MARKER, 1, true) ~= nil
+  local cacheRemoved = false
+  if rejectedCache then
+    local restored, restoreErr = replaceOnce(source, [=[
+      return ok and mesh or nil
+    end,
+    payload = function()
+      return { vertices = buf, n = n, indices = indexBuf, ni = ni }
+    end,
+  }
+]=], [=[
+      return ok and mesh or nil
+    end,
+  }
+]=], "rejected persistent cache payload")
+    if not restored then return nil, restoreErr end
+    source = restored
+
+    restored, restoreErr = replaceOnce(source, [=[
+local jobs = {}       -- FIFO of pending jobs
+local jobIndex = {}   -- "id:slot" -> job
+
+-- quest persistent indexed mesh cache: raw GPU-neutral buffers only.
+local QuestMeshCache = require("src.quest.dramaless.MeshCache")
+]=], [=[
+local jobs = {}       -- FIFO of pending jobs
+local jobIndex = {}   -- "id:slot" -> job
+]=], "rejected persistent cache declaration")
+    if not restored then return nil, restoreErr end
+    source = restored
+
+    restored, restoreErr = replaceOnce(source, [=[
+  local hit, mesh, water = QuestMeshCache.load(
+    map, job.slot, job.masks, Voxel3D.FORMAT, Budget.check)
+  if not hit then
+    local sink = newSink()
+    local waterSink = newSink()
+    runGeometry(map, job.slot == "body", job.masks, sink, waterSink)
+    mesh = sink.finish()
+    water = waterSink.finish()
+    if sink.payload and waterSink.payload then
+      QuestMeshCache.save(map, job.slot, job.masks,
+        sink.payload(), waterSink.payload(), Budget.check)
+    end
+  end
+]=], [=[
+  local sink = newSink()
+  local waterSink = newSink()
+  runGeometry(map, job.slot == "body", job.masks, sink, waterSink)
+  local mesh = sink.finish()
+  local water = waterSink.finish()
+]=], "rejected persistent cache build")
+    if not restored then return nil, restoreErr end
+    source, cacheRemoved = restored, true
+  end
   if alreadyPaced then
     local restored, restoreErr = replaceOnce(source, [=[
 -- quest paced neighbour meshing: preserve every requested map, but keep
@@ -50,7 +106,8 @@ local COVERED_SLICE = 0.030
     source, alreadyPaced = restored, false
   end
   if alreadyIndexed and alreadyTraced then
-    return source, "indexed and traced"
+    return source, cacheRemoved and "indexed and traced; rejected persistent cache removed"
+      or "indexed and traced"
   end
   if source:find("setVertexMap", 1, true) and not alreadyIndexed then
     return source, "foreign indexed sink preserved"

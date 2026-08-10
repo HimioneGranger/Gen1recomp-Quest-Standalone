@@ -1065,3 +1065,22 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   controller profiles repeatedly disconnected/reconnected. Restarting while a
   controller was actively tracked restored the launcher. This was independent
   of the missing-trunk cache regression.
+
+### Cache rollback migration correction
+
+- The first reverted APK removed the cache adapter from `game.love`, but the
+  installed Dramaless mesher had already been rewritten in writable mod state.
+  Its indexed/traced marker caused the older adapter to accept that stale mixed
+  source, leaving the cache-bypassing geometry path active and disrupting the
+  Dramaless/VR gameplay pipeline.
+- Added an exact, one-time source migration to `IndexMesherPatch.lua`. When the
+  rejected cache marker is present it removes the payload exposure, cache
+  import, and cache-first job block before accepting the indexed/traced mesher.
+  Device startup confirmed: `Dramaless indexed and traced; rejected persistent
+  cache removed mesher ready` and the Quest OpenXR transport remained installed.
+- Corrected ARM64 APK SHA-256:
+  `7CD12423D2339750F4704A88BBBB45D552B53B849220AA69A274344DF342DAC4`.
+  Hardware validation passed: gameplay entered VR voxel mode, Pallet tree trunks
+  returned, Quest controls worked, and Cinnabar loaded. Route 1 was briefly
+  choppy when its standard uncached neighboring meshes rebuilt; returning to
+  Pallet recovered. This is the retained completeness-first baseline.
