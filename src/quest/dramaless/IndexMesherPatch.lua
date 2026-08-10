@@ -14,6 +14,7 @@ local Patch = {}
 
 Patch.MARKER = "quest indexed FFI sink"
 Patch.TRACE_MARKER = "quest transition mesh trace"
+Patch.PACING_MARKER = "quest paced neighbour meshing"
 
 local function replaceOnce(source, before, after, label)
   local first, last = source:find(before, 1, true)
@@ -29,8 +30,27 @@ function Patch.apply(source)
   source = source:gsub("\r\n", "\n")
   local alreadyIndexed = source:find(Patch.MARKER, 1, true) ~= nil
   local alreadyTraced = source:find(Patch.TRACE_MARKER, 1, true) ~= nil
+  local alreadyPaced = source:find(Patch.PACING_MARKER, 1, true) ~= nil
+  if alreadyPaced then
+    local restored, restoreErr = replaceOnce(source, [=[
+-- quest paced neighbour meshing: preserve every requested map, but keep
+-- cooperative mesh construction inside a VR-safe share of each frame.
+-- Optional neighbours are deliberately slow; the visible current map wins.
+local URGENT_SLICE = 0.006
+local IDLE_SLICE = 0.001
+local COVERED_SLICE = 0.010
+]=], [=[
+-- quest rejected pacing restored: smaller nominal slices did not improve the
+-- measured transition because individual meshing operations yield coarsely.
+local URGENT_SLICE = 0.012
+local IDLE_SLICE = 0.005
+local COVERED_SLICE = 0.030
+]=], "rejected Quest mesh pacing")
+    if not restored then return nil, restoreErr end
+    source, alreadyPaced = restored, false
+  end
   if alreadyIndexed and alreadyTraced then
-    return source, "already indexed and traced"
+    return source, "indexed and traced"
   end
   if source:find("setVertexMap", 1, true) and not alreadyIndexed then
     return source, "foreign indexed sink preserved"
@@ -208,7 +228,6 @@ local function finishJob(job, ok, err)
     if not source then return nil, err end
   end
 
-  if alreadyIndexed then return source, "indexed and traced" end
   return source, "indexed and traced"
 end
 

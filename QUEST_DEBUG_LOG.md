@@ -945,3 +945,43 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   performance feels acceptable. Cancel the forest-effects ablation and retain
   those visuals. Transition-time mesh queue/build/upload/cache instrumentation
   is the next active target.
+## 2026-08-10 - Transition mesh trace and Quest pacing candidate
+
+- Added source-guarded `MESHJOB` queue/start/finish diagnostics to the
+  Dramaless `ChunkMesher` adapter. The first Pallet load proved that the
+  current map was followed immediately by costly speculative neighbours:
+  `PALLET_TOWN full` 1581 ms, `ROUTE_21 body` 1833 ms, `ROUTE_1 body`
+  993 ms, `CINNABAR_ISLAND body` 2582 ms, and `VIRIDIAN_CITY body` 3218 ms.
+- A controlled Pallet -> Red's House -> Pallet -> Route 1 run isolated the
+  transition. `REDS_HOUSE_1F full` needed only 113 ms. `ROUTE_1 full` needed
+  2140 ms, then optional `PALLET_TOWN body`, `ROUTE_22 body`, and
+  `ROUTE_2 body` consumed another 8940 ms. During that optional burst the
+  ten-second performance window averaged 134.50 ms/frame, with an 839.80 ms
+  worst frame. This identifies eager neighbour mesh construction as a major
+  transition hitch; it does not implicate current Dramaless forest visuals.
+- Added a Quest-only pacing candidate without removing maps, shortening draw
+  distance, or changing mesh results: urgent/current-map slice 12 -> 6 ms,
+  optional-neighbour slice 5 -> 1 ms, and fade/covered slice 30 -> 10 ms.
+  The exact-source guard refuses unknown Dramaless layouts.
+- Reproduced the recurring Meta loading-screen failure after controllers were
+  reactivated. Logs showed `RequiresControllersLaunchInterceptor` followed by
+  overlapping immersive/single-instance tasks. A normal force-stop relaunch
+  reused the bad task, while a cold clear-task component launch recovered the
+  launcher without clearing application data. This is a recovery procedure,
+  not yet a permanent lifecycle fix.
+
+### Pacing candidate rejected
+
+- Physical validation reported no perceptible transition improvement. The
+  attempted comparison reused already-cached Pallet/Route meshes, so it could
+  not establish a favorable timing result; the nominally smaller budgets also
+  left the initial job resume counts effectively unchanged, consistent with
+  coarse yield points inside mesh construction.
+- The same run regressed the Pokédex feed to a black box and unexpectedly began
+  at 2x game speed. No Lua, shader, canvas, or OpenGL error was logged. Repeated
+  `start=true` gameplay input events were recorded and are a possible cause of
+  the setting change, but causation is not established.
+- Rejected the pacing constants and added a one-time source-guarded migration
+  that restores the installed mesher to the prior 12/5/30 ms values. Preserve
+  the indexed-mesh optimization and diagnostics while investigating a design
+  that defers or cancels irrelevant neighbour jobs at the queue-policy level.
