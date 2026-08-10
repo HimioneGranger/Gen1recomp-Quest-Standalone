@@ -694,17 +694,31 @@ local questPerf = {
 
 local QUEST_PERF_LOG = "quest_perf10.log"
 local QUEST_PERF_LOG_OLD = "quest_perf10.previous.log"
+local QUEST_PERF_MAX_BYTES = 256 * 1024
 
 local function persistQuestPerformance(line)
   if not love.filesystem then return end
   pcall(function()
     local info = love.filesystem.getInfo(QUEST_PERF_LOG)
-    if info and (info.size or 0) > 1024 * 1024 then
+    if info and (info.size or 0) > QUEST_PERF_MAX_BYTES then
       local old = love.filesystem.read(QUEST_PERF_LOG)
       if old then love.filesystem.write(QUEST_PERF_LOG_OLD, old) end
       love.filesystem.remove(QUEST_PERF_LOG)
     end
     love.filesystem.append(QUEST_PERF_LOG, line .. "\n")
+  end)
+end
+
+local function replayQuestPerformance(log)
+  if not love.filesystem then return end
+  pcall(function()
+    local history = love.filesystem.read(QUEST_PERF_LOG)
+    if not history or history == "" then return end
+    log(("PERF_HISTORY_BEGIN bytes=%d"):format(#history))
+    for line in history:gmatch("[^\r\n]+") do
+      log("PERF_HISTORY " .. line)
+    end
+    log("PERF_HISTORY_END")
   end)
 end
 
@@ -716,6 +730,7 @@ local function sampleQuestPerformance()
     questPerf.started, questPerf.last = now, now
     if not questPerf.sessionStarted then
       questPerf.sessionStarted = true
+      replayQuestPerformance(log)
       local stamp = "unknown"
       pcall(function() stamp = os.date("!%Y-%m-%dT%H:%M:%SZ") end)
       persistQuestPerformance(("SESSION start=%s uptime=%.3f")

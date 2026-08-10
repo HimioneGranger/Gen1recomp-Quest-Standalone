@@ -921,3 +921,16 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   and verified to contain the persistent logger. APK SHA-256:
   `E541D419A559A3EF25D4E429EEF22353EA9C0D88CE26CEB3B3BE5557E2F8290F`.
   Saves, imported ROM content, and separately installed mods were preserved.
+- First verification exposed two packaging/retrieval details before a new route
+  was accepted. The standard Android payload list does not include Quest's
+  external `lib/VRXR.lua` and `lib/VRGL.lua`; recreating `game.love` without
+  explicitly restoring them left the old installed Dramaless conductor active.
+  Both verified Quest-native transports were restored to the payload, after
+  which logcat confirmed `PERF10 persistent log: quest_perf10.log` from the new
+  conductor. The file is created under Android app-specific external storage,
+  where scoped-storage SELinux rules prevent direct ADB reads despite matching
+  UID ownership. On each new gameplay session the conductor now replays the
+  bounded saved history between `PERF_HISTORY_BEGIN/END` markers into QuestXR
+  logcat. Rotation was tightened to 256 KiB, retaining many hours of ten-second
+  samples while keeping replay safely bounded. No broad storage permission was
+  added.
