@@ -470,11 +470,23 @@ function love.draw()
       love.graphics.setCanvas(questLauncherCanvas)
       love.graphics.origin()
       love.graphics.clear(0, 0, 0, 1)
-      love.graphics.scale(panelW / windowW, panelH / windowH)
+      -- LÖVE keeps reporting the Android window size while a Canvas is bound.
+      -- Give the responsive immediate-mode launcher the Canvas dimensions for
+      -- this draw so layout, pixels, navigation rectangles, and native focus
+      -- normalization all use the same 1024x768 coordinate space.
+      local getDimensions = love.graphics.getDimensions
+      local getWidth = love.graphics.getWidth
+      local getHeight = love.graphics.getHeight
+      love.graphics.getDimensions = function() return panelW, panelH end
+      love.graphics.getWidth = function() return panelW end
+      love.graphics.getHeight = function() return panelH end
       Importer:draw()
       if love.graphics.flushBatch then love.graphics.flushBatch() end
       love.graphics.setScissor()
       QuestPanel.captureBound(panelW, panelH)
+      love.graphics.getDimensions = getDimensions
+      love.graphics.getWidth = getWidth
+      love.graphics.getHeight = getHeight
       love.graphics.setCanvas()
       love.graphics.origin()
       love.graphics.setColor(1, 1, 1, 1)

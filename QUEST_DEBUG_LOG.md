@@ -702,6 +702,22 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   upright, its green focus ring is aligned and movable, and all buttons are
   selectable. This is the verified launcher capture/input baseline.
 
+## 2026-08-10 - Dramatic Shape licensing preservation checkpoint
+
+- Local Git history shows an MIT `LICENSE` was added at Dramatic Shape commit
+  `e3c13ed` and deleted at `442e9d2`, the same commit that changed the manifest
+  from 1.6.1 to 1.6.2. Tag 1.8.2 therefore has no explicit license file.
+- To avoid publicly redistributing the legally uncertain post-1.6.1 source,
+  the `dramatic-shape-quest-openxr` branch was deleted from the public
+  `quest-standalone` remote. The Gen1Recomp `main` and `quest-openxr` branches
+  were not changed.
+- The complete local Dramatic Shape branch history through `901f739` remains
+  available in the working clone and in the verified offline bundle
+  `dist/DramaticShapeVoxelMod-quest-openxr-local-backup.bundle`. Experimental
+  local ZIPs remain private and must not be published unless licensing is
+  clarified. The branch can be restored from the bundle if written permission
+  is obtained.
+
 ## 2026-08-09 - Recurring immersive-loading stall during launcher testing
 
 - The owner-level launcher build again remained on Meta's immersive loading
