@@ -227,11 +227,9 @@ end
 
 -- ------- the pokedex's screen
 --
--- What the device in the hand shows: the completed previous left-eye view.
--- The Quest mirror framebuffer stores both 2064x2208 eyes side by side.  Do
--- not centre a UI crop across the full 4128-pixel buffer: that crosses the
--- stereo seam and puts its black separator on the device.  Instead, take the
--- left eye and centre-crop it to the device screen's 10:9 aspect ratio.
+-- What the device in the hand shows: the completed previous framebuffer,
+-- cropped to the engine's active UI rectangle. This keeps palette/composite
+-- effects that are not baked into Renderer.canvas itself.
 local dexCanvas = nil
 local lastDexMetrics = nil
 
@@ -239,18 +237,15 @@ local function dexScreen()
   local ok, out = pcall(function()
     local ww, wh = love.graphics.getPixelDimensions()
     if not (ww and ww > 0 and wh and wh > 0) then return nil end
-    local eyeW = math.floor(ww / 2)
-    local eyeH = wh
-    local outW, outH = 320, 288
-    local targetAspect = outW / outH
-    local frameW, frameH = eyeW, eyeH
-    if eyeW / eyeH > targetAspect then
-      frameW = math.floor(eyeH * targetAspect)
-    else
-      frameH = math.floor(eyeW / targetAspect)
-    end
-    local sx = math.floor((eyeW - frameW) / 2)
-    local sy = math.floor((eyeH - frameH) / 2)
+    local Renderer = require("src.render.Renderer")
+    local uiW, uiH = Renderer:uiSize()
+    local s = Renderer:uiScale()
+    if Renderer.uiFill then s = math.min(wh / uiH, ww / uiW) end
+    local frameW = math.max(1, math.ceil(uiW * s))
+    local frameH = math.max(1, math.ceil(uiH * s))
+    local lx = math.floor((ww - frameW) / 2)
+    local ly = math.floor((wh - frameH) / 2)
+    local outW, outH = uiW * 2, uiH * 2
     if not (dexCanvas and dexCanvas:getWidth() == outW
             and dexCanvas:getHeight() == outH) then
       dexCanvas = love.graphics.newCanvas(outW, outH, { dpiscale = 1 })
@@ -261,10 +256,13 @@ local function dexScreen()
       fbo = VRGL.canvasFBO(dexCanvas)
       fboCache[dexCanvas] = fbo
     end
+    local sx = math.max(0, lx)
+    local sy = math.max(0, math.floor(wh - ly - frameH))
     if not (fbo and VRGL.copyFrontRegionToCanvas(
         fbo, sx, sy, frameW, frameH, outW, outH)) then return nil end
-    local metrics = ("fb=%dx%d leftEye=%dx%d rect=%d,%d %dx%d out=%dx%d")
-      :format(ww, wh, eyeW, eyeH, sx, sy, frameW, frameH, outW, outH)
+    local metrics = ("fb=%dx%d ui=%dx%d scale=%.3f rect=%d,%d %dx%d fill=%s")
+      :format(ww, wh, uiW, uiH, s, sx, sy, frameW, frameH,
+              tostring(Renderer.uiFill and true or false))
     if metrics ~= lastDexMetrics then
       lastDexMetrics = metrics
       local log = rawget(_G, "QUEST_XR_LOG")
