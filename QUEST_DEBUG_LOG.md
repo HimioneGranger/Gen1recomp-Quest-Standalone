@@ -871,13 +871,6 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   handheld. The right eye reuses it. This avoids the combined stereo buffer,
   state-dependent UI crops, a second world render, and Pokedex-in-Pokedex
   recursion because the snapshot occurs before the prop is drawn.
-- Headset verification found the raw snapshot vertically inverted and missing
-  all menu UI (the hook is intentionally before the separate 2D composition).
-  PERF10 also rose to roughly 25 ms with a 35 MB full-eye mirror allocation,
-  although the enabled sky mods simultaneously raised draw/texture load. The
-  blit orientation is corrected, the exploration mirror is downsampled to
-  640px wide (~1.7 MB), and readable UI states now use the prior verified
-  composed capture while ordinary exploration uses the clean POV mirror.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 
