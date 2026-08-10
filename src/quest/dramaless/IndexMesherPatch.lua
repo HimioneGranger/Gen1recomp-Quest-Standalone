@@ -15,6 +15,7 @@ local Patch = {}
 Patch.MARKER = "quest indexed FFI sink"
 Patch.TRACE_MARKER = "quest transition mesh trace"
 Patch.PACING_MARKER = "quest paced neighbour meshing"
+Patch.CACHE_MARKER = "quest persistent indexed mesh cache"
 
 local function replaceOnce(source, before, after, label)
   local first, last = source:find(before, 1, true)
@@ -30,6 +31,7 @@ function Patch.apply(source)
   source = source:gsub("\r\n", "\n")
   local alreadyIndexed = source:find(Patch.MARKER, 1, true) ~= nil
   local alreadyTraced = source:find(Patch.TRACE_MARKER, 1, true) ~= nil
+  local alreadyCached = source:find(Patch.CACHE_MARKER, 1, true) ~= nil
   local alreadyPaced = source:find(Patch.PACING_MARKER, 1, true) ~= nil
   if alreadyPaced then
     local restored, restoreErr = replaceOnce(source, [=[
@@ -49,8 +51,8 @@ local COVERED_SLICE = 0.030
     if not restored then return nil, restoreErr end
     source, alreadyPaced = restored, false
   end
-  if alreadyIndexed and alreadyTraced then
-    return source, "indexed and traced"
+  if alreadyIndexed and alreadyTraced and alreadyCached then
+    return source, "indexed, traced, and persistently cached"
   end
   if source:find("setVertexMap", 1, true) and not alreadyIndexed then
     return source, "foreign indexed sink preserved"
@@ -228,7 +230,67 @@ local function finishJob(job, ok, err)
     if not source then return nil, err end
   end
 
-  return source, "indexed and traced"
+  if not alreadyCached then
+    source, err = replaceOnce(source, [=[
+    finish = function()
+      if n == 0 then return nil end
+]=], [=[
+    finish = function()
+      if n == 0 then return nil end
+]=], "cache indexed sink confirmation")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+      return ok and mesh or nil
+    end,
+  }
+]=], [=[
+      return ok and mesh or nil
+    end,
+    payload = function()
+      return { vertices = buf, n = n, indices = indexBuf, ni = ni }
+    end,
+  }
+]=], "cache payload exposure")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+local jobs = {}       -- FIFO of pending jobs
+local jobIndex = {}   -- "id:slot" -> job
+]=], [=[
+local jobs = {}       -- FIFO of pending jobs
+local jobIndex = {}   -- "id:slot" -> job
+
+-- quest persistent indexed mesh cache: raw GPU-neutral buffers only.
+local QuestMeshCache = require("src.quest.dramaless.MeshCache")
+]=], "cache declaration")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+  local sink = newSink()
+  local waterSink = newSink()
+  runGeometry(map, job.slot == "body", job.masks, sink, waterSink)
+  local mesh = sink.finish()
+  local water = waterSink.finish()
+]=], [=[
+  local hit, mesh, water = QuestMeshCache.load(
+    map, job.slot, job.masks, Voxel3D.FORMAT, Budget.check)
+  if not hit then
+    local sink = newSink()
+    local waterSink = newSink()
+    runGeometry(map, job.slot == "body", job.masks, sink, waterSink)
+    mesh = sink.finish()
+    water = waterSink.finish()
+    if sink.payload and waterSink.payload then
+      QuestMeshCache.save(map, job.slot, job.masks,
+        sink.payload(), waterSink.payload(), Budget.check)
+    end
+  end
+]=], "cache async build")
+    if not source then return nil, err end
+  end
+
+  return source, "indexed, traced, and persistently cached"
 end
 
 return Patch
