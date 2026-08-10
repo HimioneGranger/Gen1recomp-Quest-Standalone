@@ -227,50 +227,33 @@ end
 
 -- ------- the pokedex's screen
 --
--- What the device in the hand shows during a battle: the flat window --
--- which IS the 2D battle screen for as long as the battle state draws --
--- copied into a canvas the scene pass can texture with, cropped by UV to
--- the battle's own letterbox so the screen wears the GB frame edge to
--- edge. Menus over the battle (the party, the bag) ride along for free:
--- they are the flat screen too, and reading them on the device in your
--- hand is exactly the point.
+-- What the device in the hand shows: the engine's UI canvas itself, never the
+-- desktop mirror. The mirror is a previous left-eye VR frame and therefore
+-- carries its window bars and perspective crop. Classic 160x144 UI fills the
+-- device; a wide battle is aspect-fitted so the whole 304x144 composition is
+-- readable rather than centre-cropped and enlarged.
 local dexCanvas = nil
 
 local function dexScreen()
   local ok, out = pcall(function()
-    local ww, wh = love.graphics.getPixelDimensions()
-    if not (ww and ww > 0 and wh and wh > 0) then return nil end
     local Renderer = require("src.render.Renderer")
     local uiW, uiH = Renderer:uiSize()
-    -- Match Renderer:endFrame's final UI compositor, not its base world/fit
-    -- scale. Survey zoom may reduce uiScale, and BATTLE SIZE=FILL replaces it
-    -- with a fractional scale; using fitScale here caused side bars in menus
-    -- and cropped/zoomed battle captures.
-    local s = Renderer:uiScale()
-    if Renderer.uiFill then
-      s = math.min(wh / uiH, ww / uiW)
-    end
-    local frameW = math.max(1, math.ceil(uiW * s))
-    local frameH = math.max(1, math.ceil(uiH * s))
-    local lx = math.floor((ww - frameW) / 2)
-    local ly = math.floor((wh - frameH) / 2)
-    local outW, outH = uiW * 2, uiH * 2
+    local source = Renderer.canvas
+    if not (source and uiW and uiH and uiW > 0 and uiH > 0) then return nil end
+    local outW, outH = 320, 288
     if not (dexCanvas and dexCanvas:getWidth() == outW
             and dexCanvas:getHeight() == outH) then
       dexCanvas = love.graphics.newCanvas(outW, outH, { dpiscale = 1 })
       pcall(dexCanvas.setFilter, dexCanvas, "nearest", "nearest")
     end
-    local fbo = fboCache[dexCanvas]
-    if not fbo then
-      fbo = VRGL.canvasFBO(dexCanvas)
-      fboCache[dexCanvas] = fbo
-    end
-    local sx = math.max(0, math.floor(lx))
-    local sy = math.max(0, math.floor(wh - ly - frameH))
-    if not (fbo and VRGL.copyFrontRegionToCanvas(
-        fbo, sx, sy, frameW, frameH, outW, outH)) then return nil end
-    -- The region is already the exact active UI surface. Sampling the entire
-    -- result preserves both classic 160x144 menus and 304x144 wide battles.
+    local s = math.min(outW / uiW, outH / uiH)
+    local dx, dy = (outW - uiW * s) / 2, (outH - uiH * s) / 2
+    love.graphics.push("all")
+    love.graphics.setCanvas(dexCanvas)
+    love.graphics.clear(0, 0, 0, 1)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.draw(source, dx, dy, 0, s, s)
+    love.graphics.pop()
     return { dexCanvas, 0, 0, 1, 1 }
   end)
   return ok and out or nil

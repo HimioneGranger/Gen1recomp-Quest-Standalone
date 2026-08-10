@@ -837,6 +837,13 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   were insufficient: the final compositor uses `Renderer:uiScale()`, with a
   fractional override when `uiFill` is active, rather than always using
   `fitScale()`. The Pokedex crop now mirrors those exact end-frame scale rules.
+- User clarified that the black bars exist on the large paused desktop stream
+  itself and that the handheld remains zoomed. This proves the fundamental
+  source was wrong: `dexScreen` photographed the previous desktop mirror frame,
+  which is the left-eye VR view, not the game UI. Replaced framebuffer capture
+  with direct composition from `Renderer.canvas` into a fixed 320x288 device
+  texture. Classic UI fills it exactly; wide 304x144 battles are aspect-fitted
+  with the entire battle visible.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 
