@@ -233,7 +233,7 @@ end
 local dexCanvas = nil
 local lastDexMetrics = nil
 
-local function dexScreen()
+local function dexScreen(isBattle)
   local ok, out = pcall(function()
     local ww, wh = love.graphics.getPixelDimensions()
     if not (ww and ww > 0 and wh and wh > 0) then return nil end
@@ -243,12 +243,17 @@ local function dexScreen()
     if Renderer.uiFill then s = math.min(wh / uiH, ww / uiW) end
     local frameW = math.max(1, math.ceil(uiW * s))
     local frameH = math.max(1, math.ceil(uiH * s))
+    -- Kanto First Person's staged battle scene extends substantially beyond
+    -- the classic 160px UI frame even when Renderer still reports 160x144.
+    -- Widen only the live battle source, like zooming out its fixed feed
+    -- camera, so both combatants fit instead of being cut at opposite edges.
+    if isBattle then frameW = math.min(ww, math.floor(frameW * 1.5)) end
     local lx = math.floor((ww - frameW) / 2)
     local ly = math.floor((wh - frameH) / 2)
     -- Trim the narrow black columns that remain inside the live mirror source.
     -- This changes the source rectangle only; no intermediate presentation
     -- canvas is used, so battle remains a continuously updating feed.
-    local sideTrim = math.floor(frameW * 0.03)
+    local sideTrim = isBattle and 0 or math.floor(frameW * 0.03)
     frameW = frameW - sideTrim * 2
     lx = lx + sideTrim
     local outW, outH = uiW * 2, uiH * 2
@@ -266,9 +271,10 @@ local function dexScreen()
     local sy = math.max(0, math.floor(wh - ly - frameH))
     if not (fbo and VRGL.copyFrontRegionToCanvas(
         fbo, sx, sy, frameW, frameH, outW, outH)) then return nil end
-    local metrics = ("fb=%dx%d ui=%dx%d scale=%.3f rect=%d,%d %dx%d trim=%d live=true fill=%s")
+    local metrics = ("fb=%dx%d ui=%dx%d scale=%.3f rect=%d,%d %dx%d trim=%d battle=%s live=true fill=%s")
       :format(ww, wh, uiW, uiH, s, sx, sy, frameW, frameH,
-              sideTrim, tostring(Renderer.uiFill and true or false))
+              sideTrim, tostring(isBattle and true or false),
+              tostring(Renderer.uiFill and true or false))
     if metrics ~= lastDexMetrics then
       lastDexMetrics = metrics
       local log = rawget(_G, "QUEST_XR_LOG")
@@ -354,7 +360,7 @@ local function renderWorld(views, ctl)
   if hand and (battle or fp) then
     Pokedex.place(hand, pivot, anchor, scale, mountYaw)
     if showing then
-      local scr = dexScreen()
+      local scr = dexScreen(battle ~= nil)
       if scr then
         Pokedex.screen(scr[1], scr[2], scr[3], scr[4], scr[5])
       end

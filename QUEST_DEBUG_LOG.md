@@ -878,6 +878,11 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   into the device texture every frame; a 3% symmetric source trim removes the
   remaining inner black bezels. Exploration still keeps the physical device
   with its screen dark and performs no capture.
+- The restored live battle screenshot proved the feed updates, but its normal
+  160x144 source crop cuts the staged player's and opponent's sprites at the
+  left/right edges. Battle now widens the centred live source rectangle by 50%
+  (clamped to the framebuffer), with no bezel trim, effectively zooming out the
+  fixed battle feed. Dialog/menu capture retains its verified crop unchanged.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 
