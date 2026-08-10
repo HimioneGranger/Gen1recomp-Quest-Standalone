@@ -92,44 +92,6 @@ local wasOn = false
 local savedVsync = nil
 local fboCache = setmetatable({}, { __mode = "k" })   -- canvas -> GL FBO id
 local mirrorSrc = nil           -- last left-eye canvas, for the window
-local dexEyeCanvas = nil        -- clean left eye, snapped before Pokedex.draw
-local dexEyeFBO = nil
-local dexCopyGL = nil
-
--- Raw in-scene FBO copy used only at the seam immediately before the Pokedex
--- prop is drawn. Bindings are restored exactly, so LOVE's framebuffer cache
--- remains truthful. This gives the device a clean left-eye mirror without a
--- second world render and without recursively capturing the device itself.
-local function copyBoundEyeToCanvas(dstFBO, w, h)
-  if not dstFBO then return false end
-  if not dexCopyGL then
-    local ok, built = pcall(function()
-      local ffi = require("ffi")
-      pcall(ffi.cdef, [[
-        void glGetIntegerv(unsigned int pname, int *data);
-        void glBindFramebuffer(unsigned int target, unsigned int framebuffer);
-        void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1,
-          int dstX0, int dstY0, int dstX1, int dstY1,
-          unsigned int mask, unsigned int filter);
-      ]])
-      return { ffi = ffi, gl = ffi.load("GLESv2") }
-    end)
-    if not ok then return false end
-    dexCopyGL = built
-  end
-  local ffi, gl = dexCopyGL.ffi, dexCopyGL.gl
-  local ok = pcall(function()
-    local oldRead, oldDraw = ffi.new("int[1]"), ffi.new("int[1]")
-    gl.glGetIntegerv(0x8CAA, oldRead) -- GL_READ_FRAMEBUFFER_BINDING
-    gl.glGetIntegerv(0x8CA6, oldDraw) -- GL_DRAW_FRAMEBUFFER_BINDING
-    gl.glBindFramebuffer(0x8CA8, oldDraw[0]) -- READ <- active eye scene
-    gl.glBindFramebuffer(0x8CA9, dstFBO)
-    gl.glBlitFramebuffer(0, 0, w, h, 0, h, w, 0, 0x4000, 0x2600)
-    gl.glBindFramebuffer(0x8CA8, oldRead[0])
-    gl.glBindFramebuffer(0x8CA9, oldDraw[0])
-  end)
-  return ok
-end
 local mirrorCanvas = nil
 local status = "off"
 
@@ -420,6 +382,12 @@ local function renderWorld(views, ctl)
   local hand = ctl and ctl.handl or nil
   if hand and (battle or fp) then
     Pokedex.place(hand, pivot, anchor, scale, mountYaw)
+    if uiShowing() then
+      local scr = dexScreen()
+      if scr then
+        Pokedex.screen(scr[1], scr[2], scr[3], scr[4], scr[5])
+      end
+    end
   else
     Pokedex.clear()
   end
@@ -439,33 +407,8 @@ local function renderWorld(views, ctl)
   end
   eyes.cx, eyes.cy = pivot[1], pivot[3]
 
-  -- VoxelScene calls this hook once per eye immediately before Pokedex.draw.
-  -- The first call is the left eye. Snapshot it, assign that clean texture to
-  -- the device, then leave the right-eye call alone so both eyes see the same
-  -- left-eye mirror on the physical screen.
-  local eyeCaptured = false
-  if Pokedex.frame then
-    local ew, eh = eyes[1].w, eyes[1].h
-    if not (dexEyeCanvas and dexEyeCanvas:getWidth() == ew
-            and dexEyeCanvas:getHeight() == eh) then
-      dexEyeCanvas = love.graphics.newCanvas(ew, eh, { dpiscale = 1 })
-      pcall(dexEyeCanvas.setFilter, dexEyeCanvas, "linear", "linear")
-      dexEyeFBO = VRGL.canvasFBO(dexEyeCanvas)
-    end
-    _G.QUEST_CAPTURE_EYE_BEFORE_POKEDEX = function()
-      if eyeCaptured then return end
-      eyeCaptured = true
-      if copyBoundEyeToCanvas(dexEyeFBO, ew, eh) then
-        Pokedex.screen(dexEyeCanvas, 0, 0, 1, 1)
-      end
-    end
-  else
-    _G.QUEST_CAPTURE_EYE_BEFORE_POKEDEX = nil
-  end
-
   local okR, canvases = pcall(VoxelScene.render, ow, 0, 0, vw, vh,
                               VR.paletteFor, eyes)
-  _G.QUEST_CAPTURE_EYE_BEFORE_POKEDEX = nil
   if not (okR and type(canvases) == "table" and canvases[1] and canvases[2])
   then
     return false
