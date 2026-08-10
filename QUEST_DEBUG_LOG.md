@@ -853,9 +853,11 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - A full-left-eye experiment was rejected on-headset because it made the normal
   composition substantially worse; it was reverted in `90d42ef`. Screenshots
   of the restored framebuffer-region path show only narrow symmetric side bars
-  on the classic 160x144 handheld image. The normal source now trims 4% from
-  each side before downsampling. Wide battle UI is explicitly excluded so its
-  existing zoom is not increased.
+  on the large flat UI panel, while the handheld Load Report was already close.
+  The initial 4% handheld trim targeted the wrong surface and was removed.
+  `updateQuad` now uses `Renderer:uiSize()` and `Renderer:uiScale()` instead of
+  Dramaless's fixed `BattleScene.letterbox()`: this follows stepped-down classic
+  UI scale and the 304x144 wide-battle surface without arbitrary zoom.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 
