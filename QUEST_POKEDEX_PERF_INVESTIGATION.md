@@ -202,3 +202,29 @@ above 40 ms. Indexed terrain is therefore visually safe in this run but is not
 sufficient on its own. The next performance pass should target draw-call-heavy
 Kanto First Person flora/horizon groups while retaining connected-map scenery,
 and should persist the complete PERF10 stream before the next route.
+
+## Controlled baseline with persistent capture
+
+The first fully recoverable baseline video is 133.978 seconds. Although planned
+as Pallet-to-Viridian, the captured route actually begins in Viridian, includes
+a wild battle, walks north, crosses the gate/loading seam, enters Viridian
+Forest, and finishes with repeated views into the canopy. This route is retained
+as the comparison baseline rather than relabelled.
+
+Video start aligns with approximately session window 16. The expensive windows
+were:
+
+- Battle/load activity: windows 17-22 averaged 35.28-78.98 ms, with individual
+  worst frames from 70.39 to 903.37 ms.
+- The forest transition window retained a 751.95 ms worst frame while its
+  median recovered to 16.64 ms.
+- Settled forest viewing (windows 24-28) averaged 24.42-28.04 ms, approximately
+  35-41 application frames per second. Draw calls were 340-392 and texture
+  memory held at 273.0 MB.
+
+The video visibly contains the full canopy, hanging vines, dense grass/flora,
+and connected background scenery. The first controlled ablation will disable
+only the optional forest-effects group (canopy, vines, sun shafts, insects and
+particles) while preserving terrain, buildings, horizon, map apron, ordinary
+trees and connected-map visibility. This matches the user's earlier visual
+judgment that forest FX looked poor and cost too much performance.
