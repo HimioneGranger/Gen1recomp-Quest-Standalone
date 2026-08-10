@@ -76,12 +76,28 @@ do
           or love.filesystem.write(mesherPath, indexed)
       end
     end
+    local okStreamed, streamedNote = false, "VoxelScene unavailable"
+    local okStreamPatch, NeighborStreamPatch = pcall(
+      require, "src.quest.dramaless.NeighborStreamPatch")
+    local scenePath = "mods/DRAMALESS_SHAPE/lib/VoxelScene.lua"
+    local sceneSource = love.filesystem.read(scenePath)
+    if okStreamPatch and NeighborStreamPatch and sceneSource then
+      local streamed, note = NeighborStreamPatch.apply(sceneSource)
+      streamedNote = note or "unknown"
+      if streamed then
+        okStreamed = streamed == sceneSource
+          or love.filesystem.write(scenePath, streamed)
+      end
+    end
     pcall(C.questxr_log, okXR and okVR and okVRGL and
       "Dramaless Shape Quest OpenXR transport installed" or
       "Dramaless Shape Quest transport install failed")
     pcall(C.questxr_log, okIndexed
       and ("Dramaless " .. indexedNote .. " mesher ready")
       or ("Dramaless indexed mesher skipped: " .. tostring(indexedNote)))
+    pcall(C.questxr_log, okStreamed
+      and ("Dramaless " .. streamedNote .. " neighbour stream ready")
+      or ("Dramaless neighbour stream skipped: " .. tostring(streamedNote)))
   end
 end
 

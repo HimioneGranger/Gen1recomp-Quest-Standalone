@@ -985,3 +985,55 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   that restores the installed mesher to the prior 12/5/30 ms values. Preserve
   the indexed-mesh optimization and diagnostics while investigating a design
   that defers or cancels irrelevant neighbour jobs at the queue-policy level.
+
+## 2026-08-10 - First/third-person neighbour streaming candidate
+
+- Scope decision: Quest optimization now targets the intended first- and
+  third-person experience. Top-down voxel views may later need a different
+  streaming policy because they can expose a much wider area at once.
+- Added a Quest-only, exact-source-guarded `VoxelScene` adapter. It preserves
+  the complete neighbor/live set and all rendering behavior, but requests an
+  uncached neighbor body only when that map's world-space bounds come within
+  384 pixels (24 movement tiles) of the player. Already cached meshes remain
+  drawable. The current map is still always requested urgently.
+- This is intended to admit directly connected Route 1 and Route 21 while the
+  player is in Pallet, but defer Viridian City and Cinnabar Island until the
+  player approaches through their connecting routes. `STREAM` admit/defer
+  transitions are logged once per state change for physical verification.
+- Candidate status: source complete; APK build and headset validation pending.
+
+### First streaming hardware result and radius revision
+
+- Pallet correctly admitted Route 21 and Route 1 while deferring Cinnabar and
+  Viridian. Initial queued maps fell from five to three, mesh work from about
+  10.2 to 4.5 seconds, texture residency from 202.5 to 78.4 MB, and settled
+  frame averages from roughly 25-35 to 18.3-18.4 ms. The retained Route/Kanto
+  First Person scenery still showed the road, trainers, mountains, and skyline.
+- The Pallet -> Route 1 -> Viridian -> Route 23 run proved admission followed
+  player distance, but exposed obvious ground pop-in on transitions, especially
+  Route 23. Route 23 was admitted only about 1.2 seconds before entry and its
+  body needed 6.74 seconds; other large bodies ranged from 8.16 to 13.69
+  seconds when competing with urgent current-map work.
+- Revised the preload radius from 384 to 640 pixels (24 to 40 movement tiles),
+  retaining the performance-oriented policy while giving large maps roughly
+  fourteen additional seconds at observed walking speed. The adapter migrates
+  the already-patched installed Dramaless source exactly once.
+
+### Distance streaming rejected after 640-pixel validation
+
+- Hardware validation found Viridian and Route 23 pop-in improved at 640, but
+  Route 2 ground pop-in worsened and traversal stutter became nearly
+  continuous. The user separately observed that Route 2's left-side tree
+  pop-in improved, confirming earlier admission benefits that scenery even
+  though the map as a whole did not arrive coherently.
+  Logs confirmed the larger radius merely moved expensive construction into
+  active walking: Viridian body 7.03 s, Route 22 body 5.00 s, Route 2 body
+  17.54 s, Viridian full 7.87 s, and Route 23 body 4.02 s after waiting 7.06 s
+  behind earlier work. Ten-second frame averages remained about 39-59 ms.
+- Conclusion: one distance threshold cannot provide both early complete ground
+  and smooth traversal while meshes are rebuilt every process. Smaller radii
+  visibly pop; larger radii continuously contend with rendering.
+- Rejected distance streaming and converted its source-guarded adapter into a
+  one-time rollback that restores Dramaless's standard neighbor request loop.
+  Next design target is an independently implemented persistent indexed-mesh
+  cache, so construction cost is paid once rather than rescheduled.
