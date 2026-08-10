@@ -304,8 +304,9 @@ local function dexScreen()
     dexCanvas = love.graphics.newCanvas(320, 288, { dpiscale = 1 })
     pcall(dexCanvas.setFilter, dexCanvas, "nearest", "nearest")
   end
+  local pushed = pcall(love.graphics.push, "all")
+  if not pushed then return nil end
   local ok = pcall(function()
-    love.graphics.push("all")
     love.graphics.setCanvas(dexCanvas)
     love.graphics.origin()
     love.graphics.clear(0.035, 0.035, 0.045, 1)
@@ -314,8 +315,10 @@ local function dexScreen()
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.draw(dexSource, (320 - dw) / 2, (288 - dh) / 2,
                        0, fit, fit)
-    love.graphics.pop()
   end)
+  -- Always restore the eye-render state, including when a mod-provided canvas
+  -- or draw call fails. An unbalanced graphics stack would corrupt both eyes.
+  pcall(love.graphics.pop)
   return ok and { dexCanvas, 0, 0, 1, 1 } or nil
 end
 
