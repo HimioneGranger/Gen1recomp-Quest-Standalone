@@ -804,3 +804,19 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   conductor, with only Android support and immersive-launch defaults added;
   the Android `VRXR.lua` and `VRGL.lua` transports remain separate overrides.
   The Dramaless license is retained beside the adapted source.
+
+## 2026-08-10 - Kanto in First Person 1.60.0 added to compatibility scope
+
+- User supplied `kanto-first-person-1_60_0.zip` (mod id `ds_fp_ceiling`,
+  SHA-256 `B54B28271918AAAB9A11CED66247898E51CFF5E5F03D3530FF3B81BB3B25AF29`).
+  No ROM data is present according to its documentation.
+- Source inspection confirms it recognizes `DRAMALESS_SHAPE`, explicitly lists
+  1.6.4 as a tested base, loads before the renderer at priority 10, and claims
+  compatibility with Wilds of Kanto. It patches Dramaless `VoxelScene.lua`,
+  `FirstPerson.lua`, and related private modules through guarded text anchors;
+  it must therefore be tested as an adapter, not merged wholesale into the
+  Quest renderer.
+- The archive was copied unchanged to Quest Downloads for launcher installation
+  testing. Its most expensive effects (forest canopy, weather, particles,
+  extended terrain, and fast chunk building) require Quest-specific performance
+  profiling after basic three-mod startup and VR handoff are verified.
