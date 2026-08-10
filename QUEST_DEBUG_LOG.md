@@ -436,3 +436,28 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Future performance work must retain the connected scenery. Priorities are
   mesh/vertex representation, GPU upload cost, shadow workload, and measured
   mesh lifetime—not more aggressive world visibility cuts.
+
+## 2026-08-09 — Indexed full-view mesh optimization
+
+- Added temporary per-map Quest diagnostics around the existing cooperative
+  FFI mesh builder. The baseline path stored every quad as six complete,
+  unindexed vertices even though each face has only four distinct corners.
+- Baseline examples: Route 2 full emitted 3,820,770 terrain vertices and took
+  about 5,335 ms of wall-clock sliced generation plus 188 ms upload on its
+  first recorded build; Viridian Forest emitted 3,750,006 vertices and took
+  about 4,197 ms generation plus 93 ms upload.
+- Reworked only the FFI/GPU sink to retain four vertices per quad and submit
+  the unchanged `1,2,3,1,3,4` triangles through a 32-bit LÖVE vertex map. The
+  pure-Lua/table geometry path used by headless tests remains unchanged.
+- Indexed Route 2 emitted 2,547,180 vertices plus 3,820,770 indices and took
+  about 4,927 ms generation plus 120 ms upload. Indexed Viridian Forest
+  emitted 2,500,004 vertices plus 3,750,006 indices and took about 3,811 ms
+  generation plus 82 ms upload. This preserved the complete connected view.
+- After the user's longer indexed run through repeated transitions to Viridian
+  Forest, memory was about 1,340,325 KB PSS / 1,431,148 KB RSS with 633,092 KB
+  graphics. The earlier extended unindexed run measured about 1,546,022 KB PSS
+  / 1,641,144 KB RSS with 738,252 KB graphics. Cached-map sets were not exactly
+  identical, so these are directional rather than laboratory-perfect figures.
+- User also found Viridian Forest FX visually unsuitable and disproportionately
+  expensive on Quest, and disabled it. Treat Forest FX as a separate
+  Quest-default policy issue; it is not part of the indexed-mesh change.

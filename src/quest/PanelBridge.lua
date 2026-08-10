@@ -35,13 +35,15 @@ do
     pcall(C.questxr_log, "Lua fixed-buffer panel bridge linked")
   end
 
-  -- Quest builds carry the matching OpenXR handoff module beside the game.
-  -- Refresh only Dramatic Shape's VR transport file; ROMs, saves, manifests,
-  -- settings, and all other mod files remain user-owned and untouched.
+  -- Quest builds carry the matching OpenXR handoff modules and indexed mesh
+  -- sink beside the game. Refresh only those audited integration files; ROMs,
+  -- saves, manifests, settings, assets, and all other mod files remain
+  -- user-owned and untouched.
   local replacement = love.filesystem.read("lib/VRXR.lua")
   local questVR = love.filesystem.read("lib/VR.lua")
   local questVRGL = love.filesystem.read("lib/VRGL.lua")
-  if C and replacement and questVR and questVRGL
+  local questMesher = love.filesystem.read("lib/ChunkMesher.lua")
+  if C and replacement and questVR and questVRGL and questMesher
       and replacement:find("questxr_request_launcher_shutdown", 1, true) then
     local okXR = love.filesystem.write(
       "mods/DRAMATIC_SHAPE/lib/VRXR.lua", replacement)
@@ -49,9 +51,11 @@ do
       "mods/DRAMATIC_SHAPE/lib/VR.lua", questVR)
     local okVRGL = love.filesystem.write(
       "mods/DRAMATIC_SHAPE/lib/VRGL.lua", questVRGL)
-    pcall(C.questxr_log, okXR and okVR and okVRGL and
-      "Dramatic Shape Quest OpenXR handoff installed" or
-      "Dramatic Shape Quest OpenXR handoff install failed")
+    local okMesher = love.filesystem.write(
+      "mods/DRAMATIC_SHAPE/lib/ChunkMesher.lua", questMesher)
+    pcall(C.questxr_log, okXR and okVR and okVRGL and okMesher and
+      "Dramatic Shape Quest OpenXR and indexed mesher installed" or
+      "Dramatic Shape Quest integration install failed")
   end
 end
 
