@@ -227,35 +227,53 @@ end
 
 -- ------- the pokedex's screen
 --
--- What the device in the hand shows: the engine's UI canvas itself, never the
--- desktop mirror. The mirror is a previous left-eye VR frame and therefore
--- carries its window bars and perspective crop. Classic 160x144 UI fills the
--- device; a wide battle is aspect-fitted so the whole 304x144 composition is
--- readable rather than centre-cropped and enlarged.
+-- What the device in the hand shows: the completed previous framebuffer,
+-- cropped to the engine's active UI rectangle. This keeps palette/composite
+-- effects that are not baked into Renderer.canvas itself.
 local dexCanvas = nil
+local lastDexMetrics = nil
 
 local function dexScreen()
   local ok, out = pcall(function()
+    local ww, wh = love.graphics.getPixelDimensions()
+    if not (ww and ww > 0 and wh and wh > 0) then return nil end
     local Renderer = require("src.render.Renderer")
     local uiW, uiH = Renderer:uiSize()
-    local source = Renderer.canvas
-    if not (source and uiW and uiH and uiW > 0 and uiH > 0) then return nil end
-    local outW, outH = 320, 288
+    local s = Renderer:uiScale()
+    if Renderer.uiFill then s = math.min(wh / uiH, ww / uiW) end
+    local frameW = math.max(1, math.ceil(uiW * s))
+    local frameH = math.max(1, math.ceil(uiH * s))
+    local lx = math.floor((ww - frameW) / 2)
+    local ly = math.floor((wh - frameH) / 2)
+    local outW, outH = uiW * 2, uiH * 2
     if not (dexCanvas and dexCanvas:getWidth() == outW
             and dexCanvas:getHeight() == outH) then
       dexCanvas = love.graphics.newCanvas(outW, outH, { dpiscale = 1 })
       pcall(dexCanvas.setFilter, dexCanvas, "nearest", "nearest")
     end
-    local s = math.min(outW / uiW, outH / uiH)
-    local dx, dy = (outW - uiW * s) / 2, (outH - uiH * s) / 2
-    love.graphics.push("all")
-    love.graphics.setCanvas(dexCanvas)
-    love.graphics.clear(0, 0, 0, 1)
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(source, dx, dy, 0, s, s)
-    love.graphics.pop()
+    local fbo = fboCache[dexCanvas]
+    if not fbo then
+      fbo = VRGL.canvasFBO(dexCanvas)
+      fboCache[dexCanvas] = fbo
+    end
+    local sx = math.max(0, lx)
+    local sy = math.max(0, math.floor(wh - ly - frameH))
+    if not (fbo and VRGL.copyFrontRegionToCanvas(
+        fbo, sx, sy, frameW, frameH, outW, outH)) then return nil end
+    local metrics = ("fb=%dx%d ui=%dx%d scale=%.3f rect=%d,%d %dx%d fill=%s")
+      :format(ww, wh, uiW, uiH, s, sx, sy, frameW, frameH,
+              tostring(Renderer.uiFill and true or false))
+    if metrics ~= lastDexMetrics then
+      lastDexMetrics = metrics
+      local log = rawget(_G, "QUEST_XR_LOG")
+      if log then log("Pokedex capture " .. metrics) end
+    end
     return { dexCanvas, 0, 0, 1, 1 }
   end)
+  if not ok then
+    local log = rawget(_G, "QUEST_XR_LOG")
+    if log then log("Pokedex capture error: " .. tostring(out)) end
+  end
   return ok and out or nil
 end
 

@@ -844,6 +844,12 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   with direct composition from `Renderer.canvas` into a fixed 320x288 device
   texture. Classic UI fills it exactly; wide 304x144 battles are aspect-fitted
   with the entire battle visible.
+- Headset verification showed the direct `Renderer.canvas` texture completely
+  black: that canvas does not retain the finished palette/composite at the VR
+  update seam. Restored the prior framebuffer-region path as the playable
+  fallback and added change-only logs for framebuffer size, active UI size,
+  final UI scale/fill state, and the exact GL source rectangle. Capture errors
+  are now surfaced to QuestXR logcat rather than swallowed by `pcall`.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 
