@@ -113,7 +113,7 @@ Set-Location E:\Gen1QuestVR\gen1recomp\mobile\android
 Output:
 
 ```text
-E:\Gen1QuestVR\gen1recomp\mobile\android\app\build\intermediates\apk\questVrNoRecord\debug\app-questVr-noRecord-debug.apk
+E:\Gen1QuestVR\gen1recomp\mobile\android\app\build\outputs\apk\questVrNoRecord\debug\app-questVr-noRecord-debug.apk
 ```
 
 ```powershell

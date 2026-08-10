@@ -150,7 +150,7 @@ Dramatic Shape `quest-openxr`:
 The current development APK is produced at:
 
 ```text
-mobile/android/app/build/intermediates/apk/questVrNoRecord/debug/app-questVr-noRecord-debug.apk
+mobile/android/app/build/outputs/apk/questVrNoRecord/debug/app-questVr-noRecord-debug.apk
 ```
 
 It is intentionally ignored by Git. Exact build and install commands are in

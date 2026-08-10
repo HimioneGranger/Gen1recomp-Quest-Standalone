@@ -175,9 +175,11 @@ checkout was not deleted. Current device-debug milestones and evidence are in
 `QUEST_DEBUG_LOG.md`.
 
 Milestone `05c1d77` is a local commit on `quest-openxr`; it has not been pushed
-to the configured upstream remote. The ABI-injected APK is emitted under
-`app/build/intermediates/apk/questVrNoRecord/debug/` and must be installed with
-`adb install -t -r`.
+to the configured upstream remote. The current installable APK is emitted under
+`app/build/outputs/apk/questVrNoRecord/debug/` and must be installed with
+`adb install -t -r`. Do not use the similarly named file under
+`app/build/intermediates/apk/`: Gradle can leave that older intermediate in
+place after the final `outputs` APK has changed.
 
 ## Quest Touch and gameplay-session handoff build
 
