@@ -13,6 +13,7 @@
 local Patch = {}
 
 Patch.MARKER = "quest indexed FFI sink"
+Patch.TRACE_MARKER = "quest transition mesh trace"
 
 local function replaceOnce(source, before, after, label)
   local first, last = source:find(before, 1, true)
@@ -26,13 +27,18 @@ end
 function Patch.apply(source)
   if type(source) ~= "string" then return nil, "mesher source is not text" end
   source = source:gsub("\r\n", "\n")
-  if source:find(Patch.MARKER, 1, true) then return source, "already indexed" end
-  if source:find("setVertexMap", 1, true) then
+  local alreadyIndexed = source:find(Patch.MARKER, 1, true) ~= nil
+  local alreadyTraced = source:find(Patch.TRACE_MARKER, 1, true) ~= nil
+  if alreadyIndexed and alreadyTraced then
+    return source, "already indexed and traced"
+  end
+  if source:find("setVertexMap", 1, true) and not alreadyIndexed then
     return source, "foreign indexed sink preserved"
   end
 
   local err
-  source, err = replaceOnce(source, [=[
+  if not alreadyIndexed then
+    source, err = replaceOnce(source, [=[
 local TRI_ORDER = { 1, 2, 3, 1, 3, 4 }
 
 local function newFfiSink()
@@ -125,9 +131,85 @@ local function newFfiSink()
         end
         return m
 ]=], "indexed upload")
-  if not source then return nil, err end
+    if not source then return nil, err end
+  end
 
-  return source, "indexed"
+  if not alreadyTraced then
+    source, err = replaceOnce(source, [=[
+local jobs = {}       -- FIFO of pending jobs
+local jobIndex = {}   -- "id:slot" -> job
+
+local clock = (love and love.timer and love.timer.getTime) or os.clock
+]=], [=[
+local jobs = {}       -- FIFO of pending jobs
+local jobIndex = {}   -- "id:slot" -> job
+
+local clock = (love and love.timer and love.timer.getTime) or os.clock
+
+-- quest transition mesh trace: diagnostics only; scheduling is unchanged.
+local function traceJob(event, job, ok, err)
+  local questLog = rawget(_G, "QUEST_XR_LOG")
+  if not questLog then return end
+  local now = clock()
+  local queued = job.queuedAt or now
+  local started = job.startedAt or now
+  questLog(("MESHJOB event=%s id=%s slot=%s urgent=%s pending=%d "
+      .. "wait=%.2fms active=%.2fms resumes=%d ok=%s err=%s")
+    :format(event, tostring(job.id), tostring(job.slot),
+      tostring(job.urgent == true), #jobs,
+      math.max(0, started - queued) * 1000,
+      math.max(0, now - started) * 1000, job.resumes or 0,
+      tostring(ok ~= false), err and tostring(err) or "-"))
+end
+]=], "trace declaration")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+local function finishJob(job, ok, err)
+  jobIndex[jobKey(job.id, job.slot)] = nil
+]=], [=[
+local function finishJob(job, ok, err)
+  traceJob("finish", job, ok, err)
+  jobIndex[jobKey(job.id, job.slot)] = nil
+]=], "trace finish")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+    job = { id = map.id, map = map, slot = slot, masks = masks,
+            urgent = urgent or false, gen = gen[map.id] or 0 }
+    jobIndex[key] = job
+    jobs[#jobs + 1] = job
+]=], [=[
+    job = { id = map.id, map = map, slot = slot, masks = masks,
+            urgent = urgent or false, gen = gen[map.id] or 0,
+            queuedAt = clock(), resumes = 0 }
+    jobIndex[key] = job
+    jobs[#jobs + 1] = job
+    traceJob("queue", job, true)
+]=], "trace queue")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+    if not pick.co then
+      pick.co = coroutine.create(runJob)
+    end
+    Budget.begin(pick.co, deadline - clock())
+    local ok, err = coroutine.resume(pick.co, pick)
+]=], [=[
+    if not pick.co then
+      pick.startedAt = clock()
+      pick.co = coroutine.create(runJob)
+      traceJob("start", pick, true)
+    end
+    pick.resumes = (pick.resumes or 0) + 1
+    Budget.begin(pick.co, deadline - clock())
+    local ok, err = coroutine.resume(pick.co, pick)
+]=], "trace resume")
+    if not source then return nil, err end
+  end
+
+  if alreadyIndexed then return source, "indexed and traced" end
+  return source, "indexed and traced"
 end
 
 return Patch

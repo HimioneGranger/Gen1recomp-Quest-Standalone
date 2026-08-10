@@ -939,6 +939,9 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   gate/loading seam, entry into Viridian Forest, and multiple canopy angles.
   Settled forest windows averaged
   24.42-28.04 ms with 340-392 draws and 273.0 MB textures; battle/load windows
-  averaged 35.28-78.98 ms and contained worst frames up to 903.37 ms. The next
-  isolated comparison disables only optional forest canopy/vines/sun-shaft/
-  insect/particle effects, retaining the connected world and horizon.
+  averaged 35.28-78.98 ms and contained worst frames up to 903.37 ms. User
+  clarification: the earlier bad forest-FX report applied to Dramatic Shape,
+  not the current Dramaless + Kanto First Person stack; current forest
+  performance feels acceptable. Cancel the forest-effects ablation and retain
+  those visuals. Transition-time mesh queue/build/upload/cache instrumentation
+  is the next active target.

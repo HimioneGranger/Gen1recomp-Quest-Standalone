@@ -115,7 +115,9 @@ same route.
 Kanto First Person static complexity supports profiling it separately rather
 than guessing: `payload_flora.lua` alone is about 4,681 lines with 36 explicit
 draw sites, 17 mesh-construction sites and 260 loops; ceiling, sky and backdrop
-are much smaller. Forest canopy was already disabled by the user. Flora's
+are much smaller. The user's earlier report that forest FX was disabled and
+expensive referred to the retired Dramatic Shape stack, not the current
+Dramaless + Kanto First Person stack. Flora's
 world-apron, tall-tree/mountain, grass and particle groups remain the best
 feature-level ablation targets after indexed terrain, but none is force-disabled
 by this branch.
@@ -222,8 +224,8 @@ were:
   memory held at 273.0 MB.
 
 The video visibly contains the full canopy, hanging vines, dense grass/flora,
-and connected background scenery. The first controlled ablation will disable
-only the optional forest-effects group (canopy, vines, sun shafts, insects and
-particles) while preserving terrain, buildings, horizon, map apron, ordinary
-trees and connected-map visibility. This matches the user's earlier visual
-judgment that forest FX looked poor and cost too much performance.
+and connected background scenery. The user reports that this current forest
+presentation performs acceptably; the earlier poor forest-FX result belonged
+to Dramatic Shape before the Dramaless pivot. The planned forest-effects
+ablation is cancelled. Preserve these visuals and instrument transition-time
+queueing, coroutine work, mesh uploads and cache reuse before changing quality.
