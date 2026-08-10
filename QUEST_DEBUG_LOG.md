@@ -910,3 +910,14 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   all sampled frames remained outside the 13.89 ms 72 Hz budget. Indexed terrain
   is retained, but Kanto First Person draw/feature cost needs the next isolated
   optimization pass. Preserve the full PERF10 stream before the next route.
+- Added bounded persistent PERF10 capture to the Quest Dramaless conductor.
+  Every ten-second window is still emitted to logcat and is now appended to
+  `quest_perf10.log` in the LÖVE save directory with a UTC session marker,
+  session-relative window number, and uptime. At 1 MiB the prior file rotates
+  to `quest_perf10.previous.log`. This preserves complete routes across Android
+  logcat rollover and app shutdown without changing rendering or mod options.
+- ARM64 `questVrNoRecordDebug` build succeeded and installed as an update. The
+  embedded `src/quest/dramaless/VR.lua` was extracted back from the signed APK
+  and verified to contain the persistent logger. APK SHA-256:
+  `E541D419A559A3EF25D4E429EEF22353EA9C0D88CE26CEB3B3BE5557E2F8290F`.
+  Saves, imported ROM content, and separately installed mods were preserved.

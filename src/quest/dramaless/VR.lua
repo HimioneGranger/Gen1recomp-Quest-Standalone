@@ -684,7 +684,29 @@ end
 
 -- Lightweight on-device baseline sampler. It reports ten-second windows to
 -- logcat on Quest builds; desktop behavior and rendered output are unchanged.
-local questPerf = { started = nil, last = nil, frames = {} }
+local questPerf = {
+  started = nil,
+  last = nil,
+  frames = {},
+  sessionStarted = false,
+  window = 0,
+}
+
+local QUEST_PERF_LOG = "quest_perf10.log"
+local QUEST_PERF_LOG_OLD = "quest_perf10.previous.log"
+
+local function persistQuestPerformance(line)
+  if not love.filesystem then return end
+  pcall(function()
+    local info = love.filesystem.getInfo(QUEST_PERF_LOG)
+    if info and (info.size or 0) > 1024 * 1024 then
+      local old = love.filesystem.read(QUEST_PERF_LOG)
+      if old then love.filesystem.write(QUEST_PERF_LOG_OLD, old) end
+      love.filesystem.remove(QUEST_PERF_LOG)
+    end
+    love.filesystem.append(QUEST_PERF_LOG, line .. "\n")
+  end)
+end
 
 local function sampleQuestPerformance()
   local log = rawget(_G, "QUEST_XR_LOG")
@@ -692,6 +714,14 @@ local function sampleQuestPerformance()
   local now = love.timer.getTime()
   if not questPerf.started then
     questPerf.started, questPerf.last = now, now
+    if not questPerf.sessionStarted then
+      questPerf.sessionStarted = true
+      local stamp = "unknown"
+      pcall(function() stamp = os.date("!%Y-%m-%dT%H:%M:%SZ") end)
+      persistQuestPerformance(("SESSION start=%s uptime=%.3f")
+          :format(stamp, now))
+      log("PERF10 persistent log: " .. QUEST_PERF_LOG)
+    end
     return
   end
   local ms = (now - questPerf.last) * 1000
@@ -721,12 +751,17 @@ local function sampleQuestPerformance()
     shaders = s.shaderswitches or 0
     textureMB = (s.texturememory or 0) / 1048576
   end)
-  log(("PERF10 n=%d avg=%.2fms p50=%.2f p95=%.2f p99=%.2f "
+  questPerf.window = questPerf.window + 1
+  local line = ("PERF10 sessionWindow=%d uptime=%.1f n=%d "
+       .. "avg=%.2fms p50=%.2f p95=%.2f p99=%.2f "
        .. "worst=%.2f miss72=%d over20=%d over33=%d "
        .. "draw=%d canvas=%d shader=%d tex=%.1fMB")
-      :format(n, n > 0 and total / n or 0, percentile(0.50),
+      :format(questPerf.window, now, n, n > 0 and total / n or 0,
+              percentile(0.50),
               percentile(0.95), percentile(0.99), worst, missed72,
-              over20, over33, draws, canvases, shaders, textureMB))
+              over20, over33, draws, canvases, shaders, textureMB)
+  log(line)
+  persistQuestPerformance(line)
   questPerf.started, questPerf.frames = now, {}
 end
 
