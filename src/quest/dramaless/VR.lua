@@ -618,6 +618,54 @@ end
 
 -- ------- the per-frame drive
 
+-- Lightweight on-device baseline sampler. It reports ten-second windows to
+-- logcat on Quest builds; desktop behavior and rendered output are unchanged.
+local questPerf = { started = nil, last = nil, frames = {} }
+
+local function sampleQuestPerformance()
+  local log = rawget(_G, "QUEST_XR_LOG")
+  if not log or not love.timer or not love.timer.getTime then return end
+  local now = love.timer.getTime()
+  if not questPerf.started then
+    questPerf.started, questPerf.last = now, now
+    return
+  end
+  local ms = (now - questPerf.last) * 1000
+  questPerf.last = now
+  questPerf.frames[#questPerf.frames + 1] = ms
+  if now - questPerf.started < 10 then return end
+
+  local sorted, total, worst = {}, 0, 0
+  local missed72, over20, over33 = 0, 0, 0
+  for i, v in ipairs(questPerf.frames) do
+    sorted[i], total = v, total + v
+    if v > worst then worst = v end
+    if v > 13.89 then missed72 = missed72 + 1 end
+    if v > 20 then over20 = over20 + 1 end
+    if v > 33.3 then over33 = over33 + 1 end
+  end
+  table.sort(sorted)
+  local n = #sorted
+  local function percentile(p)
+    return sorted[math.max(1, math.min(n, math.ceil(n * p)))] or 0
+  end
+  local draws, canvases, shaders, textureMB = 0, 0, 0, 0
+  pcall(function()
+    local s = love.graphics.getStats()
+    draws = s.drawcalls or 0
+    canvases = s.canvasswitches or 0
+    shaders = s.shaderswitches or 0
+    textureMB = (s.texturememory or 0) / 1048576
+  end)
+  log(("PERF10 n=%d avg=%.2fms p50=%.2f p95=%.2f p99=%.2f "
+       .. "worst=%.2f miss72=%d over20=%d over33=%d "
+       .. "draw=%d canvas=%d shader=%d tex=%.1fMB")
+      :format(n, n > 0 and total / n or 0, percentile(0.50),
+              percentile(0.95), percentile(0.99), worst, missed72,
+              over20, over33, draws, canvases, shaders, textureMB))
+  questPerf.started, questPerf.frames = now, {}
+end
+
 function VR.update(dt)
   local on = VR.enabled()
   if not on then
@@ -699,6 +747,7 @@ function VR.update(dt)
   end
   local quadPose = updateQuad(worldUp, FirstPerson.engaged())
   VRXR.endFrame(time, worldUp or nil, quadPose)
+  sampleQuestPerformance()
 end
 
 -- ------- the window while a headset owns the picture

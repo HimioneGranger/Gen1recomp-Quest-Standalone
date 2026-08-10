@@ -837,3 +837,18 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   were insufficient: the final compositor uses `Renderer:uiScale()`, with a
   fractional override when `uiFill` is active, rather than always using
   `fitScale()`. The Pokedex crop now mirrors those exact end-frame scale rules.
+
+## 2026-08-10 - Kanto First Person Quest performance baseline
+
+- User reports that Kanto in First Person provides the desired visual direction
+  but is too expensive on Quest. A repeatable Pallet-to-Viridian walk will be
+  used as the baseline before changing visual features.
+- Added a Quest-only ten-second sampler to the Dramaless VR conductor. Reports
+  include average/p50/p95/p99/worst frame interval, missed 72 Hz counts,
+  >20 ms and >33.3 ms counts, current draw/canvas/shader switches, and texture
+  memory. This is intentionally light enough to leave enabled during video.
+- Planned ablations keep route, save, view direction, and movement comparable.
+  Test the stock visual set first, then likely high-cost groups independently:
+  FAST CHUNKS, particles/weather, extended terrain and mountain/tree geometry,
+  clouds/sky, and forest canopy/vines/shafts. Preserve interiors, horizon art,
+  and first-person presentation unless measurements specifically implicate them.
