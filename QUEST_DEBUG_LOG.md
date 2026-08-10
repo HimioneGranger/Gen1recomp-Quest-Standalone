@@ -390,3 +390,26 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   1.8.2 mesher and Android save root; (2) profile Quest eye rendering before
   adding an optional internal render scale; (3) evaluate cheaper distant
   forests only after the unconfirmed missing-building observation is resolved.
+
+## 2026-08-09 — Rejected 75% eye-resolution experiment
+
+- Tested a Quest-only 0.75 internal scale for both voxel eye canvases while
+  retaining the runtime-recommended OpenXR swapchain size and using the
+  existing blit for upscale. No camera, stereo, input, launcher, or geometry
+  behavior was changed.
+- On-headset result: initial population felt no faster and possibly slower;
+  the image was slightly blurrier and exhibited a visible shimmer artifact.
+- Telemetry during population showed severe missed-frame intervals (commonly
+  18–49 FPS, later roughly 31–38 FPS) and GPU utilization reaching 98%.
+  Captured process memory was about 1,675,848 KB PSS / 1,768,360 KB RSS,
+  including 731,564 KB graphics and 358,360 KB native heap. EGL tracking fell
+  to 89,928 KB, only about 54 MB below the prior full-resolution capture, while
+  GL tracking remained 327,116 KB.
+- Conclusion: eye-buffer memory and raw fragment resolution are not the main
+  initial-population bottleneck. The visual regression is unacceptable and
+  the experiment was fully reverted without a source commit. A restored
+  full-resolution ARM64 APK was rebuilt and installed successfully.
+- Next profiling should instrument mesh queue length, geometry generation,
+  native allocations, GPU upload time, and mesh lifetime/eviction. Persistent
+  caching or indexed geometry should be considered only after those counters
+  identify the dominant cost.
