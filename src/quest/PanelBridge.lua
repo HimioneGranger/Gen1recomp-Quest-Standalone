@@ -40,35 +40,24 @@ do
     pcall(C.questxr_log, "Lua fixed-buffer panel bridge linked")
   end
 
-  -- Quest builds carry the matching OpenXR handoff modules, indexed mesh sink,
-  -- and Quest FX defaults beside the game. Refresh only those audited files; ROMs,
-  -- saves, manifests, settings, assets, and all other mod files remain
-  -- user-owned and untouched.
+  -- Quest builds carry Android/OpenXR replacements for the platform-bound VR
+  -- modules beside the game.  Dramaless owns its renderer, asynchronous mesher,
+  -- quality policy, assets, and settings; do not overwrite those with files
+  -- from the older Dramatic Shape integration.
   local replacement = love.filesystem.read("lib/VRXR.lua")
   local questVR = love.filesystem.read("lib/VR.lua")
   local questVRGL = love.filesystem.read("lib/VRGL.lua")
-  local questMesher = love.filesystem.read("lib/ChunkMesher.lua")
-  local questForest = love.filesystem.read("lib/ForestAtmos.lua")
-  local questScene = love.filesystem.read("lib/VoxelScene.lua")
-  if C and replacement and questVR and questVRGL and questMesher and questForest
-      and questScene
+  if C and replacement and questVR and questVRGL
       and replacement:find("questxr_request_launcher_shutdown", 1, true) then
     local okXR = love.filesystem.write(
-      "mods/DRAMATIC_SHAPE/lib/VRXR.lua", replacement)
+      "mods/DRAMALESS_SHAPE/lib/VRXR.lua", replacement)
     local okVR = love.filesystem.write(
-      "mods/DRAMATIC_SHAPE/lib/VR.lua", questVR)
+      "mods/DRAMALESS_SHAPE/lib/VR.lua", questVR)
     local okVRGL = love.filesystem.write(
-      "mods/DRAMATIC_SHAPE/lib/VRGL.lua", questVRGL)
-    local okMesher = love.filesystem.write(
-      "mods/DRAMATIC_SHAPE/lib/ChunkMesher.lua", questMesher)
-    local okForest = love.filesystem.write(
-      "mods/DRAMATIC_SHAPE/lib/ForestAtmos.lua", questForest)
-    local okScene = love.filesystem.write(
-      "mods/DRAMATIC_SHAPE/lib/VoxelScene.lua", questScene)
-    pcall(C.questxr_log, okXR and okVR and okVRGL and okMesher and okForest
-      and okScene and
-      "Dramatic Shape Quest OpenXR, mesher, and map policy installed" or
-      "Dramatic Shape Quest integration install failed")
+      "mods/DRAMALESS_SHAPE/lib/VRGL.lua", questVRGL)
+    pcall(C.questxr_log, okXR and okVR and okVRGL and
+      "Dramaless Shape Quest OpenXR transport installed" or
+      "Dramaless Shape Quest transport install failed")
   end
 end
 

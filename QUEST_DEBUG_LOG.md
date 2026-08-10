@@ -748,3 +748,20 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   yet proof that the intermittent loading defect is fixed. Retain the tracing
   and repeat cold-start, rapid-relaunch, and suspend/resume tests before
   promoting the zero-layer handling as the complete solution.
+## 2026-08-10 - Dramaless Shape 1.6.4 transition started
+
+- Preserved the physically verified launcher baseline in commit `1bdd56a`,
+  then created the isolated `dramaless-1.6.4-integration` branch.
+- Pinned the official Dramaless Shape `v1.6.4` release at commit
+  `3e7138a31f9d0ca608aba7d0adf9f8ca9b610161`. The release fixes the 1.6.3
+  first/third-person softlock and explicitly says not to continue using 1.6.3.
+- Dramaless uses mod id `DRAMALESS_SHAPE` and declares hard conflicts with
+  `DRAMATIC_SHAPE` and `TERRARIUM`; only Dramaless will be enabled for the
+  transition test.
+- Narrowed Android startup injection to `VRXR.lua`, `VR.lua`, and `VRGL.lua`
+  under `mods/DRAMALESS_SHAPE`. The old six-file injection must not be reused:
+  Dramaless 1.6.4 has its own asynchronous `ChunkMesher.lua`, performance
+  policy, and `VoxelScene.lua`, and it has no `ForestAtmos.lua`.
+- The existing Dramatic Shape working tree and offline bundle remain unchanged
+  as a private behavioral reference. No ROM, save, or generated game data was
+  added to source or packaging.
