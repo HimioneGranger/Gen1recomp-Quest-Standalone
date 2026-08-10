@@ -31,6 +31,7 @@ static volatile int questxr_bootstrap_stopped = 1;
 static pthread_mutex_t questxr_panel_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t questxr_input_mutex = PTHREAD_MUTEX_INITIALIZER;
 static uint32_t questxr_input_events;
+static uint32_t questxr_input_held;
 static unsigned char *questxr_panel_rgba;
 static unsigned char *questxr_panel_spare;
 static uint64_t questxr_panel_generation;
@@ -57,6 +58,12 @@ static void questxr_queue_input(uint32_t events) {
     if (!events) return;
     pthread_mutex_lock(&questxr_input_mutex);
     questxr_input_events |= events;
+    pthread_mutex_unlock(&questxr_input_mutex);
+}
+
+static void questxr_set_held(uint32_t held) {
+    pthread_mutex_lock(&questxr_input_mutex);
+    questxr_input_held = held;
     pthread_mutex_unlock(&questxr_input_mutex);
 }
 
@@ -588,6 +595,7 @@ static void *questxr_native_bootstrap(void *unused) {
             float x = active_stick == 2 ? right_x : left_x;
             float y = active_stick == 2 ? right_y : left_y;
             int new_direction = 0;
+            uint32_t held_direction = 0;
             // Quest's launcher should respond before the stick reaches its
             // outer gate. Gameplay can use analogue values; menu navigation
             // needs only an intentional deflection and one event per flick.
@@ -601,6 +609,16 @@ static void *questxr_native_bootstrap(void *unused) {
                     else if (y < -0.35f) new_direction = QUESTXR_INPUT_DOWN;
                 }
             }
+            if (active_stick != 0) {
+                if (fabsf(x) >= fabsf(y)) {
+                    if (x > 0.35f) held_direction = QUESTXR_INPUT_RIGHT;
+                    else if (x < -0.35f) held_direction = QUESTXR_INPUT_LEFT;
+                } else {
+                    if (y > 0.35f) held_direction = QUESTXR_INPUT_UP;
+                    else if (y < -0.35f) held_direction = QUESTXR_INPUT_DOWN;
+                }
+            }
+            questxr_set_held(held_direction);
             if (new_direction) {
                 input_events |= (uint32_t) new_direction;
                 XR_LOG("Quest stick=%s x=%.3f y=%.3f direction=0x%x",
@@ -820,6 +838,13 @@ QUESTXR_EXPORT uint32_t questxr_poll_input(void) {
     questxr_input_events = 0;
     pthread_mutex_unlock(&questxr_input_mutex);
     return events;
+}
+
+QUESTXR_EXPORT uint32_t questxr_poll_held_input(void) {
+    pthread_mutex_lock(&questxr_input_mutex);
+    uint32_t held = questxr_input_held;
+    pthread_mutex_unlock(&questxr_input_mutex);
+    return held;
 }
 
 QUESTXR_EXPORT void questxr_request_launcher_shutdown(void) {

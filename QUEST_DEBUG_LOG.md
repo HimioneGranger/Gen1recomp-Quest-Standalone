@@ -765,3 +765,28 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - The existing Dramatic Shape working tree and offline bundle remain unchanged
   as a private behavioral reference. No ROM, save, or generated game data was
   added to source or packaging.
+- First headset launch reached Yellow's animated title sequence, proving the
+  game and Dramaless installation loaded rather than crashing. The screenshot
+  showed the green launcher focus ring stranded to the left of the game panel.
+  Root cause: `Kit.focusId` remained globally visible after `Importer` handed
+  off to `Game`. The transition now explicitly retires launcher focus in
+  `bootGame`, and `PanelBridge.focusRect` reports no ring outside the launcher.
+- The next headset test removed the ring but Yellow ignored every later title
+  press. QuestXR logs proved repeated `0x10` confirm edges reached Lua. The
+  bridge had synthesized `love.keypressed("return")` without a matching release,
+  so Gen1Recomp's per-source input state accepted the first intro-skip edge and
+  treated A as permanently held. Non-launcher native events now synthesize a
+  complete press/release tap; `Input:step` preserves its queued edge while
+  permitting the next physical press to become a new edge.
+- Button taps then advanced through Yellow into the overworld, but neither
+  thumbstick could move the player. Menu input needs edges; overworld movement
+  reads held direction state. The native launcher session now publishes a
+  separate held-direction mask, and `PanelBridge` presses/releases directional
+  keys as that mask changes while retaining edge-only navigation in launcher UI.
+- Physical verification then confirmed controls work through the title menu and
+  in the overworld. The first Dramaless import attempt reported that the ZIP
+  could not be opened and the app lost immersive focus. Our generated Git
+  archive was structurally valid but wrapped all files under a
+  `DRAMALESS_SHAPE/` directory. Replaced it with the publisher's official
+  `DRAMALESS_SHAPE_1-6-4-hotfix.zip`, whose `manifest.json` is at archive root
+  (SHA-256 `8B073FE0A97DB8EEB10CFA0A3B9F7D52767217780BD251F885326745C838CFB9`).

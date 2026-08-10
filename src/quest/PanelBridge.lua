@@ -17,6 +17,7 @@ do
       float focus_x, float focus_y, float focus_width, float focus_height);
     void questxr_log(const char *message);
     unsigned int questxr_poll_input(void);
+    unsigned int questxr_poll_held_input(void);
   ]])
   local libraries = {
     function() return ffi.C end,
@@ -62,6 +63,9 @@ do
 end
 
 local function focusRect()
+  if not rawget(_G, "QUEST_LAUNCHER_ACTIVE") then
+    return -1, -1, 0, 0
+  end
   local width, height = love.graphics.getDimensions()
   local okKit, Kit = pcall(require, "src.ui.kit.Kit")
   local target
@@ -82,9 +86,32 @@ local function focusRect()
     math.min(height, target.h + pad * 2) / height
 end
 
+local heldDirections = {}
+
+local function updateGameplayDirections()
+  if rawget(_G, "QUEST_LAUNCHER_ACTIVE") then return end
+  local ok, held = pcall(C.questxr_poll_held_input)
+  if not ok then return end
+  held = tonumber(held) or 0
+  for _, binding in ipairs({
+    { 1, "up" }, { 2, "down" }, { 4, "left" }, { 8, "right" },
+  }) do
+    local down = bit.band(held, binding[1]) ~= 0
+    local key = binding[2]
+    if down and not heldDirections[key] then
+      heldDirections[key] = true
+      love.keypressed(key, key, false)
+    elseif not down and heldDirections[key] then
+      heldDirections[key] = nil
+      love.keyreleased(key, key)
+    end
+  end
+end
+
 function PanelBridge.update(dt)
   elapsed = elapsed + (dt or 0)
   if not C then return end
+  updateGameplayDirections()
   local ok, events = pcall(C.questxr_poll_input)
   if not ok then
     pcall(C.questxr_log, "Lua Quest input poll failed")
@@ -101,6 +128,10 @@ function PanelBridge.update(dt)
     if bit.band(events, binding[1]) ~= 0 then
       local key = binding[2]
       if key == "up" or key == "down" or key == "left" or key == "right" then
+        if not rawget(_G, "QUEST_LAUNCHER_ACTIVE") then
+          -- Gameplay directions are level-triggered by poll_held_input above.
+          -- The event bit remains launcher-only so walking can stay held.
+        else
         -- Native input arrives during update, after the previous immediate-mode
         -- frame has already built a complete navigation graph. Resolve against
         -- that graph now so the visible ring changes on the very next draw.
@@ -113,6 +144,8 @@ function PanelBridge.update(dt)
             key, before, tostring(Kit.focusId)))
         else
           love.keypressed(key, key, false)
+          love.keyreleased(key, key)
+        end
         end
       else
         local handled = false
@@ -127,7 +160,14 @@ function PanelBridge.update(dt)
             pcall(C.questxr_log, "Quest owner confirm handled=" .. tostring(handled))
           end
         end
-        if not handled then love.keypressed(key, key, false) end
+        if not handled then
+          -- Native OpenXR polling reports rising-edge events, not SDL key-up
+          -- events. Complete the synthetic tap immediately. Input keeps the
+          -- queued edge for the next fixed step while clearing the held source,
+          -- allowing the next Quest press to become a fresh A/B/direction edge.
+          love.keypressed(key, key, false)
+          love.keyreleased(key, key)
+        end
       end
     end
   end

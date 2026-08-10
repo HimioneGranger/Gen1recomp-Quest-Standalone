@@ -204,6 +204,12 @@ function closeTouchControlsEditor()
 end
 
 local function bootGame(version)
+  -- The native Quest quad is shared by the launcher and the game during the
+  -- handoff.  Retire the immediate-mode launcher's focus target before game
+  -- input or drawing begins so its green ring cannot survive over the title
+  -- screen while Dramaless starts the gameplay OpenXR session.
+  _G.QUEST_LAUNCHER_ACTIVE = false
+  pcall(function() require("src.ui.kit.Kit").focusId = nil end)
   -- The launcher hands us the chosen game (Red / Blue / Yellow); scripted and
   -- headless runs fall back to POKEPORT_VERSION, then Red.  Set the active
   -- version and overlay its extracted cache BEFORE anything requires generated
@@ -386,6 +392,7 @@ function love.load(args)
     onEditSave = openEditor,
     onEditTouchControls = openTouchControlsEditor,
   })
+  _G.QUEST_LAUNCHER_ACTIVE = true
   -- Quest input is polled before the launcher's update/draw. Own permanent
   -- top-tab confirmation here beside the live Importer reference instead of
   -- relying on an immediate-mode activation flag surviving into a later draw.
