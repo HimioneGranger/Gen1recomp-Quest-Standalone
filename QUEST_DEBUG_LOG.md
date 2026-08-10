@@ -864,6 +864,13 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   state-specific: only a top-of-stack `TextBox` trims 4% per side; Load Report
   remains untouched; 304x144 battle capture is aspect-fitted into the 320x288
   device texture with dark top/bottom padding rather than stretched or cropped.
+- User chose a single stable POV mirror instead of continuing state-specific
+  battle-camera tuning. Dramaless `VoxelScene` now invokes a Quest hook directly
+  before `Pokedex.draw`; the hook blits the active left-eye FBO into a dedicated
+  canvas, restores the GL bindings, and assigns that clean snapshot to the
+  handheld. The right eye reuses it. This avoids the combined stereo buffer,
+  state-dependent UI crops, a second world render, and Pokedex-in-Pokedex
+  recursion because the snapshot occurs before the prop is drawn.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 

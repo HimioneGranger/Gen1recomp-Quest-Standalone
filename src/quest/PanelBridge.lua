@@ -51,6 +51,14 @@ do
   -- exist in 1.6.4 and therefore cannot be mixed into this installation.
   local questVR = love.filesystem.read("src/quest/dramaless/VR.lua")
   local questVRGL = love.filesystem.read("lib/VRGL.lua")
+  local voxelScene = love.filesystem.read("mods/DRAMALESS_SHAPE/lib/VoxelScene.lua")
+  if voxelScene and not voxelScene:find("QUEST_CAPTURE_EYE_BEFORE_POKEDEX", 1, true) then
+    voxelScene = voxelScene:gsub(
+      "  if Pokedex%.frame then\r?\n",
+      "  local questCapture = rawget(_G, \"QUEST_CAPTURE_EYE_BEFORE_POKEDEX\")\n"
+        .. "  if questCapture then pcall(questCapture) end\n"
+        .. "  if Pokedex.frame then\n", 1)
+  end
   if C and replacement and questVR and questVRGL
       and replacement:find("questxr_request_launcher_shutdown", 1, true) then
     local okXR = love.filesystem.write(
@@ -59,7 +67,9 @@ do
       "mods/DRAMALESS_SHAPE/lib/VR.lua", questVR)
     local okVRGL = love.filesystem.write(
       "mods/DRAMALESS_SHAPE/lib/VRGL.lua", questVRGL)
-    pcall(C.questxr_log, okXR and okVR and okVRGL and
+    local okScene = voxelScene and love.filesystem.write(
+      "mods/DRAMALESS_SHAPE/lib/VoxelScene.lua", voxelScene)
+    pcall(C.questxr_log, okXR and okVR and okVRGL and okScene and
       "Dramaless Shape Quest OpenXR transport installed" or
       "Dramaless Shape Quest transport install failed")
   end
