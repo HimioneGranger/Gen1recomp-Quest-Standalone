@@ -246,6 +246,12 @@ local function dexScreen()
     local lx = math.floor((ww - frameW) / 2)
     local ly = math.floor((wh - frameH) / 2)
     local outW, outH = uiW * 2, uiH * 2
+    -- The classic 160x144 presentation leaves a narrow black column at both
+    -- edges of the finished mirror image. Trim only those margins. Wide battle
+    -- UI must retain its full source width or it becomes noticeably zoomed.
+    local sideTrim = uiW <= 160 and math.floor(frameW * 0.04) or 0
+    frameW = frameW - sideTrim * 2
+    lx = lx + sideTrim
     if not (dexCanvas and dexCanvas:getWidth() == outW
             and dexCanvas:getHeight() == outH) then
       dexCanvas = love.graphics.newCanvas(outW, outH, { dpiscale = 1 })
@@ -260,9 +266,9 @@ local function dexScreen()
     local sy = math.max(0, math.floor(wh - ly - frameH))
     if not (fbo and VRGL.copyFrontRegionToCanvas(
         fbo, sx, sy, frameW, frameH, outW, outH)) then return nil end
-    local metrics = ("fb=%dx%d ui=%dx%d scale=%.3f rect=%d,%d %dx%d fill=%s")
+    local metrics = ("fb=%dx%d ui=%dx%d scale=%.3f rect=%d,%d %dx%d trim=%d fill=%s")
       :format(ww, wh, uiW, uiH, s, sx, sy, frameW, frameH,
-              tostring(Renderer.uiFill and true or false))
+              sideTrim, tostring(Renderer.uiFill and true or false))
     if metrics ~= lastDexMetrics then
       lastDexMetrics = metrics
       local log = rawget(_G, "QUEST_XR_LOG")

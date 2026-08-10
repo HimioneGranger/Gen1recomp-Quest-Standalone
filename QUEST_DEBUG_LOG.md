@@ -850,6 +850,12 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   fallback and added change-only logs for framebuffer size, active UI size,
   final UI scale/fill state, and the exact GL source rectangle. Capture errors
   are now surfaced to QuestXR logcat rather than swallowed by `pcall`.
+- A full-left-eye experiment was rejected on-headset because it made the normal
+  composition substantially worse; it was reverted in `90d42ef`. Screenshots
+  of the restored framebuffer-region path show only narrow symmetric side bars
+  on the classic 160x144 handheld image. The normal source now trims 4% from
+  each side before downsampling. Wide battle UI is explicitly excluded so its
+  existing zoom is not increased.
 
 ## 2026-08-10 - Kanto First Person Quest performance baseline
 
