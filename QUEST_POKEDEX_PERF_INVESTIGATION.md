@@ -124,12 +124,26 @@ Compile-only artifact (not installed automatically):
 
 `E:/Gen1QuestVR/dist/Gen1Recomp-Quest-PokedexPostDraw-IndexedDramaless-candidate.apk`
 
-SHA-256: `54C6AAFABDE2DCB61DBBDBBB107B0E799675F41568429B9D6719A7A3CEAD67D5`
+SHA-256: `FA419141714CADBB187E9CB111EB32FD6120E37651B1392834C5523401381916`
 
 The Quest was left on the earlier `86e2c2d` post-draw-Pokedex-only APK while
 unattended. The indexed candidate was deliberately preserved but not installed,
 because first launch rewrites the writable Dramaless mesher shadow and requires
 an awake-controller/headset test to verify map rebuilds.
+
+Installed safe visual-test artifact:
+
+`E:/Gen1QuestVR/dist/Gen1Recomp-Quest-PokedexPostDraw-safe-test.apk`
+
+SHA-256: `41D0F7D837EEEFA0665DBE1A712366CC60AFE189BEF7823D8915FCE2A8F0270C`
+
+Build-process correction: Gradle's current installable artifact is under
+`app/build/outputs/apk/...`; an older 34MB file remained under
+`app/build/intermediates/apk/...`. Several late-night install/copy commands
+initially referenced that stale intermediate. Both named artifacts above were
+subsequently rebuilt, opened, and verified from the 55.9MB `outputs` APK. The
+safe post-draw-only APK was then installed successfully; the indexed candidate
+was not installed.
 
 Headset validation remains required for visual decisions. The computer can
 compile, inspect sources, compare logs, and reject structural errors unattended,
