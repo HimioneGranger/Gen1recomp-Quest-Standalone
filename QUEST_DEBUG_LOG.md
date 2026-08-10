@@ -413,3 +413,26 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   native allocations, GPU upload time, and mesh lifetime/eviction. Persistent
   caching or indexed geometry should be considered only after those counters
   identify the dominant cost.
+
+## 2026-08-09 — Rejected connected-map streaming experiment
+
+- Tested a deliberately narrow Quest-only distance constraint at the mesher's
+  existing whole-map boundary. The current map remained complete; connected
+  neighbours were requested and retained only within sixteen tiles of their
+  world-space rectangles. No chunking or mesher redesign was attempted.
+- The first installed APK did not exercise the change because the writable mod
+  refresh list carried only `VRXR.lua`, `VR.lua`, and `VRGL.lua`. A corrected
+  test temporarily refreshed `ViewBox.lua` and `VoxelScene.lua` as well, and a
+  runtime trace verified that the constrained implementation was active.
+- User testing found a noticeable performance improvement, confirming that
+  connected-map geometry contributes materially to the load, but the reduced
+  visible world/draw distance was too dramatic. Preserving the broad view is a
+  project requirement and worth the performance cost.
+- The experiment was rejected without a source commit. A one-time restoration
+  APK rewrote the original wide-view files into the writable mod; Quest logged
+  `Dramatic Shape wide-view restoration installed`. It was then replaced by a
+  permanent normal APK with the restoration hook removed. Both repositories
+  returned exactly to their pre-experiment source state.
+- Future performance work must retain the connected scenery. Priorities are
+  mesh/vertex representation, GPU upload cost, shadow workload, and measured
+  mesh lifetime—not more aggressive world visibility cuts.
