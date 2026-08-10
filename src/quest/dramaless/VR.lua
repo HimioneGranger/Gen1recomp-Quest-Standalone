@@ -240,11 +240,14 @@ local function dexScreen()
   local ok, out = pcall(function()
     local ww, wh = love.graphics.getPixelDimensions()
     if not (ww and ww > 0 and wh and wh > 0) then return nil end
-    local BattleScene = V.require("BattleScene")
-    local lx, ly, s = BattleScene.letterbox()
-    local frameW = math.max(1, math.ceil(BattleScene.GB_W * s))
-    local frameH = math.max(1, math.ceil(BattleScene.GB_H * s))
-    local outW, outH = BattleScene.GB_W * 2, BattleScene.GB_H * 2
+    local Renderer = require("src.render.Renderer")
+    local uiW, uiH = Renderer:uiSize()
+    local s = Renderer:fitScale()
+    local frameW = math.max(1, math.ceil(uiW * s))
+    local frameH = math.max(1, math.ceil(uiH * s))
+    local lx = math.floor((ww - frameW) / 2)
+    local ly = math.floor((wh - frameH) / 2)
+    local outW, outH = uiW * 2, uiH * 2
     if not (dexCanvas and dexCanvas:getWidth() == outW
             and dexCanvas:getHeight() == outH) then
       dexCanvas = love.graphics.newCanvas(outW, outH, { dpiscale = 1 })
@@ -259,9 +262,9 @@ local function dexScreen()
     local sy = math.max(0, math.floor(wh - ly - frameH))
     if not (fbo and VRGL.copyFrontRegionToCanvas(
         fbo, sx, sy, frameW, frameH, outW, outH)) then return nil end
-    -- Android's mirror capture has a narrow unused strip at the left edge.
-    -- Crop only that padding; do not offset the model or either eye camera.
-    return { dexCanvas, 0.035, 0, 1, 1 }
+    -- The region is already the exact active UI surface. Sampling the entire
+    -- result preserves both classic 160x144 menus and 304x144 wide battles.
+    return { dexCanvas, 0, 0, 1, 1 }
   end)
   return ok and out or nil
 end

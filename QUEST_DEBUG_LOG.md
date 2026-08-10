@@ -829,3 +829,7 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Headset follow-up found the corrected screen slightly oversized at its left
   edge. Reduced the UV crop from 5.5% to 3.5%; this retains the Android padding
   correction while restoring more of the source image and reducing its scale.
+- Further headset evidence isolated battle zoom to the handheld screen, not the
+  VR battle camera. The capture had hard-coded the classic 160x144 dimensions,
+  while the active WIDE battle UI is 304x144. It now reads `Renderer:uiSize()`
+  and captures the exact active UI letterbox; arbitrary UV cropping is removed.
