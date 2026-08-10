@@ -47,6 +47,10 @@
 #include <SDL_syswm.h>
 #endif
 
+#ifdef LOVE_ANDROID
+extern "C" void questxr_capture_presented_panel_gl(int width, int height);
+#endif
+
 namespace love
 {
 namespace graphics
@@ -907,6 +911,10 @@ void Graphics::present(void *screenshotCallbackData)
 	endPass();
 
 	gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, gl.getDefaultFBO());
+
+#ifdef LOVE_ANDROID
+	questxr_capture_presented_panel_gl(getPixelWidth(), getPixelHeight());
+#endif
 
 	if (!pendingScreenshotCallbacks.empty())
 	{

@@ -35,6 +35,8 @@ static unsigned char *questxr_panel_rgba;
 static unsigned char *questxr_panel_spare;
 static uint64_t questxr_panel_generation;
 static float questxr_focus_rect[4] = {-1.0f, -1.0f, 0.0f, 0.0f};
+static float questxr_pending_focus_rect[4] = {-1.0f, -1.0f, 0.0f, 0.0f};
+static int questxr_panel_capture_requested;
 static EGLContext questxr_capture_context = EGL_NO_CONTEXT;
 static GLuint questxr_capture_texture;
 static GLuint questxr_capture_fbo;
@@ -492,6 +494,7 @@ static void *questxr_native_bootstrap(void *unused) {
             if (event.type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED) {
                 XrEventDataSessionStateChanged *changed =
                     (XrEventDataSessionStateChanged *) &event;
+                XR_LOG("native bootstrap session state=%d", changed->state);
                 if (changed->state == XR_SESSION_STATE_READY && !running) {
                     XrSessionBeginInfo begin = { XR_TYPE_SESSION_BEGIN_INFO };
                     begin.primaryViewConfigurationType =
@@ -534,6 +537,24 @@ static void *questxr_native_bootstrap(void *unused) {
         if (XR_FAILED(frame_result)) {
             XR_LOG("xrBeginFrame failed: %d", frame_result);
             break;
+        }
+        static int last_should_render = -1;
+        if (last_should_render != (int) frame.shouldRender) {
+            last_should_render = (int) frame.shouldRender;
+            XR_LOG("native bootstrap shouldRender=%d", last_should_render);
+        }
+        if (!frame.shouldRender) {
+            XrFrameEndInfo idle_end = { XR_TYPE_FRAME_END_INFO };
+            idle_end.displayTime = frame.predictedDisplayTime;
+            idle_end.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+            idle_end.layerCount = 0;
+            idle_end.layers = NULL;
+            frame_result = xrEndFrame(session, &idle_end);
+            if (XR_FAILED(frame_result)) {
+                XR_LOG("idle xrEndFrame failed: %d", frame_result);
+                break;
+            }
+            continue;
         }
         XrActiveActionSet active_action_set = { action_set, XR_NULL_PATH };
         XrActionsSyncInfo sync_info = { XR_TYPE_ACTIONS_SYNC_INFO };
@@ -812,13 +833,16 @@ QUESTXR_EXPORT int questxr_launcher_stopped(void) {
 // Scale LÖVE's completed back buffer on its own GLES context and read only the
 // 1024x768 panel. Two fixed buffers avoid full-resolution screenshots and
 // allocation churn on the Quest's memory-constrained foreground process.
-QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
-    if (width <= 0 || height <= 0 || !questxr_bootstrap_started) return;
+static int questxr_capture_panel_gl(int width, int height,
+                                    float focus_x, float focus_y,
+                                    float focus_width, float focus_height,
+                                    int use_draw_fbo) {
+    if (width <= 0 || height <= 0 || !questxr_bootstrap_started) return 0;
     EGLContext current_context = eglGetCurrentContext();
-    if (current_context == EGL_NO_CONTEXT) return;
+    if (current_context == EGL_NO_CONTEXT) return 0;
     const size_t size = 1024u * 768u * 4u;
     if (!questxr_panel_spare) questxr_panel_spare = (unsigned char *) malloc(size);
-    if (!questxr_panel_spare) return;
+    if (!questxr_panel_spare) return 0;
 
     if (questxr_capture_context != current_context) {
         questxr_capture_context = current_context;
@@ -832,7 +856,7 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
         }
         if (!questxr_gl_blit_framebuffer) {
             XR_LOG("panel capture glBlitFramebuffer unavailable");
-            return;
+            return 0;
         }
         glGenTextures(1, &questxr_capture_texture);
         glBindTexture(GL_TEXTURE_2D, questxr_capture_texture);
@@ -849,7 +873,7 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
             questxr_capture_texture = 0;
             questxr_capture_fbo = 0;
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            return;
+            return 0;
         }
         XR_LOG("native fixed-buffer panel capture ready");
     }
@@ -858,9 +882,35 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
     glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &old_read);
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &old_draw);
     glGetIntegerv(GL_PACK_ALIGNMENT, &old_pack);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    GLuint capture_source = (GLuint) (use_draw_fbo ? old_draw : old_read);
+    static int logged_read_framebuffer = 0;
+    if (!logged_read_framebuffer) {
+        logged_read_framebuffer = 1;
+        GLint viewport[4] = {0, 0, 0, 0};
+        GLint attachment_type = 0;
+        GLint attachment_name = 0;
+        GLint samples = 0;
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        glGetFramebufferAttachmentParameteriv(
+            GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+            GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &attachment_type);
+        glGetFramebufferAttachmentParameteriv(
+            GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+            GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &attachment_name);
+        glGetIntegerv(GL_SAMPLES, &samples);
+        XR_LOG("panel capture readFbo=%d drawFbo=%d viewport=%d,%d %dx%d attachmentType=0x%x attachment=%d samples=%d",
+               old_read, old_draw, viewport[0], viewport[1], viewport[2],
+               viewport[3], attachment_type, attachment_name, samples);
+    }
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, capture_source);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, questxr_capture_fbo);
-    questxr_gl_blit_framebuffer(0, 0, width, height, 0, 0, 1024, 768,
+    // LÖVE Canvas textures use top-left image coordinates while glReadPixels
+    // returns framebuffer rows from the bottom up. Flip only the explicit
+    // bound-Canvas path; the default Android back buffer is already oriented
+    // correctly. Focus coordinates remain unchanged in panel space.
+    questxr_gl_blit_framebuffer(0, use_draw_fbo ? height : 0,
+                                width, use_draw_fbo ? 0 : height,
+                                0, 0, 1024, 768,
                                 GL_COLOR_BUFFER_BIT, GL_LINEAR);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, questxr_capture_fbo);
     glPixelStorei(GL_PACK_ALIGNMENT, 4);
@@ -873,6 +923,7 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
     // SDL's Android back buffer can briefly be empty between surface/present
     // transitions. Never replace a valid VR panel with one of those frames.
     uint64_t brightness = 0;
+    uint32_t fingerprint = 2166136261u;
     uint32_t samples = 0;
     // Sample a grid across the image. The old first-column-only check treated
     // Yellow's black game border as an empty SDL frame and froze the last
@@ -882,6 +933,9 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
             const unsigned char *sample = questxr_panel_spare +
                 ((size_t) y * 1024u + x) * 4u;
             brightness += sample[0] + sample[1] + sample[2];
+            fingerprint ^= sample[0]; fingerprint *= 16777619u;
+            fingerprint ^= sample[1]; fingerprint *= 16777619u;
+            fingerprint ^= sample[2]; fingerprint *= 16777619u;
             samples++;
         }
     }
@@ -890,15 +944,61 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
         rejected_frames++;
         if (rejected_frames == 1 || rejected_frames % 60 == 0)
             XR_LOG("rejected blank launcher capture count=%u", rejected_frames);
-        return;
+        return 0;
     }
 
     pthread_mutex_lock(&questxr_panel_mutex);
     unsigned char *old_front = questxr_panel_rgba;
     questxr_panel_rgba = questxr_panel_spare;
     questxr_panel_spare = old_front;
+    questxr_focus_rect[0] = focus_x;
+    questxr_focus_rect[1] = focus_y;
+    questxr_focus_rect[2] = focus_width;
+    questxr_focus_rect[3] = focus_height;
     questxr_panel_generation++;
+    uint64_t accepted_generation = questxr_panel_generation;
     pthread_mutex_unlock(&questxr_panel_mutex);
+    if (accepted_generation == 1 || accepted_generation % 30u == 0u)
+        XR_LOG("panel capture generation=%llu fingerprint=%08x sourceFbo=%u",
+               (unsigned long long) accepted_generation, fingerprint,
+               capture_source);
+    return 1;
+}
+
+QUESTXR_EXPORT void questxr_request_panel_capture(float focus_x, float focus_y,
+                                                   float focus_width,
+                                                   float focus_height) {
+    pthread_mutex_lock(&questxr_panel_mutex);
+    questxr_pending_focus_rect[0] = focus_x;
+    questxr_pending_focus_rect[1] = focus_y;
+    questxr_pending_focus_rect[2] = focus_width;
+    questxr_pending_focus_rect[3] = focus_height;
+    questxr_panel_capture_requested = 1;
+    pthread_mutex_unlock(&questxr_panel_mutex);
+}
+
+QUESTXR_EXPORT int questxr_capture_bound_panel_gl(int width, int height,
+                                                   float focus_x, float focus_y,
+                                                   float focus_width,
+                                                   float focus_height) {
+    return questxr_capture_panel_gl(width, height, focus_x, focus_y,
+                                    focus_width, focus_height, 1);
+}
+
+/* Called by LÖVE after Graphics::present has flushed/endPass'd and bound the
+ * completed default framebuffer, but before SDL swaps it away. */
+QUESTXR_EXPORT void questxr_capture_presented_panel_gl(int width, int height) {
+    float focus[4];
+    pthread_mutex_lock(&questxr_panel_mutex);
+    int requested = questxr_panel_capture_requested;
+    if (requested) {
+        memcpy(focus, questxr_pending_focus_rect, sizeof(focus));
+        questxr_panel_capture_requested = 0;
+    }
+    pthread_mutex_unlock(&questxr_panel_mutex);
+    if (requested)
+        questxr_capture_panel_gl(width, height,
+                                 focus[0], focus[1], focus[2], focus[3], 0);
 }
 
 QUESTXR_EXPORT void questxr_set_focus_rect(float x, float y,

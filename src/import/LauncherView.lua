@@ -200,7 +200,23 @@ function LauncherView.keypressed(imp, key)
     Kit.navigate(key)
     return true
   end
-  if imp._ringArmed and (key == "return" or key == "kpenter" or key == "space") then
+  -- Quest always displays the native focus ring and routes confirm through it,
+  -- so it never uses the desktop legacy shortcut that assumes unarmed Enter
+  -- means Play. Direct native navigation intentionally does not synthesize a
+  -- second launcher arrow event merely to set _ringArmed.
+  if (imp._ringArmed or rawget(_G, "QUEST_PANEL_ACTIVE"))
+      and (key == "return" or key == "kpenter" or key == "space") then
+    if rawget(_G, "QUEST_PANEL_ACTIVE") then
+      -- Native Quest input arrives during update, outside the immediate-mode
+      -- draw that owns tab closures. Do not depend on _activateId surviving
+      -- until that later draw for the launcher's permanent top-level tabs.
+      local tab = Kit.focusId and Kit.focusId:match("^tab%-(.+)$") or nil
+      if tab == "red" or tab == "blue" or tab == "yellow"
+          or tab == "mods" or tab == "find" then
+        imp:_switchTab(tab)
+        return true
+      end
+    end
     Kit.activateFocused()
     return true
   end
@@ -2465,6 +2481,11 @@ end
 
 function LauncherView.draw(imp)
   ensureState(imp)
+  if rawget(_G, "QUEST_PANEL_ACTIVE") and imp._questLoggedDrawTab ~= imp.tab then
+    imp._questLoggedDrawTab = imp.tab
+    local log = rawget(_G, "QUEST_XR_LOG")
+    if log then log("Quest launcher drawing tab=" .. tostring(imp.tab)) end
+  end
   local m = Layout.metrics(1200)
 
   -- The pointer is the pad cursor while it is active, so the ring, hover and

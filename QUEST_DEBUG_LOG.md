@@ -461,3 +461,274 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - User also found Viridian Forest FX visually unsuitable and disproportionately
   expensive on Quest, and disabled it. Treat Forest FX as a separate
   Quest-default policy issue; it is not part of the indexed-mesh change.
+
+## 2026-08-09 - Forest verification and Indigo Plateau policy
+
+- The user completed a broad indexed-mesh traversal: repeated building
+  transitions, Viridian Forest entry, walking throughout the forest, and a
+  save created inside Viridian Forest. No indexed-mesh rendering corruption
+  was reported, and the user described the resulting gameplay as smooth.
+- Forest FX was physically judged both unattractive and disproportionately
+  expensive on Quest. Quest now presents `OFF` as the default/fallback rung;
+  desktop remains `FULL` and ordinary Android remains `LOW`. Persisted strings
+  (`off`/`low`) remain valid, so an explicit existing choice is not overwritten.
+- The first launch after installing this payload remained in immersive loading.
+  Logs showed a live launcher producing frames and repeatedly rejecting blank
+  captures, with no crash and no mod/gameplay OpenXR handoff yet. A clean
+  force-stop/relaunch first entered the mod screen abnormally with a visible
+  mouse cursor; a user restart recovered normally. Keep this evidence under
+  the existing intermittent-startup defect rather than attributing it to the
+  not-yet-loaded Forest setting.
+- Source inspection found that the expensive scenery adjacent to
+  `INDIGO_PLATEAU` is the long outdoor `ROUTE_23` map toward Victory Road, not
+  half of a Victory Road cave floor. Literal half-map terrain streaming would
+  require a new chunk mesh/cache/invalidation design.
+- A narrow Quest-only candidate instead defers only the south-connected Route
+  23 neighbour while the player remains in the northern half of Indigo
+  Plateau. Entering the southern half requests the existing complete body mesh
+  through the established asynchronous builder. No gameplay map loading,
+  collision, transitions, other neighbours, or desktop/ordinary Android paths
+  change. Awaiting physical verification at Indigo Plateau.
+- After installing that candidate, the user loaded the Viridian Forest save,
+  walked through Route 2 and back to Viridian City, and reported normal smooth
+  operation. The process remained alive with no fatal exception, mesh-build
+  failure, integration-install failure, ANR, or memory kill in the captured
+  log window. Post-walk memory was 1,262,183 KB PSS / 1,354,564 KB RSS, with
+  573,740 KB graphics. This is a useful general regression pass but does not
+  exercise the Indigo-specific branch.
+
+## 2026-08-09 - Wilds of Kanto compatibility test
+
+- Audited user-supplied `Wilds.of.Kanto.v1.12.1.zip` before installation. It is
+  an API-2 content mod (`overworld_wild_spawns`), contains no native DLL/SO
+  payload, declares no conflicts, and explicitly adapts its native
+  `SpriteRenderer` entities to Dramatic Shape's voxel/depth/grass path.
+- The archive is asset-heavy: 18,199,093 bytes, roughly 14,000 sprite assets,
+  SHA-256 `423AAA5F00F08C671826C5F53407A1E23FCD7BCD0CF355BF902A253C58CB0ED0`.
+  Copied unchanged to Quest Downloads for installation through the normal mod
+  importer; no ROM, save, Dramatic Shape asset, or private app file changed.
+- During installation navigation, the native green focus ring moved from Play
+  Yellow to the Mods puzzle-piece tab, but A still launched Yellow. Root cause:
+  `PanelBridge` called `Kit.navigate` directly, bypassing
+  `LauncherView.keypressed`, so the visible focus moved while `_ringArmed`
+  remained false and Enter retained its legacy Play shortcut. Quest directions
+  initially appeared to require routing through `love.keypressed`; that first
+  hypothesis was subsequently rejected by device testing (next bullet).
+- The first attempted fix routed directions back through `love.keypressed` and
+  immediately regressed native-ring/icon alignment without fixing activation;
+  it was rejected and reverted. The corrected candidate preserves the proven
+  direct `Kit.navigate` path and changes only launcher confirmation: when
+  `QUEST_PANEL_ACTIVE` is true, Enter activates `Kit.focusId` regardless of the
+  desktop `_ringArmed` compatibility flag. Awaiting physical verification.
+- Live reproduction then proved the focus model and activation were moving
+  through real controls (`tab-mods`, `tab-find`, `idx-add`, `idx-close`), while
+  native capture simultaneously logged repeated rejected blank frames. The
+  native focus rectangle had been updated even when its corresponding panel
+  frame was rejected, placing a current ring over a stale launcher image.
+  `questxr_capture_panel_gl` now reports acceptance, and `PanelBridge` commits
+  the matching focus rectangle only after a successful panel capture. Awaiting
+  physical confirmation that image and ring remain synchronized.
+- That synchronization candidate made physical ring alignment worse and was
+  immediately rejected. The native capture ABI and original focus/capture
+  ordering were restored. Future launcher-image work must use a controlled
+  frame source rather than coupling focus publication to the current blank
+  heuristic.
+- The validated one-time installer completed Wilds of Kanto 1.12.1 in about
+  24.5 seconds and the mod defaulted enabled. Yellow loaded the Viridian Forest
+  save and audio/gameplay continued, but the headset display was black. Wilds
+  logged six spawned entities; three immediately failed its Dramatic Shape
+  world-billboard contract with `pose() returned nil sprite` and selected the
+  spatial-overlay emergency path. No fatal exception was logged. Treat 1.12.1
+  as Quest-incompatible pending adapter investigation. A one-time validated
+  uninstall rollback was prepared; the original ZIP remains in Downloads and
+  on the host, while Dramatic Shape, ROM data, and saves are not removed.
+- The rollback payload ran successfully on-device and logged `Wilds of Kanto
+  rolled back after black VR output`. The user then confirmed that full 6DoF
+  voxel rendering returned. This isolates the flat/head-tracked screen failure
+  to the Wilds compatibility test rather than the base Quest OpenXR handoff.
+- Wilds 1.12.1 is therefore classified as incompatible with the current Quest
+  voxel adapter. Its temporary automatic installer/uninstaller and bundled ZIP
+  were removed from the clean APK payload after recovery. The user's original
+  ZIP remains untouched in Quest Downloads and on the host for future audit;
+  it is not enabled or copied into the app's mod directory.
+- A clean ARM64 debug APK was rebuilt after removing the 18.2 MB test archive
+  and all automatic Wilds install/rollback logic. The embedded `game.love`
+  payload fell from about 16.6 MB compressed to 3.2 MB and was inspected to
+  confirm no Wilds archive entry remained. The APK installed as an update with
+  app data preserved. Fresh startup logs show the OpenXR session, Touch action
+  attachment, live launcher capture, and Dramatic Shape integration install;
+  they contain no Wilds installation or rollback event.
+
+## 2026-08-09 - Launcher focus/image synchronization investigation
+
+- After the clean post-Wilds baseline was installed, the launcher still had
+  the unresolved focus defect: the native green ring could move while the
+  launcher image remained stale, and confirming the apparent Mods icon did
+  not reliably open the Mods panel.
+- A first focused experiment disabled the native overlay ring and drew a thin
+  green cursor directly into LÖVE's captured launcher frame. This guaranteed
+  that cursor and controls came from one image, but physical testing showed it
+  reintroduced the old flashing highlighter and did not work. The user rejected
+  it immediately, and all three Lua changes specific to that experiment were
+  reverted before the next build.
+- Source tracing confirmed the split-generation failure: Lua published the
+  native focus rectangle before native capture decided whether to accept or
+  reject the corresponding SDL back buffer. A rejected blank frame therefore
+  retained old pixels while displaying a newer focus rectangle.
+- The current candidate retains the previously steady native green ring and
+  changes the capture ABI so pixels and their computed focus rectangle are
+  committed together under `questxr_panel_mutex`, immediately before the same
+  panel-generation increment. A rejected frame now changes neither pixels nor
+  focus. The ARM64 APK compiled and installed successfully. Physical validation
+  of steadiness, alignment, Mods activation, and return navigation is pending;
+  this candidate is intentionally uncommitted until that test passes.
+- Physical testing reported the same failure with that atomic candidate. Live
+  logs nevertheless proved that accepted panel generations continued, focus
+  reached `tab-mods`, and confirm event `0x10` reached Lua. The failure is now
+  isolated after input/focus resolution: the generic one-frame `_activateId`
+  did not execute the focused tab's deferred draw-time closure.
+- The next narrow candidate directly calls the existing `_switchTab` action
+  when Quest confirms one of the five permanent top-level `tab-*` focus IDs.
+  It does not special-case Play or Mods content controls; those continue using
+  the shared activation path. Confirm-focus logging was added for the physical
+  test. This candidate is unverified and uncommitted.
+- The user recorded the failure. The synchronized 26-second Quest capture is
+  preserved locally as `debug-media/launcher-mods-232501.mp4` (with the longer
+  app capture beside it). It visibly shows the native ring moving across the
+  small top tabs while the complete Yellow panel remains unchanged. At
+  `23:25:18.448`, logs record `Quest confirm focus=tab-mods`; accepted panel
+  generations continue afterward, proving this is not missing controller input
+  or a stopped capture thread.
+- Direct switching inside `LauncherView.keypressed` still did not change the
+  visible panel. The next candidate moves permanent top-tab confirmation to a
+  handler installed in `main.lua`, beside the actual live `Importer` reference.
+  `PanelBridge` invokes it before the ordinary key fallback and logs both the
+  chosen tab and whether the owner handled the event. This avoids transient
+  immediate-mode activation and also provides decisive runtime evidence.
+- The owner-level device test produced decisive confirmation: logs show
+  `Quest confirm focus=tab-mods`, `Quest owner switched tab=mods`, and
+  `handled=true`, followed by hundreds of accepted panel generations, while
+  the headset still displayed the Yellow panel. Input, focus, and launcher
+  model activation are therefore functioning; the displayed pixels are stale.
+- Native inspection found the capture bridge queried LÖVE's bound read/draw
+  framebuffer IDs but then ignored `old_read` and always blitted from Android
+  framebuffer 0. On this GLES path, framebuffer 0 can contain the last
+  presented Android surface while LÖVE's current draw is in its own display or
+  MSAA framebuffer. The next candidate blits from the framebuffer LÖVE left
+  bound and logs the source IDs once. This is unverified and uncommitted.
+- Physical testing still showed no visual tab change. Logs again proved the
+  owner switched to Mods and handled confirm. The next instrumentation logs
+  each launcher tab actually entering `LauncherView.draw` and a sampled pixel
+  fingerprint every 30 accepted captures. This will distinguish a draw/model
+  reset from stale GL readback or stale native texture upload without another
+  speculative capture-source change.
+- The evidence build identified the exact mismatch. `LauncherView.draw` logged
+  Yellow, native capture logged `readFbo=0 drawFbo=1`, and accepted generations
+  1, 30, and 60 all had the identical sampled fingerprint `1dc1c3f0` even as
+  focus moved. LÖVE renders the current frame to draw framebuffer 1 while read
+  framebuffer 0 retains the stale presented Yellow image. The fix now binds
+  LÖVE's saved draw framebuffer as `GL_READ_FRAMEBUFFER` for the blit, then
+  restores both bindings. Awaiting physical verification that Mods becomes
+  visible and its ring/action remain aligned.
+- The first draw-framebuffer build produced a severely incomplete launcher;
+  the user captured it and the image is preserved as
+  `debug-media/draw-fbo-failure-234442.jpg`. It contains the field background,
+  native focus rectangle, one horizontal rule, and clipped footer text, but no
+  completed controls. This proves draw framebuffer 1 is live but was copied
+  while LÖVE still held most UI work in its renderer batch. `PanelBridge` now
+  calls `love.graphics.flushBatch()` immediately before the native blit. The
+  live-FBO choice remains; only capture timing changes.
+- Physical testing showed the flush did not restore the missing controls. The
+  draw-FBO experiment was therefore rejected and reverted to framebuffer 0 to
+  restore the last complete launcher presentation. The two pre-present sources
+  have now been characterized: FBO 0 is complete but can be stale; FBO 1 is
+  current but not the final composed window. The next implementation must
+  capture after LÖVE presents, not choose between these two incomplete timing
+  points.
+- Source inspection located that safe point in LÖVE's OpenGL
+  `Graphics::present`: it calls `flushStreamDraws()`, `endPass()`, and binds the
+  completed default FBO immediately before `window->swapBuffers()`. The current
+  candidate moves fixed-buffer capture there. Lua posts a throttled request and
+  matching focus rectangle; native present fulfills it after composition and
+  before swap. It retains the 1024x768 double buffers and does not allocate
+  full-resolution screenshot objects. Awaiting physical verification.
+- Post-present device logs then proved `LauncherView.draw` changed from Yellow
+  to Mods while generations 30 through 180 retained fingerprint `1dc1c3f0`.
+  Even after LÖVE's wrapper bound its completed default target, raw GLES state
+  remained `readFbo=0 drawFbo=1`; the candidate was still selecting stale READ
+  FBO 0. Capture now selects saved DRAW FBO 1 at the post-compose hook. This is
+  materially different from the rejected draw-time FBO-1 experiment because
+  `flushStreamDraws()` and `endPass()` have completed first.
+- Physical testing rejected post-compose DRAW FBO 1 as currently blitted: it
+  returned the same severely cropped/zoomed presentation as the earlier live
+  FBO experiment. The post-present timing made the target complete but did not
+  make its dimensions/layout equivalent to the full Android pixel extent used
+  by the blit. Capture source was immediately restored to READ FBO 0 so the
+  headset is not left on a broken launcher. Any future FBO-1 test must first
+  query and use its real viewport/attachment dimensions; do not reuse the
+  window's 4128x2208 pixel extent.
+- The normal complete FBO-0 presentation was rebuilt and installed; the user
+  confirmed the launcher was restored and Mods remained visually stale. The
+  next safe diagnostic keeps FBO 0 active while logging FBO 1's GL viewport,
+  attachment type, and attachment object ID at the post-compose hook. It does
+  not display or blit from FBO 1.
+- Safe measurement reported `readFbo=0 drawFbo=1`, viewport 4128x2208, with
+  DRAW color attachment type `GL_TEXTURE` (`0x1702`), object 23. The viewport
+  therefore matches the Android pixel extent; the next safe probe queries the
+  texture attachment's actual level-0 storage dimensions and sample count.
+- The level-0 texture-size probe used desktop GL queries unavailable in this
+  GLES header set and failed at compile time; no APK was produced or installed.
+  Re-examining the partial screenshot identified an unpreserved GL state with a
+  closer visual match: `glBlitFramebuffer` obeys `GL_SCISSOR_TEST`, and the
+  bridge never disabled it. The next candidate uses post-compose DRAW FBO 1,
+  saves/disables the scissor for the full-panel blit, then restores both its
+  enable state and box. This also preserves LÖVE's renderer state.
+- Physical testing showed the scissor-corrected DRAW-FBO build was still not
+  the normal launcher. Scissor clipping was therefore rejected as the primary
+  cause, and capture was restored to READ FBO 0 immediately. Do not test DRAW
+  FBO 1 again without a different resolved-source design.
+- After restoring the normal playable build, the next isolated design avoids
+  both window FBOs: Quest launcher drawing targets a fixed 1024x768 LÖVE Canvas,
+  flushes it, captures that exact bound Canvas into the existing fixed native
+  buffers, then draws the same Canvas to Android. This adds one small persistent
+  GPU target, performs no full-resolution screenshot allocation, and makes the
+  Android and OpenXR launcher pixels share one explicit source.
+- Physical verification confirmed that the explicit Canvas solved the stale
+  launcher: the displayed image now changes with navigation and every on-screen
+  button is selectable. The first Canvas build appeared vertically inverted
+  while the independently rendered native focus ring remained correctly placed.
+  The bridge now flips only the bound-Canvas source during the GPU blit, leaving
+  focus coordinates unchanged. The user confirmed the resulting launcher is
+  upright, its green focus ring is aligned and movable, and all buttons are
+  selectable. This is the verified launcher capture/input baseline.
+
+## 2026-08-09 - Recurring immersive-loading stall during launcher testing
+
+- The owner-level launcher build again remained on Meta's immersive loading
+  screen immediately after install/start. This recurrence is frequent enough
+  to remain a release-blocking issue rather than incidental test friction.
+- The captured stalled state is not a crash or Lua startup failure. PID 22674
+  remained the top activity; OpenXR context/session creation, `xrBeginSession`,
+  first `xrEndFrame`, fixed-buffer capture, and Dramatic Shape deployment all
+  completed. Accepted panel generations advanced past 300 while the headset
+  continued displaying Meta's loading environment.
+- No Quest controller event reached the app during this stalled window. This
+  combination points to a session that is nominally running/submitting but
+  never compositor-visible/focused. Existing logs record only READY/begin, so
+  the next diagnostic must record every OpenXR session-state transition and
+  `XrFrameState.shouldRender` before adding a bounded recovery watchdog.
+- Rapid debug APK replacement/force-stop may increase reproduction frequency,
+  but prior sleep and ordinary relaunch reports show it is not sufficient as
+  the sole explanation. Recovery must be valid for normal standalone use.
+- A clean force-stop, three-second cooldown, and relaunch reproduced the same
+  loading screen while startup and accepted panel generations again advanced.
+  The next build logs every session-state transition and `shouldRender` change.
+  It also follows the OpenXR frame contract by ending `shouldRender=false`
+  frames with zero layers instead of acquiring/submitting the launcher quad.
+- The diagnostic build then launched successfully and the user confirmed the
+  launcher was visible. Its state trace progressed IDLE (1), READY (2),
+  SYNCHRONIZED (3), VISIBLE (4), and FOCUSED (5); `shouldRender` was true and
+  accepted panel generations advanced. This is one successful recovery, not
+  yet proof that the intermittent loading defect is fixed. Retain the tracing
+  and repeat cold-start, rapid-relaunch, and suspend/resume tests before
+  promoting the zero-layer handling as the complete solution.

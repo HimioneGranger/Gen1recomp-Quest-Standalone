@@ -30,6 +30,7 @@ do
 end
 
 local Game, EditorApp, Importer, TouchEditor
+local questLauncherCanvas
 
 -- #887: quit-to-launcher state, shared by love.load and love.quit (both need
 -- it, so it is declared here rather than next to love.quit).
@@ -385,6 +386,22 @@ function love.load(args)
     onEditSave = openEditor,
     onEditTouchControls = openTouchControlsEditor,
   })
+  -- Quest input is polled before the launcher's update/draw. Own permanent
+  -- top-tab confirmation here beside the live Importer reference instead of
+  -- relying on an immediate-mode activation flag surviving into a later draw.
+  _G.QUEST_LAUNCHER_CONFIRM = function()
+    if not Importer then return false end
+    local Kit = require("src.ui.kit.Kit")
+    local tab = Kit.focusId and Kit.focusId:match("^tab%-(.+)$") or nil
+    if tab ~= "red" and tab ~= "blue" and tab ~= "yellow"
+        and tab ~= "mods" and tab ~= "find" then
+      return false
+    end
+    Importer:_switchTab(tab)
+    local log = rawget(_G, "QUEST_XR_LOG")
+    if log then log("Quest owner switched tab=" .. tab) end
+    return true
+  end
 end
 
 function love.update(dt)
@@ -441,6 +458,31 @@ function love.draw()
     return QuestPanel.capture()
   end
   if Importer then
+    if rawget(_G, "QUEST_PANEL_ACTIVE") and love.graphics.newCanvas then
+      local panelW, panelH = 1024, 768
+      if not questLauncherCanvas then
+        questLauncherCanvas = love.graphics.newCanvas(panelW, panelH, {
+          dpiscale = 1,
+        })
+      end
+      local windowW, windowH = love.graphics.getDimensions()
+      love.graphics.push("all")
+      love.graphics.setCanvas(questLauncherCanvas)
+      love.graphics.origin()
+      love.graphics.clear(0, 0, 0, 1)
+      love.graphics.scale(panelW / windowW, panelH / windowH)
+      Importer:draw()
+      if love.graphics.flushBatch then love.graphics.flushBatch() end
+      love.graphics.setScissor()
+      QuestPanel.captureBound(panelW, panelH)
+      love.graphics.setCanvas()
+      love.graphics.origin()
+      love.graphics.setColor(1, 1, 1, 1)
+      love.graphics.draw(questLauncherCanvas, 0, 0, 0,
+        windowW / panelW, windowH / panelH)
+      love.graphics.pop()
+      return
+    end
     Importer:draw()
     return QuestPanel.capture()
   end
