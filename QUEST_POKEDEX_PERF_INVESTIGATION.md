@@ -145,6 +145,21 @@ subsequently rebuilt, opened, and verified from the 55.9MB `outputs` APK. The
 safe post-draw-only APK was then installed successfully; the indexed candidate
 was not installed.
 
+## 2026-08-10 headset follow-up
+
+Post-draw timing alone did not remove Android's narrow unused column from the
+classic menu/dialog source, and battle remained a near-square crop of the
+widescreen eye mirror. Restored the conservative 3.5% left-only UV correction
+for classic non-battle UI. It does not move or resize the physical device and
+does not discard battle width.
+
+Battle zoom is a separate aspect-ratio constraint: a 10:9 physical screen
+cannot show the complete roughly 1.87:1 eye mirror without letterboxing,
+distortion, a wider physical screen, or an additional battle-camera render.
+Larger source crops already failed and worsened load cost. The indexed full-view
+performance test therefore proceeds without adding another full-resolution
+battle copy; camera/presentation alternatives remain isolated follow-up work.
+
 Headset validation remains required for visual decisions. The computer can
 compile, inspect sources, compare logs, and reject structural errors unattended,
 but it cannot infer perceived stereo alignment or readability from desktop

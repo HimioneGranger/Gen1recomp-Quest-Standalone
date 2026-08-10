@@ -95,6 +95,7 @@ local mirrorSrc = nil           -- last left-eye canvas, for the window
 local mirrorCanvas = nil
 local dexCanvas = nil           -- physical-device presentation texture
 local dexSource = nil           -- completed flat UI captured after Game:draw
+local dexBattle = false         -- state captured into dexSource
 local status = "off"
 
 -- the diorama's live adjustments: the right stick's zoom (a multiplier on
@@ -210,7 +211,7 @@ local function shutdown(reason)
     _G.QUEST_POKEDEX_CAPTURE = nil
     _G.QUEST_POKEDEX_CAPTURE_OWNER = nil
   end
-  dexSource, dexCanvas = nil, nil
+  dexSource, dexCanvas, dexBattle = nil, nil, false
   zoom, heightOff = 1, 0
   fpYawOff, snapArmed = 0, true
   camMode, fadeAlpha = "explore", 0
@@ -249,6 +250,7 @@ local function captureDexFrame()
     local ww, wh = love.graphics.getPixelDimensions()
     if not (ww and ww > 0 and wh and wh > 0) then return nil end
     local Renderer = require("src.render.Renderer")
+    dexBattle = camMode == "battle"
     local uiW, uiH = Renderer:uiSize()
     local s = Renderer:uiScale()
     if Renderer.uiFill then s = math.min(wh / uiH, ww / uiW) end
@@ -297,7 +299,11 @@ local function dexScreen()
   -- live frame into a fixed device texture.  This is one small canvas pass,
   -- not another world/eye render.
   if math.abs(sw / sh - 10 / 9) < 0.02 then
-    return { dexSource, 0, 0, 1, 1 }
+    -- Android's completed classic frame retains a narrow unused column at
+    -- the left edge. Dramatic Shape's near-correct Quest path established
+    -- that this is source padding, not a misplaced physical device. Crop a
+    -- conservative 3.5% only for menus/dialog; battles need their full width.
+    return { dexSource, dexBattle and 0 or 0.035, 0, 1, 1 }
   end
   if not (dexCanvas and dexCanvas:getWidth() == 320
           and dexCanvas:getHeight() == 288) then
