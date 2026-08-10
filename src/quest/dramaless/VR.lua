@@ -242,7 +242,14 @@ local function dexScreen()
     if not (ww and ww > 0 and wh and wh > 0) then return nil end
     local Renderer = require("src.render.Renderer")
     local uiW, uiH = Renderer:uiSize()
-    local s = Renderer:fitScale()
+    -- Match Renderer:endFrame's final UI compositor, not its base world/fit
+    -- scale. Survey zoom may reduce uiScale, and BATTLE SIZE=FILL replaces it
+    -- with a fractional scale; using fitScale here caused side bars in menus
+    -- and cropped/zoomed battle captures.
+    local s = Renderer:uiScale()
+    if Renderer.uiFill then
+      s = math.min(wh / uiH, ww / uiW)
+    end
     local frameW = math.max(1, math.ceil(uiW * s))
     local frameH = math.max(1, math.ceil(uiH * s))
     local lx = math.floor((ww - frameW) / 2)

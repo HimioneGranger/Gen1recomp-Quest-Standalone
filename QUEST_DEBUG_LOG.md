@@ -833,3 +833,7 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   VR battle camera. The capture had hard-coded the classic 160x144 dimensions,
   while the active WIDE battle UI is 304x144. It now reads `Renderer:uiSize()`
   and captures the exact active UI letterbox; arbitrary UV cropping is removed.
+- Menu side bars and continued battle zoom showed that active dimensions alone
+  were insufficient: the final compositor uses `Renderer:uiScale()`, with a
+  fractional override when `uiFill` is active, rather than always using
+  `fitScale()`. The Pokedex crop now mirrors those exact end-frame scale rules.
