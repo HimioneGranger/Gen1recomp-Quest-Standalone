@@ -100,7 +100,7 @@ local dexCopyGL = nil
 -- prop is drawn. Bindings are restored exactly, so LOVE's framebuffer cache
 -- remains truthful. This gives the device a clean left-eye mirror without a
 -- second world render and without recursively capturing the device itself.
-local function copyBoundEyeToCanvas(dstFBO, w, h)
+local function copyBoundEyeToCanvas(dstFBO, srcW, srcH, dstW, dstH)
   if not dstFBO then return false end
   if not dexCopyGL then
     local ok, built = pcall(function()
@@ -124,7 +124,11 @@ local function copyBoundEyeToCanvas(dstFBO, w, h)
     gl.glGetIntegerv(0x8CA6, oldDraw) -- GL_DRAW_FRAMEBUFFER_BINDING
     gl.glBindFramebuffer(0x8CA8, oldDraw[0]) -- READ <- active eye scene
     gl.glBindFramebuffer(0x8CA9, dstFBO)
-    gl.glBlitFramebuffer(0, 0, w, h, 0, h, w, 0, 0x4000, 0x2600)
+    -- Both VoxelScene's canvas and the destination are LOVE canvases; their
+    -- texture orientation matches. The earlier y-reversing blit inverted the
+    -- image on the physical Pokedex.
+    gl.glBlitFramebuffer(0, 0, srcW, srcH, 0, 0, dstW, dstH,
+                         0x4000, 0x2601)
     gl.glBindFramebuffer(0x8CA8, oldRead[0])
     gl.glBindFramebuffer(0x8CA9, oldDraw[0])
   end)
@@ -420,6 +424,13 @@ local function renderWorld(views, ctl)
   local hand = ctl and ctl.handl or nil
   if hand and (battle or fp) then
     Pokedex.place(hand, pivot, anchor, scale, mountYaw)
+    -- The clean eye snapshot contains the 3D scene only. Whenever the game has
+    -- UI that must be read (menu, dialog, battle, wipe), retain the verified
+    -- composed UI capture instead. Exploration uses the cheaper POV mirror.
+    if uiShowing() then
+      local scr = dexScreen()
+      if scr then Pokedex.screen(scr[1], scr[2], scr[3], scr[4], scr[5]) end
+    end
   else
     Pokedex.clear()
   end
@@ -444,18 +455,23 @@ local function renderWorld(views, ctl)
   -- the device, then leave the right-eye call alone so both eyes see the same
   -- left-eye mirror on the physical screen.
   local eyeCaptured = false
-  if Pokedex.frame then
+  if Pokedex.frame and not uiShowing() then
     local ew, eh = eyes[1].w, eyes[1].h
-    if not (dexEyeCanvas and dexEyeCanvas:getWidth() == ew
-            and dexEyeCanvas:getHeight() == eh) then
-      dexEyeCanvas = love.graphics.newCanvas(ew, eh, { dpiscale = 1 })
+    -- The prop occupies a small fraction of the eye. A full 2064x2208 mirror
+    -- consumed ~35 MB and measurable bandwidth for detail the device cannot
+    -- display. Preserve eye aspect at a compact 640px width instead.
+    local mw = 640
+    local mh = math.max(1, math.floor(mw * eh / ew + 0.5))
+    if not (dexEyeCanvas and dexEyeCanvas:getWidth() == mw
+            and dexEyeCanvas:getHeight() == mh) then
+      dexEyeCanvas = love.graphics.newCanvas(mw, mh, { dpiscale = 1 })
       pcall(dexEyeCanvas.setFilter, dexEyeCanvas, "linear", "linear")
       dexEyeFBO = VRGL.canvasFBO(dexEyeCanvas)
     end
     _G.QUEST_CAPTURE_EYE_BEFORE_POKEDEX = function()
       if eyeCaptured then return end
       eyeCaptured = true
-      if copyBoundEyeToCanvas(dexEyeFBO, ew, eh) then
+      if copyBoundEyeToCanvas(dexEyeFBO, ew, eh, mw, mh) then
         Pokedex.screen(dexEyeCanvas, 0, 0, 1, 1)
       end
     end
