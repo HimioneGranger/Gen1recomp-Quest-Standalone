@@ -533,7 +533,10 @@ function love.draw()
     local inset = math.max(8, 4 * scale)
     local titleFont = preloadFont(math.min(44, math.max(24, wh * 0.075)))
     local bodyFont = preloadFont(math.min(28, math.max(17, wh * 0.047)))
-    local smallFont = preloadFont(math.min(22, math.max(15, wh * 0.036)))
+    -- Status text must survive the panel's distance and headset sampling.
+    -- Use the medium face instead of a thin caption; drawing it once avoids
+    -- the ghosting caused by offset pseudo-bold/shadow passes in stereo.
+    local statusFont = preloadFont(math.min(30, math.max(20, wh * 0.052)))
     local mapName = tostring(vrPreload.map or "WORLD"):gsub("_", " ")
     local complete = tonumber(vrPreload.complete) or 0
     local required = tonumber(vrPreload.required) or 0
@@ -591,7 +594,7 @@ function love.draw()
     love.graphics.rectangle("line", barX - gap, barY - gap,
       barW + gap * 2, barH + gap * 2)
 
-    love.graphics.setFont(smallFont)
+    love.graphics.setFont(statusFont)
     love.graphics.printf(("LOADING MAP DATA  %02d / %02d")
       :format(complete, required), cardX,
       cardY + math.floor(cardH * 0.78), cardW, "center")

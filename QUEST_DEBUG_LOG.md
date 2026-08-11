@@ -1177,3 +1177,11 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - The user reported that the `PREPARING VR WORLD` title looked doubled. The
   loading card intentionally drew a two-pixel title shadow, so that decorative
   duplicate was removed; the title is now rendered once for clean VR legibility.
+- The first incremental APK rebuild silently retained the old embedded game
+  archive despite the corrected source. Inspection inside the APK exposed two
+  title draws, so a clean rebuild was performed and the packaged archive was
+  checked before installation. The corrected APK contains one title draw and
+  no shadow expression; headset testing confirmed the loading title is clean.
+- The lower `LOADING MAP DATA` caption remained too thin at headset distance.
+  It now uses a larger medium-weight raster size and remains a single draw, so
+  legibility improves without reintroducing offset ghosting.
