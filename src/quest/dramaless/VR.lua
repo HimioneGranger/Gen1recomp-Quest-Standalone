@@ -1122,13 +1122,20 @@ function VR.update(dt)
       started = true
       status = "session created"
       print("[DRAMALESS_SHAPE] VR: " .. VRXR.status())
-      log(("VRSTREAM policy hops=%d cap=%d majorDistance=%d "
-          .. "historyAPI=%s bodyAPI=%s warmAPI=%s")
-        :format(PRELOAD_HOPS, PRELOAD_MAP_CAP,
-          StreamingPolicy.MAJOR_PRELOAD_DISTANCE,
-          tostring(type(ChunkMesher.dropPrevious) == "function"),
-          tostring(type(ChunkMesher.dropBody) == "function"),
-          tostring(type(ChunkMesher.setWarmLive) == "function")))
+      -- Diagnostics are optional. The conductor runs in the installed mod's
+      -- namespace, where no global `log` is guaranteed; an unguarded call here
+      -- disabled the entire voxel render pipeline immediately after a
+      -- successful launcher-to-gameplay OpenXR handoff.
+      local log = rawget(_G, "QUEST_XR_LOG")
+      if log then
+        log(("VRSTREAM policy hops=%d cap=%d majorDistance=%d "
+            .. "historyAPI=%s bodyAPI=%s warmAPI=%s")
+          :format(PRELOAD_HOPS, PRELOAD_MAP_CAP,
+            StreamingPolicy.MAJOR_PRELOAD_DISTANCE,
+            tostring(type(ChunkMesher.dropPrevious) == "function"),
+            tostring(type(ChunkMesher.dropBody) == "function"),
+            tostring(type(ChunkMesher.setWarmLive) == "function")))
+      end
     else
       failed = VRXR.status()
       print("[DRAMALESS_SHAPE] VR unavailable: " .. failed
