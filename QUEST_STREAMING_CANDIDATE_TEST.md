@@ -1,19 +1,20 @@
 # Quest Gen 2 streaming/launcher candidate — physical validation
 
-Source tip: `287879a4` (`quest: restore left-stick launcher navigation`)
+Source tip: `268a3448` (`quest: guard VR startup diagnostics`)
 
 The candidate includes the bounded-streaming work beginning at `bc2e2092`, the
 atomic Quest payload/transport refresh at `2aa5253e`, and the left-stick-only
-launcher correction at `287879a4`.
+launcher correction at `287879a4`. `268a3448` prevents optional startup
+diagnostics from disabling the voxel pipeline after OpenXR handoff.
 
 Canonical APK:
 
 `mobile/android/app/build/outputs/apk/questVrNoRecord/debug/app-questVr-noRecord-debug.apk`
 
-- bytes: `58,594,071`
-- SHA-256: `EC7167DC0EEABA0D2BDA01DD8083B325166B85F9C48C1854AEF02E2F09403027`
+- bytes: `58,594,191`
+- SHA-256: `899339B1101158007DED6D8B359135CB92FF8134813857A3E369AFDFF3BCFF29`
 - embedded `game.love` SHA-256:
-  `260D9C464BBDFAF4C7F0CF8E029BF6B7BAA3170E20B2A4237467DB16D3E4499C`
+  `32868C1CE13CD5666D644AB1F1FDB71FEDB2F0F5BABEACD450600F50DE608489`
 - stamped engine: `0.1.78`
 
 The APK passed Android APK Signature Scheme v2 verification. Its LÖVE payload
@@ -39,15 +40,20 @@ generated ROM data, ROM binaries, saves, or mod artwork.
   thumbstick. The right stick remains reserved for VR camera control.
 - The temporary Quest-only thick yellow pointer experiment was removed; the
   launcher retains its existing appearance.
+- The `VRSTREAM` startup diagnostic now obtains and checks the optional Quest
+  log sink locally. The previous unguarded global call crashed the voxel render
+  pipeline immediately after a successful OpenXR handoff and produced a black
+  screen.
 
 ## Short headset test
 
 1. Install with `adb install -t -r <apk>`. The `-r` flag preserves app data,
    imported ROM caches, saves, and launcher-managed mods. The exact candidate
    above was installed successfully on Quest 3 `2G0YC1ZFB608RH`.
-2. Launch normally. Keep HGSS Visual Overhaul 0.3.0 and the usual Crystal 251,
-   Dramaless Shape, Kanto First Person, Wilds of Kanto, and Wild Skies stack
-   enabled.
+2. Launch normally. Keep the usual Crystal 251, Dramaless Shape, Kanto First
+   Person, Wilds of Kanto, and Wild Skies stack enabled. Confirm the intended
+   HGSS Visual Overhaul version in the log: the captured failure loaded 0.2.6,
+   not the supplied 0.3.0 archive.
 3. On the launcher, move the **left** stick in all four directions and confirm
    that the focused tab/control changes. The right stick must not navigate the
    menu. Move down to the Gold ROM row and confirm with A.
@@ -89,5 +95,6 @@ throttling. This candidate should reduce startup work and stop retaining every
 previous outdoor region; one short run is directional evidence rather than an
 absolute memory threshold.
 
-Physical headset validation of left-stick launcher navigation and game handoff
-is the remaining gate.
+Physical headset validation of left-stick launcher navigation with the left
+controller awake, and a rendered world after game handoff, is the remaining
+gate.
