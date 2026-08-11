@@ -1,20 +1,25 @@
-# Quest regional-streaming candidate — physical validation
+# Quest Gen 2 streaming/launcher candidate — physical validation
 
-Source commit: `bc2e2092` (`quest: bound regional streaming warmup`)
+Source tip: `613952af` (`quest: show launcher focus cursor`)
+
+The candidate includes the bounded-streaming work beginning at `bc2e2092`, the
+atomic Quest payload/transport refresh at `2aa5253e`, and the visible launcher
+focus fix at `613952af`.
 
 Canonical APK:
 
 `mobile/android/app/build/outputs/apk/questVrNoRecord/debug/app-questVr-noRecord-debug.apk`
 
-- bytes: `58,384,739`
-- SHA-256: `71021D8979CDF15149BD214BD3CB709568B759F4C1A8479ED71F18A91F2CD809`
+- bytes: `58,598,459`
+- SHA-256: `F7698FDA20599491B01449B2C12929460C231FF88E9411D655A343D04EBDE491`
 - embedded `game.love` SHA-256:
-  `E1D0AD04E2525FD8C25894437D54D0DA8EE50EAB19783E39469EFB4265A5D9F6`
+  `F6F68B43C999F478B5BCC095B819380CC67BDFBBE617F9320F8D2ED7F3A6682D`
 - stamped engine: `0.1.78`
 
 The APK passed Android APK Signature Scheme v2 verification. Its LÖVE payload
-contains the Gen 2 beta, the bounded-streaming policy, and the independent
-Dramaless lifetime adapter. It contains no generated ROM data or ROM binaries.
+contains the Gen 2 beta, the bounded-streaming policy, the current Quest
+launcher/conductor seams, `lib/VRXR.lua`, and `lib/VRGL.lua`. It contains no
+generated ROM data, ROM binaries, saves, or mod artwork.
 
 ## What changed
 
@@ -27,32 +32,43 @@ Dramaless lifetime adapter. It contains no generated ROM data or ROM binaries.
   body-release, or warm-live APIs.
 - Seamless route/town crossings and Fly discard the superseded mesh set. Door
   and interior warps retain it for a warm return.
+- Quest startup refreshes the current conductor and mesher adapters even when
+  an optional packaged transport is absent. This fixes the stale writable
+  conductor that kept showing the old 12-map warmup.
+- Launcher direction edges accept the right Touch thumbstick. Gameplay held
+  movement remains left-stick-only.
+- Quest paints the launcher's thick yellow focus ring and triangular pointer
+  into the captured surface, because the native overlay ring was not visibly
+  surviving headset filtering.
 
 ## Short headset test
 
-There is no need to watch or wait on the loading screen for this test.
-
-1. Install the APK with `adb install -t -r <apk>`. The `-r` flag preserves app
-   data, imported ROM caches, saves, and launcher-managed mods.
-2. Launch normally. Keep the launcher-updated HGSS Visual Overhaul 0.2.5 and
-   the usual Crystal 251, Dramaless Shape, Kanto First Person, Wilds of Kanto,
-   and Wild Skies stack enabled.
-3. Load the Saffron save. Confirm the Pokédex, game speed, tracking, and
+1. Install with `adb install -t -r <apk>`. The `-r` flag preserves app data,
+   imported ROM caches, saves, and launcher-managed mods. The exact candidate
+   above was installed successfully on Quest 3 `2G0YC1ZFB608RH`.
+2. Launch normally. Keep HGSS Visual Overhaul 0.3.0 and the usual Crystal 251,
+   Dramaless Shape, Kanto First Person, Wilds of Kanto, and Wild Skies stack
+   enabled.
+3. On the launcher, move the **right** stick in all four directions. A thick
+   yellow outline and yellow triangular pointer must visibly follow the focused
+   tab/control. Move down to the Gold ROM row and confirm with A.
+4. Load the Saffron save. Confirm the Pokédex, game speed, tracking, and
    controls are normal before walking.
-4. Walk east from Saffron through the gate to Route 8, then continue into
+5. Walk east from Saffron through the gate to Route 8, then continue into
    Lavender. A brief one-time warmup is acceptable; sustained stuttering is
    not.
-5. In Lavender, turn around once and cross back toward Route 8 if battery and
+6. In Lavender, turn around once and cross back toward Route 8 if battery and
    time permit. Then leave the game running and collect the capture below.
 
-## Expected log evidence
+## Expected evidence
 
 At VR startup:
 
 `VRSTREAM policy hops=1 cap=6 majorDistance=512 historyAPI=true bodyAPI=true warmAPI=true`
 
-The Saffron preload should report no more than six required maps. The previous
-build required 12 and took 50.86 seconds in the profiled Saffron session.
+The Saffron preload should report no more than six required maps. The first
+physical run displayed five stages, replacing the stale 12-stage load. The old
+12-map build took 50.86 seconds in the profiled Saffron session.
 
 The Route 8/Lavender outdoor seam should report:
 
@@ -74,4 +90,5 @@ throttling. This candidate should reduce startup work and stop retaining every
 previous outdoor region; one short run is directional evidence rather than an
 absolute memory threshold.
 
-Physical headset validation is the remaining gate.
+Physical headset validation of the visible focus cursor and game handoff is the
+remaining gate.
