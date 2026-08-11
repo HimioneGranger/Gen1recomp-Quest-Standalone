@@ -1302,3 +1302,16 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `96D2B7C0218D34B36A07DAA31EF69AA3EC3675F261B3C0057A087042C3CE0F56`
   and is 55,885,323 bytes. Install succeeded without replacing user saves or
   writable installed mods.
+
+## 2026-08-11 - Quest mod-modal regression coverage
+
+- Added a headless launcher seam test for the Quest-only modal input bridge.
+  It exercises confirm and directional input for experimental confirmation,
+  version selection, release notes, and mod details; checks the existing
+  Escape/Back close precedence; and proves desktop unarmed Enter remains
+  unchanged.
+- Result: 20/20 checks passed using the local LÖVE runtime. The source change
+  remains limited to forwarding Quest focus keys through the existing
+  `LauncherView.keypressed` handler before `RomImporter`'s modal guard returns.
+- Next checkpoint is canonical full-payload packaging and physical validation
+  of Enable, Update (when available), Back, and ordinary launcher navigation.

@@ -2647,6 +2647,15 @@ function RomImporter:keypressed(key)
   end
   if self._modConfirm or self._modVersions or self._modReleaseNotes
       or self._findDetails then
+    -- Modal buttons participate in the same immediate-mode focus list as the
+    -- rest of the launcher.  Handle arrows/A-as-Enter before this modal guard
+    -- returns; otherwise Quest keeps drawing the green focus ring but every
+    -- confirm key is discarded here, so the highlighted Enable/Update button
+    -- can never run.  Escape remains the explicit close path below.
+    if rawget(_G, "QUEST_PANEL_ACTIVE") and self._flex
+        and require("src.import.LauncherView").keypressed(self, key) then
+      return
+    end
     if key == "escape" then
       if self._findDetails then
         self._findDetails = nil

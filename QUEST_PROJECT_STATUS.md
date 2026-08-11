@@ -120,9 +120,9 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 - Performance, thermals, long-session stability, save/load, suspend/resume,
   and broad map coverage have not yet passed a release test matrix.
 - Quest experimental-mod dialogs can display focus on `Enable`/`Update` while
-  discarding A/Trigger. A narrow Quest-only source fix exists locally in
-  `src/import/RomImporter.lua`, but it is uncommitted and absent from the
-  installed APK until modal regression coverage is added.
+  discarding A/Trigger. The narrow Quest-only source fix now has 20 passing
+  regression checks across all four modal types and desktop behavior. It is
+  awaiting canonical packaging and physical headset validation.
 - Never deploy `build/intermediates/apk` artifacts. One such APK contained an
   incomplete/older `game.love` and visibly regressed the Pokédex. Only the
   verified canonical `build/outputs/apk/questVrNoRecord/debug` APK is a
@@ -181,8 +181,7 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Add regression coverage for Quest focus/confirm handling in experimental
-   mod dialogs, then package and device-test the local modal-input candidate.
+1. Package and device-test the covered Quest modal-input candidate.
 2. Re-test mod install, Enable/Update, release notes/details, Back, launch, and
    ordinary launcher navigation after that fix.
 3. Device-test the bounded major-location/interior preload candidate, including
