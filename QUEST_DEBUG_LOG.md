@@ -1432,3 +1432,33 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Result: controls and gameplay-state transitions pass; sustained memory,
   graphics allocation, and thermal behavior—not functional input—are now the
   primary concern for this stack.
+
+## 2026-08-11 - Bounded Quest UI and route-memory candidate
+
+- Audited the retained-resource paths against the 2.31 GB stress sample. The
+  Quest Pokédex capture and mirror replaced resized canvases without explicitly
+  releasing their old GPU objects, and VR shutdown/invalidation did not release
+  every owned capture target. Added a small ownership helper and now release
+  superseded/teardown canvases immediately rather than waiting for Android's
+  eventual Lua/graphics finalizer.
+- Dramaless intentionally retains the current and previous complete mesh live
+  sets so a door into an interior can return to its outdoor neighbourhood
+  without a flat rebuild flash. That same extra history is redundant after a
+  seamless route/town crossing: the new connected live set already contains
+  the map behind the player. Added a source-guarded `dropPrevious` seam and call
+  it only for connection crossings and Fly. Ordinary doors, caves, towers,
+  elevators, and other warp returns keep the warm-history behavior.
+- Offline tests passed: Quest canvas ownership `12/12`; history adapter `6/6`;
+  the complete adapter still applies exactly to checked Dramaless Shape 1.6.4
+  and produces compilable Lua.
+- Reproduced the known ABI-injected Gradle trap: the ARM64 intermediate updated
+  while the canonical output stayed at the old `D08A...` hash. That intermediate
+  was rejected. A forced multi-ABI canonical rebuild then succeeded.
+- Verified candidate APK SHA-256:
+  `B013F36302DE4BB0DD82317C4E99C80B25EE53F06BD4634863DD5DB4236E2DDA`
+  (52,815,428 bytes). APK Signature Scheme v2 passes; its embedded `game.love`
+  hash is `E6770E0AC9EE0F747591795DFC842168D17D06608F0CFF543CD86CB7028C965D`.
+  The payload has 367 entries, exactly one copy of each changed Quest file, and
+  no generated ROM/cache paths.
+- The headset was shut down, so the candidate was built but not installed.
+  Exact ordinary-play validation is in `QUEST_MEMORY_CANDIDATE_TEST.md`.

@@ -139,6 +139,15 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
   894 MB Graphics at 50 C. Long-session allocation and thermal optimization is
   the next performance priority for this expanded mod stack.
 
+- A first bounded-memory candidate is built, source-tested, payload-audited,
+  and signature-verified. It explicitly releases resized Quest UI/mirror
+  canvases and drops only redundant previous mesh neighbourhoods after
+  seamless crossings/Fly; warm interior return meshes remain unchanged.
+  Candidate SHA-256 is
+  `B013F36302DE4BB0DD82317C4E99C80B25EE53F06BD4634863DD5DB4236E2DDA`.
+  Physical headset validation remains and is documented in
+  `QUEST_MEMORY_CANDIDATE_TEST.md`.
+
 - Dramatic Sky Ride 0.1.5 is deferred: it was stable but reduced the measured
   Celadon interval from about 30.5 to 26.5 FPS. Its 3D flight works in VR, but
   altitude control does not: Quest triggers currently map to Start rather than
@@ -200,8 +209,9 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Device-test the bounded major-location/interior preload candidate, including
-   Celadon full preload, memory/body release, and representative interiors.
+1. Device-test `QUEST_MEMORY_CANDIDATE_TEST.md`, including seamless crossings,
+   a warm Tower/interior return, Pokédex/battle resize transitions, and final
+   memory/thermal capture.
 2. Profile and fix intermittent startup and slow initial Yellow/voxel loading.
 3. Fix SDL/OpenAL suspend/resume lifecycle crashes.
 4. Determine whether missing distant buildings are culling, asset population,
