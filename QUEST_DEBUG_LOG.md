@@ -1084,3 +1084,32 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   returned, Quest controls worked, and Cinnabar loaded. Route 1 was briefly
   choppy when its standard uncached neighboring meshes rebuilt; returning to
   Pallet recovered. This is the retained completeness-first baseline.
+
+## 2026-08-10 - Route 2 neighbor priority candidate
+
+- Hardware report tied aggressive north Route 2 tree pop-in to the westbound
+  Indigo Plateau road. Trace confirmed the Route 1 neighbor queue built
+  `PALLET_TOWN body`, then costly `ROUTE_22 body` (4530.67 ms), and only then
+  `ROUTE_2 body`. Route 2 waited 8347.40 ms and finished 12609.24 ms after its
+  request, matching the visible late tree arrival.
+- Added a narrow, source-guarded priority request: when `ROUTE_2` is present in
+  the neighbor set it is requested once immediately before the unchanged
+  standard loop. Mesher job deduplication keeps one body job; every neighbor is
+  still requested and retained, with no draw-distance or geometry change.
+- ARM64 candidate installed with APK SHA-256
+  `8695AFE4EB886C717AD0E77DDA0BD701BE2D264B9610F90369EA7A8E0CF2E928`.
+  Startup reached the launcher even after the controllers had slept.
+- Controlled Pallet -> Route 1 -> Viridian -> immediate Route 2 test passed.
+  User assessment: time-to-pop was only slightly better, but the slowdown during
+  pop-in was noticeably better. Trace verified `ROUTE_2 body` moved ahead of
+  Pallet/Route 22: wait fell from 8347.40 to 3477.21 ms and total queue-to-finish
+  fell from 12609.24 to 8183.01 ms, making it available about 4.43 seconds
+  earlier. Remaining costs are `ROUTE_1 full` (3253.46 ms), `ROUTE_2 body`
+  (4705.80 ms), and on entry `ROUTE_2 full` (11254.10 ms).
+- Follow-up clarified that the most conspicuous pop-in is specifically the row
+  of trees on the left beside the Victory Road/Route 22 boundary. Those trees
+  appeared slightly faster with this candidate, confirming Route 2 priority
+  materially gates that visible boundary even though it looks westbound.
+- Retain the priority correction. The next optimization must reduce Route 2's
+  own complete-mesh construction/draw cost without bypassing Kanto First Person
+  object side effects or reintroducing terrain/tree pop from distance culling.
