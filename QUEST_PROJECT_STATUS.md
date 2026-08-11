@@ -131,10 +131,11 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 ## Low-priority polish
 
 - Dramatic Sky Ride 0.1.5 is deferred: it was stable but reduced the measured
-  Celadon interval from about 30.5 to 26.5 FPS while its intended 3D flight
-  experience was not visible in VR. A later compatibility pass should inspect
-  its flight-camera path for explicit stereo/OpenXR integration. Keep it
-  disabled for now.
+  Celadon interval from about 30.5 to 26.5 FPS. Its 3D flight works in VR, but
+  altitude control does not: Quest triggers currently map to Start rather than
+  LÖVE trigger axes, and camera-altitude does not receive Quest head pitch.
+  Revisit with a generic raw OpenXR trigger/head-pitch input surface, then
+  reassess whether flight is worth the measured cost. Keep it disabled now.
 - Launcher modal highlighter appearance/alignment can be cleaned up further.
   Input and activation are device-verified functional; rank this above Pokédex
   presentation polish but below gameplay, loading, lifecycle, and performance

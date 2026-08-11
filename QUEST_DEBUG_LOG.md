@@ -1365,8 +1365,15 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   17 MB total and 16 MB graphics above the preceding Wild Skies-only sample.
   Temperature moved from 42 C to 45 C. No crash, ANR, OOM, or mod error was
   observed.
-- The user could not see the mod's intended 3D flight experience working in VR.
-  With measurable cost and no visible Quest benefit, Dramatic Sky Ride is
-  disabled/deferred. Revisit only with a focused audit of its flight-camera
-  path and explicit stereo/OpenXR integration; do not optimize it in the
-  current gameplay/performance pass.
+- The 3D flight experience does work in VR and the user flew around the map.
+  Vertical control is inaccessible: DSR polls standard LÖVE `triggerright` /
+  `triggerleft` axes for climb/descent, while the Quest OpenXR bridge currently
+  maps either trigger to Start, opening the game menu instead. Enabling both
+  `MANUAL ALTITUDE` and `CAMERA ALTITUDE` and using right-stick vertical look
+  also produced no altitude change; DSR observes the flat voxel camera pitch,
+  not the Quest head-pose path used by the current VR integration.
+- With measurable cost and no usable vertical flight control, Dramatic Sky
+  Ride is disabled/deferred. Revisit with a generic raw OpenXR trigger-state
+  bridge (without hard-coding this mod) and, if desired, a VR-head-pitch input
+  surface. Then repeat the same performance sample before deciding whether the
+  immersive flight benefit justifies the approximately four-FPS Celadon cost.
