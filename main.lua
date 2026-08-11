@@ -31,6 +31,17 @@ end
 
 local Game, EditorApp, Importer, TouchEditor
 local questLauncherCanvas
+local questPreloadFonts = {}
+
+local function preloadFont(size)
+  size = math.max(12, math.floor(size))
+  if not questPreloadFonts[size] then
+    local font = love.graphics.newFont(size)
+    font:setFilter("nearest", "nearest")
+    questPreloadFonts[size] = font
+  end
+  return questPreloadFonts[size]
+end
 
 -- #887: quit-to-launcher state, shared by love.load and love.quit (both need
 -- it, so it is declared here rather than next to love.quit).
@@ -514,27 +525,79 @@ function love.draw()
   local vrPreload = rawget(_G, "QUEST_VR_PRELOAD")
   if vrPreload and vrPreload.active then
     local ww, wh = love.graphics.getDimensions()
-    local bw = math.max(240, math.floor(ww * 0.56))
-    local bh = math.max(18, math.floor(wh * 0.035))
-    local bx, by = math.floor((ww - bw) / 2), math.floor(wh * 0.62)
     local p = math.max(0, math.min(1, tonumber(vrPreload.progress) or 0))
+    local scale = math.max(1, math.floor(math.min(ww / 320, wh / 240)))
+    local margin = math.max(12, math.floor(ww * 0.075))
+    local cardX, cardY = margin, math.floor(wh * 0.16)
+    local cardW, cardH = ww - margin * 2, math.floor(wh * 0.68)
+    local inset = math.max(8, 4 * scale)
+    local titleFont = preloadFont(math.min(44, math.max(24, wh * 0.075)))
+    local bodyFont = preloadFont(math.min(28, math.max(17, wh * 0.047)))
+    local smallFont = preloadFont(math.min(22, math.max(15, wh * 0.036)))
+    local mapName = tostring(vrPreload.map or "WORLD"):gsub("_", " ")
+    local complete = tonumber(vrPreload.complete) or 0
+    local required = tonumber(vrPreload.required) or 0
+    local segments = math.max(8, math.min(12, required > 0 and required or 10))
+    local filled = math.floor(p * segments + 0.0001)
     love.graphics.push("all")
     love.graphics.origin()
-    love.graphics.setColor(0.025, 0.04, 0.09, 0.96)
+
+    -- Four-tone LCD palette and subtle scan rows: deliberately reminiscent
+    -- of a classic handheld boot/load card, but made from plain geometry.
+    love.graphics.setColor(0.84, 0.91, 0.58, 1)
     love.graphics.rectangle("fill", 0, 0, ww, wh)
-    love.graphics.setColor(0.9, 0.95, 1, 1)
-    local title = "Preparing VR world"
-    local detail = ("%s  %d / %d"):format(tostring(vrPreload.map or "WORLD"),
-      tonumber(vrPreload.complete) or 0, tonumber(vrPreload.required) or 0)
-    love.graphics.printf(title, 0, by - 58, ww, "center")
-    love.graphics.printf(detail, 0, by - 30, ww, "center")
-    love.graphics.setColor(0.12, 0.16, 0.24, 1)
-    love.graphics.rectangle("fill", bx, by, bw, bh, 4, 4)
-    love.graphics.setColor(0.2, 0.85, 0.45, 1)
-    love.graphics.rectangle("fill", bx + 3, by + 3,
-      math.floor((bw - 6) * p), math.max(1, bh - 6), 3, 3)
-    love.graphics.setColor(0.9, 0.95, 1, 1)
-    love.graphics.rectangle("line", bx, by, bw, bh, 4, 4)
+    love.graphics.setColor(0.73, 0.82, 0.45, 0.42)
+    for y = 0, wh, math.max(4, 3 * scale) do
+      love.graphics.rectangle("fill", 0, y, ww, math.max(1, scale))
+    end
+
+    love.graphics.setColor(0.18, 0.29, 0.18, 0.35)
+    love.graphics.rectangle("fill", cardX + 6 * scale, cardY + 6 * scale,
+      cardW, cardH)
+    love.graphics.setColor(0.15, 0.25, 0.16, 1)
+    love.graphics.rectangle("fill", cardX, cardY, cardW, cardH)
+    love.graphics.setColor(0.84, 0.91, 0.58, 1)
+    love.graphics.rectangle("fill", cardX + inset, cardY + inset,
+      cardW - inset * 2, cardH - inset * 2)
+    love.graphics.setColor(0.31, 0.43, 0.22, 1)
+    love.graphics.setLineWidth(math.max(2, 2 * scale))
+    love.graphics.rectangle("line", cardX + inset * 1.7, cardY + inset * 1.7,
+      cardW - inset * 3.4, cardH - inset * 3.4)
+
+    local titleY = cardY + math.floor(cardH * 0.16)
+    love.graphics.setFont(titleFont)
+    love.graphics.setColor(0.31, 0.43, 0.22, 1)
+    love.graphics.printf("PREPARING VR WORLD", cardX, titleY + 2 * scale,
+      cardW, "center")
+    love.graphics.setColor(0.15, 0.25, 0.16, 1)
+    love.graphics.printf("PREPARING VR WORLD", cardX, titleY, cardW, "center")
+
+    love.graphics.setFont(bodyFont)
+    love.graphics.printf(mapName, cardX, cardY + math.floor(cardH * 0.39),
+      cardW, "center")
+
+    local barX = cardX + math.floor(cardW * 0.10)
+    local barY = cardY + math.floor(cardH * 0.59)
+    local barW = math.floor(cardW * 0.80)
+    local barH = math.max(24, math.floor(cardH * 0.12))
+    local gap = math.max(2, 2 * scale)
+    local segW = (barW - gap * (segments - 1)) / segments
+    for i = 1, segments do
+      love.graphics.setColor(i <= filled and 0.15 or 0.55,
+        i <= filled and 0.25 or 0.64,
+        i <= filled and 0.16 or 0.34, 1)
+      love.graphics.rectangle("fill", barX + (i - 1) * (segW + gap),
+        barY, math.max(1, segW), barH)
+    end
+    love.graphics.setColor(0.15, 0.25, 0.16, 1)
+    love.graphics.setLineWidth(math.max(2, scale))
+    love.graphics.rectangle("line", barX - gap, barY - gap,
+      barW + gap * 2, barH + gap * 2)
+
+    love.graphics.setFont(smallFont)
+    love.graphics.printf(("LOADING MAP DATA  %02d / %02d")
+      :format(complete, required), cardX,
+      cardY + math.floor(cardH * 0.78), cardW, "center")
     love.graphics.pop()
   end
   -- Quest VR's handheld display needs the completed flat game composition,

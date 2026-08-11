@@ -1140,6 +1140,10 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   Call this `Preparing VR world`, not shader compilation.
 ## 2026-08-10 — Location-aware startup preload and Route 2 full-mesh target
 
+- Replaced the unreadably small preload diagnostic with a scalable classic
+  handheld-style loading card: four-tone LCD palette, large nearest-filtered
+  title/map text, double frame, and a chunky segmented progress meter. It is
+  drawn entirely in code and adds no copyrighted or external artwork.
 - Added a ROM-free `Preparing VR world` handoff before gameplay OpenXR starts.
   It derives a nearest-first outdoor corridor from the selected save instead
   of assuming a fixed starting town, with four connection hops, a 12-map cap,
