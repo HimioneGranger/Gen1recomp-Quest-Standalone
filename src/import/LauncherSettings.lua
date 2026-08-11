@@ -214,10 +214,24 @@ local function coreRows(opts, hooks)
 
   local okSpd, GameSpeed = pcall(require, "src.core.GameSpeed")
   if okSpd then
-    add(Strings("GAME SPEED"),
-      function() return GameSpeed.levelLabel(opts.speed) end,
+    -- Per-category (RFC 0007): overworld/battle/menu each cycle their own
+    -- multiplier, mirroring OptionsMenu.lua's three rows.
+    add(Strings("OVERWORLD SPEED"),
+      function() return GameSpeed.levelLabel(opts.speedOverworld) end,
       function(dir)
-        opts.speed = GameSpeed.cycle(opts.speed, dir)
+        opts.speedOverworld = GameSpeed.cycle(opts.speedOverworld, dir)
+        return true
+      end)
+    add(Strings("BATTLE SPEED"),
+      function() return GameSpeed.levelLabel(opts.speedBattle) end,
+      function(dir)
+        opts.speedBattle = GameSpeed.cycle(opts.speedBattle, dir)
+        return true
+      end)
+    add(Strings("MENU SPEED"),
+      function() return GameSpeed.levelLabel(opts.speedMenu) end,
+      function(dir)
+        opts.speedMenu = GameSpeed.cycle(opts.speedMenu, dir)
         return true
       end)
   end
@@ -315,7 +329,6 @@ local function discoverModSchemas(opts)
   local okJson, Json = pcall(require, "src.link.Json")
   local okMan, Manifest = pcall(require, "src.mods.Manifest")
   if not (okJson and okMan) then return out end
-  local enabledFlags = opts.mods or {}
   local seen = {}
   for _, name in ipairs(fs.getDirectoryItems("mods")) do
     local path = "mods/" .. name
@@ -327,9 +340,10 @@ local function discoverModSchemas(opts)
       if data then okV, m = pcall(Manifest.validate, data, path) end
       if okV and m and not seen[m.id] and m.options_schema then
         seen[m.id] = true
-        -- deriveList's enable resolution: a missing entry means enabled,
+        -- deriveList's enable resolution, through the one reader both mod
+        -- surfaces use (SaveData.modEnabled): unanswered means enabled,
         -- except experimental mods, which stay off until opted in.
-        local flag = enabledFlags[m.id]
+        local flag = require("src.core.SaveData").modEnabled(opts, m.id)
         local enabled = flag == true or (flag == nil and not m.experimental)
         if enabled then
           local chunk = fs.load(path .. "/" .. m.options_schema)
@@ -433,17 +447,142 @@ local function modRows(opts, mod)
   return rows
 end
 
+-- ------- Gen 2 (Gold)
+--
+-- Gold reads NONE of the rows above.  Its OPTION screen writes a different
+-- set of names, several of which collide with Gen 1's at a different TYPE
+-- (battleStyle "SHIFT" vs "shift", textSpeed a label vs a frame delay), and
+-- its renderer has no battle layout, no SGB palette packs and no void fill --
+-- so a gear opened on the Gold tab used to offer a dozen controls that did
+-- nothing and hide the seven that the cart itself has.
+--
+-- The block lives in options.lua under `gold`, which is exactly where
+-- src/core/gen2/Save.lua loadOptions reads it, so an edit here is live on the
+-- next boot the same way a Gen 1 edit is.  Ladders mirror
+-- src/ui/gen2/OptionsMenu.lua's ROWS; when editing one, keep the two in sync.
+local GEN2_KEY = "gold"
+
+local function gen2Rows(opts)
+  local rows = {}
+  local function add(label, value, step)
+    rows[#rows + 1] = { label = label, value = value, step = step }
+  end
+
+  -- The cart's own seven (engine/menus/options_menu.asm _Option).
+  add(Strings("TEXT SPEED"), ladder(opts, "textSpeed",
+    { { "FAST", "FAST" }, { "MID", "MID" }, { "SLOW", "SLOW" } }, "MID"))
+  add(Strings("BATTLE SCENE"), ladder(opts, "battleScene",
+    { { true, "ON" }, { false, "OFF" } }, true))
+  add(Strings("BATTLE STYLE"), ladder(opts, "battleStyle",
+    { { "SHIFT", "SHIFT" }, { "SET", "SET" } }, "SHIFT"))
+  add(Strings("SOUND"), ladder(opts, "sound",
+    { { "MONO", "MONO" }, { "STEREO", "STEREO" } }, "MONO"))
+  add(Strings("PRINT"), ladder(opts, "print", {
+    { "LIGHTEST", "LIGHTEST" }, { "LIGHTER", "LIGHTER" },
+    { "NORMAL", "NORMAL" }, { "DARKER", "DARKER" }, { "DARKEST", "DARKEST" },
+  }, "NORMAL"))
+  add(Strings("MENU ACCOUNT"), ladder(opts, "menuAccount",
+    { { false, "OFF" }, { true, "ON" } }, true))
+  -- FRAME is the textbox border, 1-8, wrapping (UpdateFrame masks to 3 bits).
+  add(Strings("FRAME"),
+    function() return tostring(opts.frame or 1) end,
+    function(dir)
+      opts.frame = wrapIndex((opts.frame or 1) - 1 + (dir or 1), 8) + 1
+      return true
+    end)
+
+  -- ...then the port's, the same shared modules the Gen 1 rows drive.
+  add(Strings("MUSIC VOL"),
+    function() return volLabel(opts.musicVol) end,
+    function(dir) opts.musicVol = stepVolume(opts.musicVol, dir); return true end)
+  add(Strings("SFX VOL"),
+    function() return volLabel(opts.sfxVol) end,
+    function(dir) opts.sfxVol = stepVolume(opts.sfxVol, dir); return true end)
+  add(Strings("MUSIC FILTER"),
+    function() return FILTERS[(opts.musicFilter or 0) + 1] end,
+    function(dir)
+      opts.musicFilter = ((opts.musicFilter or 0) + dir) % #FILTERS
+      return true
+    end)
+
+  local okPal, GbcPalette = pcall(require, "src.render.GbcPalette")
+  if okPal then
+    add(Strings("COLOR"),
+      function() return GbcPalette.modeLabel(opts.color or "gbc") end,
+      function(dir)
+        local cur, idx = opts.color or "gbc", 1
+        for i, mode in ipairs(GbcPalette.MODES) do
+          if mode == cur then idx = i break end
+        end
+        opts.color =
+          GbcPalette.MODES[wrapIndex(idx - 1 + dir, #GbcPalette.MODES) + 1]
+        return true
+      end)
+  end
+
+  local okSpd, GameSpeed = pcall(require, "src.core.GameSpeed")
+  if okSpd then
+    add(Strings("GAME SPEED"),
+      function() return GameSpeed.levelLabel(opts.speed) end,
+      function(dir)
+        opts.speed = GameSpeed.cycle(opts.speed, dir)
+        return true
+      end)
+  end
+
+  local okTilt, Tilt = pcall(require, "src.render.Tilt")
+  if okTilt then
+    add(Strings("TILT"),
+      function() return Tilt.levelLabel(opts.tilt or 0) end,
+      function(dir)
+        opts.tilt = wrapIndex((opts.tilt or 0) + dir, 4)
+        return true
+      end)
+  end
+
+  -- Same #136 gate as the Gen 1 row and the in-game one.
+  local okFx, GBCFX = pcall(require, "src.render.GBCFX")
+  if okFx and GBCFX.isSupported() then
+    add(Strings("GBC FX"),
+      function() return GBCFX.levelLabel(opts.gbcfx or 0) end,
+      function(dir)
+        opts.gbcfx = wrapIndex((opts.gbcfx or 0) + dir, 5)
+        return true
+      end)
+  end
+
+  return rows
+end
+
 -- Build the whole settings model: one options table (edited in place),
 -- sections of rows, and a save() that persists it.  The caller keeps the
 -- model for as long as the panel is open; nothing else in the launcher
 -- writes options while a modal covers it, so the cached table stays true.
 -- `hooks` carries the host actions a row cannot perform itself:
 --   editTouchControls()  -- hand the screen to the touch-overlay editor
-function LauncherSettings.open(hooks)
+--
+-- `version` is the game the gear was opened on.  It picks the row set, and
+-- for Gold it also picks WHICH table the rows edit: the `gold` block inside
+-- options.lua rather than the flat Gen 1 one.
+function LauncherSettings.open(hooks, version)
   local opts = SaveData.loadOptions()
-  local sections = {
-    { title = Strings("OPTIONS"), rows = coreRows(opts, hooks) },
-  }
+  local sections
+  if version == "gold" then
+    local block = opts[GEN2_KEY]
+    if type(block) ~= "table" then
+      block = {}
+      opts[GEN2_KEY] = block
+    end
+    sections = {
+      { title = Strings("OPTIONS"), rows = gen2Rows(block) },
+    }
+  else
+    sections = {
+      { title = Strings("OPTIONS"), rows = coreRows(opts, hooks) },
+    }
+  end
+  -- Mod options are generation-agnostic (the manager's options_schema
+  -- contract), so they ride along either way.
   for _, mod in ipairs(discoverModSchemas(opts)) do
     local rows = modRows(opts, mod)
     if #rows > 0 then
@@ -452,6 +591,7 @@ function LauncherSettings.open(hooks)
   end
   return {
     opts = opts,
+    version = version,
     sections = sections,
     save = function() SaveData.saveOptions(opts) end,
   }

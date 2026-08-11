@@ -214,7 +214,15 @@ end
 -- records are a feature -- but a patch key that is only a case/underscore
 -- variant of a schema field is the classic typo and gets rejected with a
 -- suggestion.
-function Schemas.check(spec, registryName, id, value, mode)
+--
+-- `generation` is optional and only ever narrows: passing it resolves the
+-- per-generation shape first (Schemas.shapeFor), and omitting it validates
+-- against the Gen 1 shape, which is what every Gen 1 call site wants and what
+-- a caller already holding a derived spec has anyway.
+function Schemas.check(spec, registryName, id, value, mode, generation)
+  if generation ~= nil then
+    spec = Schemas.shapeFor(registryName, spec, generation)
+  end
   if mode == "remove" or spec == nil then return true end
   -- register and patch are synonyms on a deep registry, so a partial
   -- payload is the normal case there and only override is a full value
@@ -323,10 +331,10 @@ local function refsFor(spec, name, id, value)
   return refs
 end
 
--- a structured target (battle_anims' per-kind subtables) hides its ids one
--- level down, so the pristine scan asks the spec instead of the raw keys
-local function baseEntries(registry, base)
-  local spec = registry.spec
+-- a structured target (battle_anims' per-kind subtables, Gold's trainer
+-- classes) hides its ids one level down, so the pristine scan asks the spec
+-- instead of the raw keys
+local function baseEntries(spec, base)
   if not spec.baseIds then return pairs(base) end
   local ids = spec.baseIds(base)
   local i = 0
@@ -357,13 +365,26 @@ function Schemas.crossValidate(loader, data)
     end
   end
   for name, registry in pairs(loader.content) do
-    local spec = registry.spec
+    -- the shape this boot's generation validates by, so a Gen 2 record's
+    -- refs are read out of the Gen 2 fields (a species' `into`, not
+    -- `species`) instead of being missed entirely
+    local spec = Schemas.shapeFor(name, registry.spec, loader.generation)
     for id in pairs(registry.ops) do
       local value = registry:get(id)
       if value ~= nil and registry.owners[id] ~= Schemas.ENGINE then
         for _, ref in ipairs(refsFor(spec, name, id, value)) do
           local refRegistry = Schemas.REGISTRIES[ref.registry]
             and loader.content[ref.registry]
+          -- A registry with no home in this generation has no id space to
+          -- check against: its base view resolves to nothing, so EVERY
+          -- reference into it would read as dangling.  Gold's species carry a
+          -- growthRate and an evolution method like Red's do; the ids are
+          -- fine, it is the Gen 1 `growth_rates` / `evolution_methods`
+          -- namespaces that are not there to confirm them.  Skipped for the
+          -- same reason an undeclared registry is: unknown, not wrong.
+          if refRegistry and Schemas.gatedFor(ref.registry, loader.generation) then
+            refRegistry = nil
+          end
           if refRegistry and refRegistry:get(ref.ref) == nil then
             problems[#problems + 1] = {
               owner = registry.owners[id],
@@ -377,7 +398,7 @@ function Schemas.crossValidate(loader, data)
     if removed then
       local base = registry.base and registry.base()
       if base then
-        for id, value in baseEntries(registry, base) do
+        for id, value in baseEntries(spec, base) do
           if registry.ops[id] == nil then
             for _, ref in ipairs(refsFor(spec, name, id, value)) do
               local set = tombstoned[ref.registry]
@@ -408,8 +429,306 @@ Schemas.ALIASES = { scripts = "map_scripts", ui = "screens" }
 -- pass skips it and stays zero-work on a mod-free boot
 Schemas.ENGINE = "engine"
 
+-- ------- generation routing
+--
+-- Registry NAMES are shared across generations on purpose: a mod writes
+-- mod.content.pokemon whichever game is running, and mod.content.encounters
+-- means "wild encounters" in both.  What can differ is the Data path the
+-- merge lands on, because Gold namespaces the tables whose Gen 1 counterpart
+-- means something else (data.gen2Palettes beside data.palettes).
+--
+-- One routing table per generation, read through Schemas.routing, and both
+-- are read the same way:
+--
+--   absent            -> keeps spec.target in that generation
+--   mapped to a path  -> merges there instead
+--   mapped to false   -> no home in that generation; the write is taken,
+--                        dropped and reported
+--
+-- That last case is the whole point of the manifest's gen2compat opt-in: a
+-- mod that claims Gen 2 gets told which registry has no home there instead of
+-- merging into a table nothing reads and appearing to work.  It runs in both
+-- directions, because the catalog now holds content BOTH ways round: Gold has
+-- systems Red never had (the phone book, the decorations, the radio dial), and
+-- those registries are the mirror image of the rows below -- declared once,
+-- gated under GEN ONE, reported to a Red mod in the same sentence a Gold mod
+-- gets about `tokens`.  Schemas.GEN1 below Schemas.GEN2 carries them.
+--
+-- The `false` rows used to have three causes and now have one.  The first is
+-- gone: Gold's overworld tables no longer load off disk into World fields --
+-- src/core/Game2.lua:load reads every one of them into game.data BEFORE it
+-- calls mods:load(self.data), and src/world/gen2/World.lua:dataTable takes
+-- them by reference and never copies, so a routed row merges into the very
+-- table the world walks.  The second is gone too: a registry whose Gen 2
+-- records are shaped differently now says so in its own spec (the gen2Fields /
+-- gen2Keys layer below, resolved by Schemas.shapeFor), so routing it validates
+-- a mod's record against the GEN 2 shape rather than against Red's.  What is
+-- left is the systems Gold has not reimplemented through a registry at all.
+Schemas.GEN2 = {
+  -- Namespaced on Gold and merged there.  The registry NAME stays shared --
+  -- mod.content.maps means "maps" in both games -- and only the Data path
+  -- underneath it differs, which is the whole reason this table maps to paths
+  -- rather than renaming anything.  Two id-space notes an author needs, and
+  -- docs/mod-api-gen2-compat.md spells out: Gold's `text` ids are ROM pointer
+  -- strings ("55:4067") rather than TEXT_* names, and a Gen 2 tileset carries
+  -- its walkability as `collision` where Gen 1 says `walkable`.
+  maps = "gen2Maps", tilesets = "gen2Tilesets", sprites = "gen2Sprites",
+  text = "gen2Text",
+  -- Namespaced AND differently shaped, and the shape is what these waited on.
+  -- Each carries a Gen 2 record schema in its catalog entry now, so the id
+  -- space is the one Gold actually keys by: the encounter KIND (.grass), the
+  -- trainer CLASS (one level into .classes, through gen2Write), a species id
+  -- or an ICON_ sheet name, and for palettes / battle_anims / constants the
+  -- target's own subtable names.
+  encounters = "gen2Encounters", trainers = "gen2Trainers",
+  palettes = "gen2Palettes", icons = "gen2Icons",
+  battle_anims = "gen2BattleAnims", constants = "gen2Constants",
+  -- Gold reimplements the system, and reads its rules back through the same
+  -- registry: src/battle/gen2/Battle.lua:statusRecordFor / moveEffectRecordFor,
+  -- Catching.recordFor, Ai.layersFor, Evolution.methodFor and
+  -- src/core/gen2/ItemEffects.lua:recordFor each read the merged table here
+  -- and fall back to their own module records when no loader ran.  The vanilla
+  -- records at these paths are GOLD's, not Red's -- src/mods/Builtins.lua
+  -- swaps the registrant per generation, which it has to: both games call it
+  -- GREAT_BALL.
+  statuses = "gen2Statuses", move_effects = "gen2MoveEffects",
+  item_effects = "gen2ItemEffects", balls = "gen2Balls",
+  ai_classes = "gen2AiClasses", evolution_methods = "gen2EvolutionMethods",
+  -- The Gen 2-only six.  They have no Gen 1 target to keep (their specs carry
+  -- none), so the routed path IS the only path they ever have, and the
+  -- Schemas.GEN1 rows below are what makes writing to one on Red a reported
+  -- drop rather than a merge into a table Red has never heard of.  Two of them
+  -- merge onto a table that already exists when mods:load runs -- landmarks
+  -- onto the cache's own gen2Landmarks.landmarks, held_items onto the view
+  -- src/core/Game2.lua builds from data.items -- and the other four come
+  -- into existence AS the merge, seeded from their module's literals by
+  -- src/mods/Builtins.lua the way the battle-rule six are.
+  held_items = "gen2HeldItems", phone_contacts = "gen2PhoneContacts",
+  decorations = "gen2Decorations", apricorns = "gen2Apricorns",
+  landmarks = "gen2Landmarks.landmarks", radio_channels = "gen2RadioChannels",
+  -- Still no Gen 2 home.  Every one of these is a system Gold reimplements
+  -- WITHOUT reading a registry: the Gen 1 target is still built and merged
+  -- into, but nothing in a Gold boot ever looks at it.  Closing one is a
+  -- consumer change in the Gen 2 module first and a row here second, which is
+  -- exactly how battle_sprite_scales and render_pipelines came off this list
+  -- (see the note under it).
+  --   rulesets        no Gen 2 ruleset dispatch exists
+  --   transitions     Gold draws its own battle intro
+  --                   (src/ui/gen2/BattleTransition.lua) and its STYLES table
+  --                   is a boolean SET of the four cart wipes, not the
+  --                   { frames, draw, sound, flash } record this registry
+  --                   carries; there is no styleDef lookup for a mod id to
+  --                   reach, so a registered style would fall back to vanilla
+  --   field           the overworld grab bag; Gold's equivalents live in
+  --                   gen2Maps and the VM's own tables
+  --   text_pointers   Gen 1's TEXT_* indirection; Gold's text IS pointers
+  --   link_fields     link play is Gen 1 only
+  rulesets = false, transitions = false,
+  field = false, text_pointers = false, link_fields = false,
+  -- battle_sprite_scales and render_pipelines are ABSENT from this table on
+  -- purpose: both keep the shared Gen 1 target because Gold reads the merged
+  -- table at that exact path.
+  --   battle_sprite_scales  src/ui/gen2/BattleState.lua:imageScale reads
+  --                         data.battle_sprite_scales with the same
+  --                         image-then-species-then-default order as Gen 1's
+  --                         BattleState.imageBattleScale / resolveBattleScale,
+  --                         skipping the `_owners` bookkeeping row the same
+  --                         way.  Only the DEFAULT differs and neither side
+  --                         reads it from here: Red's 32x32 back pics draw at
+  --                         2x, Gold's 48x48 ones fill their 6x6 box at 1x.
+  --   render_pipelines      src/core/Game2.lua:load calls Pipelines.install
+  --                         AFTER the merge, so data.render_pipelines is the
+  --                         merged table, and Game2:draw composites `present`
+  --                         through Pipelines.wantsPresent / Pipelines.present.
+  --                         The `drawWorld` half is not composited yet (Gold's
+  --                         overworld draws straight to the window rather than
+  --                         into a canvas), and Game2 RETIRES a restored
+  --                         drawWorld-only level rather than leaving it
+  --                         switched on and rendering nothing; a mod that
+  --                         registers only drawWorld is therefore inert on
+  --                         Gold, which docs/mod-api-gen2-compat.md says in
+  --                         those words.  Gold also has no OPTION row for a
+  --                         pipeline (Pipelines.rows is read only from
+  --                         src/ui/OptionsMenu.lua), so a Gold player reaches
+  --                         one by its hotkey.
+  -- src/script/gen2/Vm.lua is a bytecode VM over the cart's own opcodes, not
+  -- the Gen 1 row-list runner.  `commands` IS routed (it is absent from this
+  -- table, so it keeps the shared data.commands target): the VM dispatches the
+  -- Opcodes.MOD_COMMAND row -- an op name with no cart byte behind it --
+  -- through that merged table, so mod.commands:register works on both games.
+  -- data.gen2Scripts is that bytecode pool keyed by ROM pointer, so
+  -- `map_scripts` has no home there: a Lua row list merged into it is not
+  -- something the VM can run.  (`tokens` used to sit on this line and does
+  -- not belong there -- TextBox.new runs TextBox.substitute on EVERY box in
+  -- both generations and substitute reads game.data.tokens, so the shared
+  -- target was already live on Gold.  It keeps that target, absent from this
+  -- table, and src/core/Game2.lua seeds data.tokens with a copy of
+  -- TextBox.TOKENS so the merge cannot mutate the module table.)
+  map_scripts = false,
+  -- Everything not listed keeps its Gen 1 target and works on Gold today:
+  -- pokemon, moves, items, type_chart, audio + music/sfx/cries/map_songs,
+  -- screens (the Gen2* ids in src/ui/Screens.lua), strings, font and commands.
+}
+
+-- The mirror of Schemas.GEN2: what a GEN 1 boot does with the registries that
+-- only exist because Gold exists.  Same three readings as the table above, and
+-- only the third is used today -- there is no Gen 2-only registry with a
+-- useful Red target to reroute to, because the systems themselves are absent
+-- from Red rather than spelled differently there.
+--
+--   held_items      Red's items carry no held attributes at all; the whole
+--                   hold/trigger machinery is Gen 2 (src/battle/gen2/Battle.lua
+--                   heldEffect)
+--   phone_contacts  no Pokegear, no phone
+--   decorations     no bedroom PC decoration menu
+--   apricorns       no Kurt, no apricorn balls
+--   landmarks       Red's town map is a Gen 1 town-map table, not the
+--                   LANDMARK_* index space the Pokegear and the #DEX AREA
+--                   page share
+--   radio_channels  no radio
+Schemas.GEN1 = {
+  held_items = false, phone_contacts = false, decorations = false,
+  apricorns = false, landmarks = false, radio_channels = false,
+}
+
+-- The routing table for a generation: which one is consulted is the only
+-- difference between the two directions.  An unknown generation routes
+-- nothing, so every registry keeps its catalog target.
+local NO_ROUTING = {}
+
+function Schemas.routing(generation)
+  if generation == 2 then return Schemas.GEN2 end
+  if generation == 1 then return Schemas.GEN1 end
+  return NO_ROUTING
+end
+
+-- The Data path `name` merges into for a generation, or nil when the registry
+-- has no home there.
+function Schemas.targetFor(name, spec, generation)
+  local routed = Schemas.routing(generation)[name]
+  if routed == nil then return spec.target end
+  return routed or nil
+end
+
+-- true when the registry exists but this generation has nowhere to put it,
+-- which is a different diagnostic from a registry that has no target at all
+function Schemas.gatedFor(name, generation)
+  return Schemas.routing(generation)[name] == false
+end
+
+-- ------- per-generation record shapes
+--
+-- Routing says WHERE a registration lands; this says what a record at that
+-- path LOOKS like.  The two are separate questions and only the second one is
+-- gating the rest of the catalog: Gold's tables are the Gen 2 ROM's own
+-- layout, so a species carries specialAttack/specialDefense where Red carries
+-- one `special`, wild encounters key by encounter kind and time of day rather
+-- than by map, and the palette table is GBC four-colour rows in a dozen named
+-- subtables.  Validating any of those against the Gen 1 schema judges a mod's
+-- record against the wrong shape, which is worse than refusing the write.
+--
+-- So beside `value` / `fields` / `keys` / `keyValue` a spec may carry
+-- `gen2Value` / `gen2Fields` / `gen2Keys` / `gen2KeyValue`, and beside
+-- `semantics` / `extra` / `write` / `baseAt` / `baseIds` / `example` /
+-- `notes` the matching `gen2*`.  Absent means "the Gen 1 shape is right here
+-- too", which is the common case and why most registries carry none of this.
+-- The registry NAME, the verbs and (wherever the id space allows it) the ids
+-- stay shared, exactly as the routing table keeps them shared.
+--
+-- `gen2X = false` CLEARS the Gen 1 slot rather than setting it, the same
+-- reading `false` has in the routing table above: battle_anims' Gen 1 `write`
+-- routes ids into per-kind subtables by prefix, and under Gen 2 the ids ARE
+-- the subtables, so the right Gen 2 write is the default one.  No slot here
+-- ever carries a meaningful `false` (they are functions, strings and tables),
+-- so the two readings cannot collide.
+--
+-- Schemas.shapeFor resolves it.  It hands back the spec unchanged for Gen 1
+-- and for any registry with no Gen 2 shape; otherwise a derived spec with the
+-- gen2* keys folded onto the canonical names, memoized per spec so the
+-- resolve is one table lookup after the first call.  Everything downstream --
+-- Schemas.check, Registry's fold and baseAt, the loader's merge and write --
+-- then reads one spec and never learns about generations.
+local GEN2_SHAPE = {
+  gen2Value = "value", gen2Fields = "fields", gen2Keys = "keys",
+  gen2KeyValue = "keyValue", gen2Extra = "extra",
+  gen2Semantics = "semantics", gen2Write = "write",
+  gen2BaseAt = "baseAt", gen2BaseIds = "baseIds",
+  gen2Example = "example", gen2Notes = "notes",
+}
+
+-- Schemas.check reads these four in a fixed order (keys/keyValue, then value,
+-- then fields), so a Gen 2 shape that describes its records with `keys` must
+-- clear the Gen 1 `value` rather than sit beside it: otherwise the first
+-- branch that matches wins and the new schema is never consulted.
+local VALUE_SLOTS = { value = true, fields = true, keys = true, keyValue = true }
+
+-- Weak keys: a derived spec lives exactly as long as the catalog entry it
+-- came from, which in a headless harness is per require rather than forever.
+-- Keyed by spec alone, which is sound because the catalog gives every
+-- registry its own table -- the two ALIASES resolve to the canonical name
+-- before anything reaches here, and `target` is the only name-dependent
+-- field a derived spec carries.
+local derivedSpecs = setmetatable({}, { __mode = "k" })
+
+-- does this registry describe its Gen 2 records differently at all?
+function Schemas.hasGen2Shape(spec)
+  if type(spec) ~= "table" then return false end
+  for source in pairs(GEN2_SHAPE) do
+    if spec[source] ~= nil then return true end
+  end
+  return false
+end
+
+-- The spec to validate and merge `name` with under `generation`.  Idempotent:
+-- a derived spec carries no gen2* keys, so resolving one again returns it.
+function Schemas.shapeFor(name, spec, generation)
+  if generation ~= 2 or not Schemas.hasGen2Shape(spec) then return spec end
+  local hit = derivedSpecs[spec]
+  if hit then return hit end
+  local out = {}
+  for key, value in pairs(spec) do out[key] = value end
+  local replacesValue = false
+  for source, slot in pairs(GEN2_SHAPE) do
+    if spec[source] ~= nil and VALUE_SLOTS[slot] then replacesValue = true end
+  end
+  if replacesValue then
+    for slot in pairs(VALUE_SLOTS) do out[slot] = nil end
+  end
+  for source, slot in pairs(GEN2_SHAPE) do
+    out[source] = nil
+    -- `or nil` is the clear: gen2Write = false leaves the slot empty
+    if spec[source] ~= nil then out[slot] = spec[source] or nil end
+  end
+  -- self-describing: a derived spec's `target` is the routed one, so a caller
+  -- holding it alone never reads the Gen 1 path by accident.  targetFor stays
+  -- authoritative and stays idempotent over the result.
+  out.target = Schemas.targetFor(name, spec, generation)
+  derivedSpecs[spec] = out
+  return out
+end
+
 local R = {}
 Schemas.REGISTRIES = R
+
+-- ------- shared Gen 2 leaves
+--
+-- The ROM name spaces Gold's tables key by.  They are enums rather than
+-- f.str so a typo ("MORNING") fails at register time instead of writing a
+-- subtable nothing ever reads; the ordered lists themselves ship as
+-- data.gen2Constants (eggGroupOrder, trainerTypeOrder, ...).
+
+-- wild encounters, overworld palettes and the roof pair all bucket by time of
+-- day; DARK is the fourth palette bucket and never an encounter one, so the
+-- encounter maps take the three-value list (constants/time_of_day.asm)
+local gen2Tod = f.enum{ "MORN", "DAY", "NITE" }
+local gen2PaletteTod = f.enum{ "MORN", "DAY", "NITE", "DARK" }
+
+-- one GBC colour as the extractor writes it: a positional {r,g,b} triple
+-- already expanded from 5-bit BGR to 0..255 (src/render/GbcPalette.lua)
+local gen2Color = f.list(f.int(0, 255))
+-- a palette row.  The OBJ rows the sprite and mon pics use carry two colours
+-- (the cart supplies white and black), the BG rows carry all four.
+local gen2PaletteRow = f.list(gen2Color)
 
 R.pokemon = {
   semantics = "record", target = "pokemon",
@@ -445,7 +764,61 @@ R.pokemon = {
     battleScaleFront = f.opt(f.numRange(0.25, 4.0)),
     battleScaleBack = f.opt(f.numRange(0.25, 4.0)),
   },
+  -- Same registry, same target (data.pokemon), same species ids: only the
+  -- record differs, and it differs in four places, every one of them a real
+  -- Gen 2 change rather than an extractor spelling.  Gen 2 splits `special`
+  -- into specialAttack/specialDefense (BaseData in pokegold's
+  -- data/pokemon/base_stats/), names the level-up table `levelMoves` and the
+  -- pic size `picSize`, has no separate level-1 move list (level 1 rows live
+  -- in levelMoves), and points an evolution at `into` rather than `species`.
+  -- Beside that it carries the breeding block Gen 1 has no analogue for
+  -- (eggGroups/eggMoves/eggSteps, genderRatio) and a held-item pair.
+  --
+  -- Without this, mod.content.pokemon:register is unusable for a Gold
+  -- species -- every record fails on the missing `special` -- while patch
+  -- happens to work, which is the worst of both.
+  gen2Fields = {
+    id = f.str, name = f.str, dex = f.int(1),
+    index = f.opt(f.int(0, 255)),
+    types = f.list(f.id("type_chart")),
+    baseStats = f.rec{ hp = f.int(1, 255), attack = f.int(1, 255),
+                       defense = f.int(1, 255), speed = f.int(1, 255),
+                       specialAttack = f.int(1, 255),
+                       specialDefense = f.int(1, 255) },
+    catchRate = f.int(0, 255), baseExp = f.int(0, 255),
+    growthRate = f.id("growth_rates"), growthRateId = f.opt(f.int(0, 255)),
+    levelMoves = f.list(f.rec{ level = f.int(1), move = f.id("moves") }),
+    tmhm = f.opt(f.list(f.id("moves"))),
+    -- the raw TM/HM bitfield bytes, kept beside the resolved list so a
+    -- re-export round-trips; the engine reads `tmhm`
+    tmhmRaw = f.opt(f.list(f.int(0, 255))),
+    evolutions = f.list(f.rec{ method = f.id("evolution_methods"),
+                               into = f.id("pokemon"),
+                               level = f.opt(f.int(1)),
+                               item = f.opt(f.id("items")),
+                               -- EVOLVE_HAPPINESS' window and EVOLVE_STAT's
+                               -- attack-vs-defence test
+                               time = f.opt(f.enum{ "ANYTIME", "MORNDAY",
+                                                    "NITE" }),
+                               comparison = f.opt(f.enum{ "ATK_LT_DEF",
+                                                          "ATK_GT_DEF",
+                                                          "ATK_EQ_DEF" }) }),
+    -- breeding: two egg groups (the raw byte packs both nibbles), the egg
+    -- move list, and the cycle count src/core/gen2/Breeding.lua counts down
+    eggGroups = f.opt(f.list(f.str)), eggGroupsRaw = f.opt(f.int(0, 255)),
+    eggMoves = f.opt(f.list(f.id("moves"))), eggSteps = f.opt(f.int(0)),
+    genderRatio = f.opt(f.int(0, 255)),
+    -- the two wild held items, in the ROM's own order (rare then common)
+    items = f.opt(f.list(f.id("items"))),
+    spriteFront = f.path, spriteBack = f.path, picSize = f.int(1, 7),
+    source = f.opt(f.str),
+    cry = f.opt(f.id("cries")), trueColor = f.opt(f.bool),
+    battleScaleFront = f.opt(f.numRange(0.25, 4.0)),
+    battleScaleBack = f.opt(f.numRange(0.25, 4.0)),
+  },
   example = 'mod.content.pokemon:patch("MEW", { baseStats = { attack = 120 } })',
+  gen2Example = 'mod.content.pokemon:patch("TOTODILE", '
+    .. '{ baseStats = { specialAttack = 80 } })',
 }
 
 R.moves = {
@@ -504,8 +877,16 @@ R.maps = {
     -- carries no palettes at all, so an id reference would fail validation for
     -- a perfectly good mod wherever there is no imported dataset.
     palette = f.opt(f.str),
+    -- destGroup / destMapNum are the ROM map-group pair Gen 2 carries beside
+    -- the destination it actually warps through (World:resolveWarp reads
+    -- destMap and destWarp, the same two keys Gen 1 does).  Optional and
+    -- additive rather than a second warp shape: `maps` routes to
+    -- data.gen2Maps under Gen 2, so the records a mod patches there are the
+    -- extractor's own, and a strict rec would reject every one of them.
     warps = f.opt(f.list(f.rec{ x = f.int(0), y = f.int(0),
-                                destMap = f.str, destWarp = f.int(0) })),
+                                destMap = f.str, destWarp = f.int(0),
+                                destGroup = f.opt(f.int(0)),
+                                destMapNum = f.opt(f.int(0)) })),
     objects = f.opt(f.list(f.any)),
     signs = f.opt(f.list(f.any)),
     connections = f.opt(f.map(f.enum{ "north", "south", "east", "west" }, f.any)),
@@ -545,6 +926,36 @@ R.tilesets = {
   example = 'mod.content.tilesets:register("MY_TILES", { image = "...", blocks = { ... } })',
 }
 
+-- ------- Gen 2 wild encounters
+--
+-- One wild slot.  A fishing slot's species may be the literal 0 the ROM uses
+-- for "no fish here, roll the map's water table instead" (pokegold
+-- data/wild/fish.asm), which is why species is a union rather than a bare id.
+local gen2Slot = f.rec{ level = f.int(1), species = f.id("pokemon") }
+-- the sentinel row carries level 0 as well as species 0, so both floors drop
+local gen2FishSlot = f.rec{ chance = f.int(0, 255), level = f.int(0),
+                            species = f.union{ f.id("pokemon"), f.int(0, 0) } }
+-- Headbutt/Rock Smash slots.  species is optional and the level floor is 0
+-- because TreeMonSet_Rock has no `rare` half in the ROM (pokegold
+-- data/wild/treemons.asm ends the table after the common rows), so the four
+-- Rock Smash maps that point at it carry a rare table read out of whatever
+-- follows: levels past 100 and rows with no species at all.  Rejecting it
+-- would mean the extractor's own table could never be re-registered.
+local gen2TreeSlot = f.rec{ chance = f.int(0, 255), level = f.int(0),
+                            species = f.opt(f.id("pokemon")) }
+
+-- a grass row: one encounter rate and one seven-slot table PER time of day,
+-- which is the whole reason this cannot share the Gen 1 shape
+local gen2GrassRow = f.rec{
+  map = f.opt(f.str),
+  rates = f.map(gen2Tod, f.int(0, 255)),
+  slots = f.map(gen2Tod, f.list(gen2Slot)),
+}
+-- water has no time-of-day split: one rate, one three-slot table
+local gen2WaterRow = f.rec{
+  map = f.opt(f.str), rate = f.int(0, 255), slots = f.list(gen2Slot),
+}
+
 R.encounters = {
   semantics = "record", target = "encounters",
   fields = {
@@ -556,7 +967,47 @@ R.encounters = {
                          slots = f.list(f.rec{ level = f.int(1),
                                                species = f.id("pokemon") }) }),
   },
+  -- Gold keys wild encounters by encounter KIND first and by map second
+  -- (data.gen2Encounters.grass.ROUTE_29), because the cart ships one table
+  -- per kind and a map appears in as many of them as it has water, swarms,
+  -- fishing spots and headbuttable trees.  There is no per-map record to key
+  -- the registry by, so the id is the kind and `patch` folds per map instead
+  -- of replacing the kind's whole table.
+  --
+  -- Semantics stay "record" rather than becoming "deep" even though the id is
+  -- a namespace: a slot table is an ORDERED list whose position is the
+  -- encounter roll, and Merge.deepMerge appends lists under "deep" semantics,
+  -- so a mod rewriting a seven-slot table would get a fourteen-slot one.
+  gen2Keys = {
+    grass = f.map(f.str, gen2GrassRow),
+    -- the swarm variants shadow their base table while a swarm is running
+    swarmGrass = f.map(f.str, gen2GrassRow),
+    water = f.map(f.str, gen2WaterRow),
+    swarmWater = f.map(f.str, gen2WaterRow),
+    -- fishing: a map's rod points at a named group, and the group carries a
+    -- chance-ordered table per rod
+    fishGroups = f.map(f.str, f.rec{
+      id = f.opt(f.str), index = f.opt(f.int(0, 255)),
+      chance = f.int(0, 255),
+      old = f.list(gen2FishSlot), good = f.list(gen2FishSlot),
+      super = f.list(gen2FishSlot) }),
+    -- headbutt: map -> tree set id, and the set's common/rare tables.  rocks
+    -- is the same indirection for Rock Smash.
+    trees = f.map(f.str, f.str),
+    rocks = f.map(f.str, f.str),
+    treeSets = f.map(f.str, f.rec{ common = f.list(gen2TreeSlot),
+                                   rare = f.list(gen2TreeSlot) }),
+    -- the Bug-Catching Contest pool (min/max level, not one level per slot)
+    bugContest = f.list(f.rec{ species = f.id("pokemon"),
+                               min = f.int(1), max = f.int(1),
+                               chance = f.int(0, 255) }),
+    -- where a roaming beast may walk next, keyed by the map it is on
+    roamMaps = f.list(f.rec{ map = f.str, to = f.list(f.str) }),
+    source = f.str, generation = f.int(1),
+  },
   example = 'mod.content.encounters:patch("ROUTE_1", { grass = { rate = 30 } })',
+  gen2Example = 'mod.content.encounters:patch("grass", '
+    .. '{ ROUTE_29 = { rates = { NITE = 40 } } })',
 }
 
 R.trainers = {
@@ -582,7 +1033,64 @@ R.trainers = {
     -- battles.  The victory jingle stays kind-based.
     battleTheme = f.opt(f.id("music")),
   },
+  -- Gold hangs its rosters off data.gen2Trainers.classes, one record per
+  -- trainer CLASS carrying every named trainer of that class.  The id space
+  -- is still the class id, so the registry keeps the Gen 1 call shape --
+  -- mod.content.trainers:patch("BEAUTY", { baseMoney = 99 }) -- and only the
+  -- one level of indirection to `.classes` is new.  That is the same trick
+  -- battle_anims plays with its per-kind subtables, and it is why these three
+  -- callbacks exist rather than a `classes` key nobody would guess.
+  gen2BaseAt = function(base, id)
+    return base.classes and base.classes[id] or nil
+  end,
+  gen2BaseIds = function(base)
+    local ids = {}
+    for id in pairs(base.classes or {}) do ids[#ids + 1] = id end
+    return ids
+  end,
+  gen2Write = function(target, registry)
+    local classes = target.classes
+    if not classes then
+      classes = {}
+      target.classes = classes
+    end
+    local tombstones = {}
+    for id in pairs(registry.ops) do
+      local value = registry:get(id)
+      if value == nil then
+        tombstones[#tombstones + 1] = id
+      else
+        classes[id] = value
+      end
+    end
+    for _, id in ipairs(tombstones) do classes[id] = nil end
+  end,
+  gen2Fields = {
+    id = f.opt(f.str), name = f.str,
+    index = f.opt(f.int(0, 255)),
+    baseMoney = f.opt(f.int(0)),
+    -- the class's battle theme; Gen 1 spells the same idea `battleTheme`,
+    -- but this is the extractor's own key and a strict rename would reject
+    -- every one of Gold's 66 classes
+    encounterMusic = f.opt(f.id("music")),
+    -- the items the class's AI may use mid-battle, and the seven raw AI
+    -- bytes behind them (pokegold data/trainers/attributes.asm)
+    items = f.opt(f.list(f.id("items"))),
+    attributes = f.opt(f.list(f.int(0, 255))),
+    -- one entry per named trainer of the class.  trainerType decides which
+    -- optional party fields the cart actually stores, so `moves` and `item`
+    -- are optional here rather than four party shapes in a union.
+    trainers = f.list(f.rec{
+      id = f.opt(f.str), name = f.str, index = f.opt(f.int(0, 255)),
+      trainerType = f.opt(f.enum{ "TRAINERTYPE_NORMAL", "TRAINERTYPE_MOVES",
+                                  "TRAINERTYPE_ITEM",
+                                  "TRAINERTYPE_ITEM_MOVES" }),
+      party = f.list(f.rec{ level = f.int(1), species = f.id("pokemon"),
+                            item = f.opt(f.id("items")),
+                            moves = f.opt(f.list(f.id("moves"))) }) }),
+  },
   example = 'mod.content.trainers:patch("OPP_BROCK", { baseMoney = 99 })',
+  gen2Example = 'mod.content.trainers:patch("BEAUTY", { baseMoney = 99 })',
 }
 
 R.sprites = {
@@ -592,13 +1100,45 @@ R.sprites = {
     image = f.path,
     frames = f.int(1),
     walker = f.opt(f.bool),
+    -- Optional sheet geometry for mod actors.  Defaults match the vanilla
+    -- 16x16 grounded walker; anchors are measured from each frame's
+    -- top-left in pixels (default: bottom-center).
+    frameWidth = f.opt(f.int(1)),
+    frameHeight = f.opt(f.int(1)),
+    anchorX = f.opt(f.num),
+    anchorY = f.opt(f.num),
     trueColor = f.opt(f.bool),
     -- Mod art can opt into an existing ROM sprite's Advanced-mode OBJ
     -- palette assignment without claiming that the image itself came from
     -- the ROM (which is what `source` documents on imported records).
     paletteSource = f.opt(f.str),
   },
+  -- Same name, same ids, and (unlike the rest of this section) already
+  -- routed: `sprites` merges into data.gen2Sprites and Gold walks that very
+  -- table.  The Gen 1 schema accepts a Gen 2 record only because the extra
+  -- keys fall through as unknown-but-preserved, which means none of them is
+  -- checked -- a mod could write paletteId = "blue" and find out at draw
+  -- time.  This types them.
+  gen2Fields = {
+    id = f.opt(f.str), image = f.path, frames = f.int(1),
+    walker = f.opt(f.bool), trueColor = f.opt(f.bool),
+    paletteSource = f.opt(f.str),
+    -- the OBJ palette this sprite draws with, by name and by the slot index
+    -- src/world/gen2/Palettes.lua indexes into (PAL_OW_RED is slot 0)
+    palette = f.opt(f.str), paletteId = f.opt(f.int(0, 7)),
+    -- how the overworld animates it: WALKING_SPRITE has the four facings and
+    -- a step cycle, STANDING_SPRITE only the facings, STILL_SPRITE one frame,
+    -- POKEMON_SPRITE the party-icon pair (pokegold constants/sprite_constants)
+    spriteType = f.opt(f.enum{ "WALKING_SPRITE", "STANDING_SPRITE",
+                               "STILL_SPRITE", "POKEMON_SPRITE" }),
+    -- a POKEMON_SPRITE names the species it follows and the party icon it
+    -- borrows its art from
+    species = f.opt(f.id("pokemon")), icon = f.opt(f.str),
+    source = f.opt(f.str),
+  },
   example = 'mod.content.sprites:register("SPRITE_HERO", { image = "...", frames = 6 })',
+  gen2Example = 'mod.content.sprites:patch("SPRITE_BEAUTY", '
+    .. '{ palette = "PAL_OW_RED", paletteId = 0 })',
 }
 
 R.text = {
@@ -832,7 +1372,48 @@ R.battle_anims = {
       into[key] = registry:get(id)
     end
   end,
+  -- Gold's battle animations are the cart's own bytecode, not a Lua sequence:
+  -- data.gen2BattleAnims is a script POOL keyed by ROM pointer plus the name
+  -- tables that index into it (a move id or an ANIM_* id resolves to a
+  -- pointer), and the object/frameset/OAM/graphics tables the scripts spawn
+  -- from.  src/battle/gen2/AnimRunner.lua walks exactly those.  The id is the
+  -- table, and `patch` adds one object without restating the pool.
+  --
+  -- The Gen 1 write/baseAt/baseIds trio is cleared rather than reused: it
+  -- routes an id into a per-kind subtable by prefix, and here the ids ARE the
+  -- subtables, so the plain record placement is the correct one.
+  gen2Write = false, gen2BaseAt = false, gen2BaseIds = false,
+  gen2Keys = {
+    -- pointer -> the decoded command rows the runner steps; each row is a
+    -- verb string followed by its operands
+    scripts = f.map(f.str, f.list(f.list(f.any))),
+    -- the pool in ROM order, which is what a re-export writes back
+    scriptOrder = f.list(f.str),
+    -- move id -> script pointer, and ANIM_* id -> script pointer
+    moves = f.map(f.str, f.str),
+    ids = f.map(f.str, f.str),
+    -- an animation object: which graphics, palette, frameset and update
+    -- function it spawns with
+    objects = f.map(f.str, f.rec{ gfx = f.str, palette = f.str,
+                                  frameset = f.str, func = f.str,
+                                  fixY = f.opt(f.int(0, 255)),
+                                  flags = f.opt(f.int(0, 255)) }),
+    -- a frameset is its own little row list (frame / wait / delete)
+    framesets = f.map(f.str, f.list(f.list(f.any))),
+    -- OAM: the sprite rectangle an object draws, and the VRAM tile it starts
+    -- at.  x/y are the cart's unsigned bytes, so 240 means -16.
+    oamsets = f.map(f.str, f.rec{ vtile = f.int(0, 255),
+                                  sprites = f.list(f.rec{
+                                    x = f.int(0, 255), y = f.int(0, 255),
+                                    tile = f.int(0, 255),
+                                    attr = f.int(0, 255) }) }),
+    gfx = f.map(f.str, f.rec{ image = f.path, tiles = f.int(1),
+                              wide = f.int(1) }),
+    bank = f.int(0), source = f.str, generation = f.int(1),
+  },
   example = 'mod.content.battle_anims:register("SHADOW_BALL", { seq = { ... } })',
+  gen2Example = 'mod.content.battle_anims:patch("moves", '
+    .. '{ SHADOW_BALL = "5e86" })',
 }
 
 R.transitions = {
@@ -1045,7 +1626,45 @@ R.palettes = {
       return ("needs exactly 4 colors, got %d"):format(#colors)
     end
   end,
+  -- Gold's palette table is not a flat name -> four colours map: the GBC has
+  -- eight BG and eight OBJ slots and the cart reloads them per context, so
+  -- the extractor writes one subtable per context (mon pics with their shiny
+  -- twin, trainer pics, the BG rows a map's environment indexes into, the
+  -- overworld OBJ rows per time of day, the town roof pair, the HP and EXP
+  -- bars).  The id is the context, so a mod that recolours one species
+  -- patches `pokemon` and leaves the other 250 alone.  The Gen 1 four-colour
+  -- `extra` is cleared: it reads the record as one palette, and here a record
+  -- is a whole subtable of them.
+  gen2Extra = false,
+  gen2Keys = {
+    -- every species has both a normal and a shiny row; the shiny one is what
+    -- src/render/GbcPalette.lua swaps in on a shiny battler
+    pokemon = f.map(f.str, f.rec{ normal = gen2PaletteRow,
+                                  shiny = gen2PaletteRow }),
+    trainers = f.map(f.str, gen2PaletteRow),
+    -- the BG rows, indexed by number: `environments` names eight of them per
+    -- environment per time of day, which is how a map gets its palette
+    bg = f.list(gen2PaletteRow),
+    environments = f.map(f.str, f.map(gen2PaletteTod, f.list(f.int(0)))),
+    -- the eight overworld OBJ rows per time of day; a sprite's paletteId
+    -- indexes this
+    objects = f.map(gen2PaletteTod, f.list(gen2PaletteRow)),
+    -- one pair per roof group (keyed by the group number, 0 included), and
+    -- the BG slot the roof colours are written into
+    roofs = f.map(f.int(0), f.rec{ mornDay = gen2PaletteRow,
+                                   nite = gen2PaletteRow }),
+    roofSlot = f.int(0, 7),
+    hpBar = f.map(f.enum{ "green", "yellow", "red", "blue" }, gen2PaletteRow),
+    expBar = gen2PaletteRow,
+    partyMenu = f.list(gen2PaletteRow),
+    battleObjects = f.map(f.str, gen2PaletteRow),
+    -- the ordered name lists the numeric indices above resolve through
+    daytimes = f.list(f.str), slotNames = f.list(f.str),
+    source = f.str, generation = f.int(1),
+  },
   example = 'mod.content.palettes:override("MEWMON", { {255,255,255}, ... })',
+  gen2Example = 'mod.content.palettes:patch("pokemon", '
+    .. '{ TOTODILE = { shiny = { {255,255,255}, {255,0,0} } } })',
 }
 
 -- keyed by species id, unlike the vanilla byDex array: a species past the
@@ -1054,10 +1673,63 @@ R.palettes = {
 -- dex-indexed default. The value is a built-in icon NAME -- one of BALL, BIRD,
 -- BUG, FAIRY, GRASS, HELIX, MON, QUADRUPED, SNAKE, WATER (uppercase) -- or a
 -- { image = <bundled file path>, frames? } table of your own art.
+-- Gold splits the same idea in two: data.gen2Icons.icons is the 39 icon
+-- SHEETS (each its own two-frame image) and data.gen2Icons.species is the
+-- species -> sheet name assignment.  Both halves keep the Gen 1 id space --
+-- a species id names an assignment, a sheet id names a sheet -- so one
+-- registry serves both, routed by the ICON_ prefix every sheet name carries.
+-- Two id forms in one registry is the same shape font and battle_anims use.
+local function gen2IconIsSheet(id)
+  return tostring(id):match("^ICON_") ~= nil
+end
+
 R.icons = {
   semantics = "record", target = "icons.bySpecies",
   value = f.union{ f.str, f.rec{ image = f.path, frames = f.opt(f.int(1)) } },
+  gen2Value = f.union{
+    -- the assignment form: a species id mapped to a sheet name
+    f.str,
+    -- the sheet form: width/height are the sheet's pixel size, and every
+    -- vanilla sheet is a 16x32 two-frame strip
+    f.rec{ id = f.opt(f.str), index = f.opt(f.int(0, 255)), image = f.path,
+           width = f.int(1), height = f.int(1), frames = f.int(1) },
+  },
+  gen2Extra = function(id, value)
+    if gen2IconIsSheet(id) then
+      if type(value) ~= "table" then
+        return "an ICON_ id is a sheet and needs an image, width, height and frames"
+      end
+    elseif type(value) ~= "string" then
+      return "a species id takes the NAME of an ICON_ sheet, not a sheet"
+    end
+  end,
+  gen2BaseAt = function(base, id)
+    if gen2IconIsSheet(id) then return base.icons and base.icons[id] or nil end
+    return base.species and base.species[id] or nil
+  end,
+  gen2BaseIds = function(base)
+    local ids = {}
+    for id in pairs(base.icons or {}) do ids[#ids + 1] = id end
+    for id in pairs(base.species or {}) do ids[#ids + 1] = id end
+    return ids
+  end,
+  gen2Write = function(target, registry)
+    local sheets, species = target.icons, target.species
+    if not sheets then
+      sheets = {}
+      target.icons = sheets
+    end
+    if not species then
+      species = {}
+      target.species = species
+    end
+    for _, id in ipairs(registry.order) do
+      local into = gen2IconIsSheet(id) and sheets or species
+      into[id] = registry:get(id)
+    end
+  end,
   example = 'mod.content.icons:register("MODMON", "QUADRUPED")  -- a built-in name, or { image = mod.assets:path("icon.png"), frames = 2 }',
+  gen2Example = 'mod.content.icons:override("TOTODILE", "ICON_MONSTER")',
 }
 
 -- glyph codes are not bytes: the vanilla pages sit at $60/$80 but a
@@ -1171,6 +1843,44 @@ R.tokens = {
 
 -- ------- deep registries: id is a top-level key of the target table
 
+-- Gold's `constants` is not the Gen 1 rule block at all: it is the ROM's own
+-- ordered name lists, one per enum the cart indexes by number.  A script
+-- opcode that says "special 12" or an animation that says "object 41" is
+-- resolved through these, so replacing an entry renames what that number
+-- means.  Every one of them is a dense list of ids in ROM order, which is why
+-- they can be built from a name list instead of restated one by one.
+local GEN2_CONSTANT_ORDERS = {
+  "battleAnimBgPaletteOrder", "battleAnimFramesetOrder", "battleAnimFuncOrder",
+  "battleAnimGfxOrder", "battleAnimOamsetOrder", "battleAnimObPaletteOrder",
+  "battleAnimObjectOrder", "battleBgEffectOrder", "cmdQueueOrder",
+  "decoDescOrder", "eggGroupOrder", "environmentOrder", "evolveMethodOrder",
+  "fishGroupOrder", "floorOrder", "growthRateOrder", "heldEffectOrder",
+  "iconOrder", "itemMenuOrder", "itemOrder", "landmarkOrder",
+  "mapCallbackOrder", "mapOrder", "moveEffectOrder", "moveOrder", "musicOrder",
+  "paletteOrder", "phoneContactOrder", "pocketOrder", "sfxOrder", "spawnOrder",
+  "specialCallOrder", "specialOrder", "speciesOrder", "spriteOrder",
+  "stdScriptOrder", "tilesetOrder", "tradeDialogOrder", "tradeGenderOrder",
+  "trainerClassOrder", "trainerTypeOrder", "treeMonSetOrder",
+}
+
+local gen2ConstantKeys = {
+  -- the map table the group/number pair in a warp resolves through
+  mapGroups = f.list(f.rec{ group = f.int(0), map = f.int(0), name = f.str,
+                            width = f.int(1), height = f.int(1) }),
+  -- class id -> its named trainers, in the order the class's table stores them
+  trainerClassMembers = f.map(f.str, f.list(f.str)),
+  -- type id -> its ROM byte; the only one of these that is a lookup rather
+  -- than an ordered list, because the type numbers are not contiguous
+  types = f.map(f.str, f.int(0)),
+  -- counts the extractor stamps beside the lists
+  itemNameCount = f.int(0), numOverworldSprites = f.int(0),
+  spritePokemon = f.int(0),
+  source = f.str, generation = f.int(1),
+}
+for _, name in ipairs(GEN2_CONSTANT_ORDERS) do
+  gen2ConstantKeys[name] = f.list(f.str)
+end
+
 -- The rules the engine used to hard-code as Kanto/Red literals.  Keys the
 -- importer does not stamp are seeded with their vanilla value at data load
 -- (src/core/Data.lua) so a patch always has something to fold over.
@@ -1188,7 +1898,16 @@ R.constants = {
     hmMoves = f.list(f.id("moves")),
     encounterBuckets = f.list(f.int(1, 256)),
   },
+  -- Gold's keys are ordered lists where position IS the id a script byte
+  -- resolves through, so they must replace rather than append -- which is
+  -- what "deep" semantics would do to them (Merge.deepMerge concatenates
+  -- lists there, and Gen 1's `field` rows genuinely want that).  A key
+  -- neither catalog names is still a mod's own data and merges as-is.
+  gen2Semantics = "record",
+  gen2Keys = gen2ConstantKeys,
   example = 'mod.content.constants:patch("levelCap", 80)',
+  gen2Example = 'mod.content.constants:patch("speciesOrder", '
+    .. '{ [252] = "MODMON" })',
 }
 
 -- The overworld's data grab bag.  Only the keys this milestone routes are
@@ -1258,6 +1977,150 @@ R.text_pointers = {
     nurse = f.opt(f.bool), pc = f.opt(f.bool), cableClub = f.opt(f.bool),
   }),
   example = 'mod.content.text_pointers:patch("PalletTown", { TEXT_PALLETTOWN_SIGN = { text = "_MySign" } })',
+}
+
+-- ------- Gen 2 only content
+--
+-- The mirror of the gated rows in Schemas.GEN2: six systems Gold has and Red
+-- does not, so there is no Gen 1 table to share a target with and no Gen 1
+-- consumer to read one.  Each spec therefore carries NO `target` at all -- the
+-- routed Schemas.GEN2 path is its only home -- and a Schemas.GEN1 row of
+-- `false`, which is what turns a Red mod's write into the same reported drop a
+-- Gold mod gets for `tokens` instead of a silent merge into a namespace
+-- nothing on Red would ever read.
+--
+-- Names stay plain for the same reason hook and event names do: `decorations`
+-- is what the thing is called, and a "gen2Decorations" registry NAME would be
+-- a namespace no mod could ever share if Gen 1 grew the system later.  Only
+-- the Data path underneath carries the gen2 prefix.
+
+-- data/items/attributes.asm's last two columns, split out of the item record
+-- so a mod can give an item a held behaviour without owning the whole item.
+-- src/core/Game2.lua seeds the merge target from data.items and writes the
+-- merged rows back onto it, and src/battle/gen2/Battle.lua's heldEffect (the
+-- one read all eight held-item sites go through, and the held_item.trigger
+-- hook's own site) reads it from there.
+R.held_items = {
+  semantics = "record",
+  fields = {
+    -- the HELD_* name the battle compares against, out of
+    -- data.gen2Constants.heldEffectOrder; a mod may invent its own and steer
+    -- it from the held_item.trigger hook
+    heldEffect = f.str,
+    -- ItemAttributes' parameter byte: the boost percentage, the heal amount,
+    -- the BrightPowder odds -- whatever the effect reads it as
+    heldParameter = f.opt(f.int(0, 255)),
+  },
+  example = 'mod.content.held_items:override("LEFTOVERS", '
+    .. '{ heldEffect = "HELD_LEFTOVERS", heldParameter = 0 })',
+}
+
+-- data/phone/phone_contacts.asm, one record per PHONE_* row.  The id space is
+-- data.gen2Constants.phoneContactOrder, so PHONE_YOUNGSTER_JOEY names the row
+-- the cart calls PHONE_YOUNGSTER_JOEY; `index` is that row's byte, which is
+-- what the save's contact list holds and what src/core/gen2/Phone.lua keys
+-- every one of its own lookups by.  The four PHONE_UNUSED const_skip holes are
+-- not registered -- they are copies of the wrong-number filler row, and one id
+-- cannot name four of them.
+R.phone_contacts = {
+  semantics = "record",
+  fields = {
+    index = f.int(0),
+    -- non-trainer rows (MOM, BILL, ELM, the BIKE SHOP) carry a PHONECONTACT_*
+    -- number instead of a trainer; trainer rows carry the class and the
+    -- roster member, which is what the rematch machinery and the caller's
+    -- name are looked up by
+    number = f.opt(f.int(0, 255)),
+    class = f.opt(f.str), member = f.opt(f.str),
+    map = f.opt(f.id("maps")),
+    -- the SCRIPT1 / SCRIPT2 time masks: MORN | DAY | NITE, 0 for "never"
+    calleeTime = f.opt(f.int(0, 7)), callerTime = f.opt(f.int(0, 7)),
+    -- the script LABEL (Phone.SCRIPT_KEYS resolves it) and, once the cache
+    -- has been read, the "<bank>:<addr>" pointer it resolved to
+    callee = f.opt(f.str), caller = f.opt(f.str),
+    calleeKey = f.opt(f.str), callerKey = f.opt(f.str),
+  },
+  example = 'mod.content.phone_contacts:patch("PHONE_YOUNGSTER_JOEY", '
+    .. '{ map = "ROUTE_31" })',
+}
+
+-- data/decorations/attributes.asm, one record per DECO_* row.  The cart's
+-- decoration constants are a bare const_def block with no name table behind
+-- them -- nothing in the ROM spells DECO_FEATHERY_BED -- so the id is the
+-- attribute row's own index, written "deco:<n>" the way battle_anims writes
+-- "subanim:<n>".  That index IS wMenuSelection, which is what every caller
+-- passes src/core/gen2/Decorations.lua.
+R.decorations = {
+  semantics = "record",
+  fields = {
+    -- constants/deco_constants.asm decoration types: 1 PLANT, 2 BED,
+    -- 3 CARPET, 4 POSTER, 5 DOLL, 6 BIGDOLL.  The type decides how GetDecoName
+    -- spells the row and whether `sprite` is a block id or a sprite one.
+    type = f.int(1, 6),
+    name = f.str,
+    -- DECOATTR_ACTION, as the Decorations.ACTIONS key rather than the
+    -- jumptable index; nil on the CANCEL row alone
+    action = f.opt(f.str),
+    -- DECOATTR_EVENT_FLAG: the wEventFlags bit that says the player owns it
+    flag = f.int(0),
+    -- DECOATTR_SPRITE: a BLOCK id for the four kinds the map paints, a
+    -- SPRITE_* byte for the four an object stands on
+    sprite = f.int(0, 255),
+  },
+  example = 'mod.content.decorations:patch("deco:2", { name = "COZY" })',
+}
+
+-- data/items/apricorn_balls.asm.  Id = the apricorn item, because that is what
+-- the player hands Kurt and what FindApricornsInBag walks the bag for;
+-- `index` is the row's position in that table, which is load bearing twice
+-- (Kurt's menu order and the checkevent chain in maps/KurtsHouse.asm).
+R.apricorns = {
+  semantics = "record",
+  fields = {
+    apricorn = f.id("items"), ball = f.id("items"),
+    -- constants/event_flags.asm index of this apricorn's EVENT_GAVE_KURT_*
+    event = f.int(0),
+    index = f.int(1),
+  },
+  example = 'mod.content.apricorns:override("RED_APRICORN", '
+    .. '{ apricorn = "RED_APRICORN", ball = "ULTRA_BALL", event = 600, index = 1 })',
+}
+
+-- data/maps/landmarks.asm.  The town-map places, which on Gold are one index
+-- space shared by the Pokegear MAP card, the #DEX AREA page and every map
+-- header's `landmark` byte.  The merge lands inside the cache's own landmark
+-- table (gen2Landmarks.landmarks), so a registered record is one the map card
+-- can already draw.
+R.landmarks = {
+  semantics = "record",
+  fields = {
+    id = f.opt(f.str),
+    -- the two-line name the town map prints, "\n" and all
+    name = f.str,
+    -- the marker's tile position on the 20x18 town map
+    x = f.int(0), y = f.int(0),
+    -- LANDMARK_*: the byte a map header carries, and what
+    -- src/core/gen2/Nests.lua's region split reads
+    index = f.int(0),
+  },
+  example = 'mod.content.landmarks:patch("LANDMARK_ROUTE_29", { x = 12 })',
+}
+
+-- PlayRadioStationPointers (engine/pokegear/pokegear.asm).  Id = the station
+-- the dial resolves to, which is the LoadStation_* id the show state machine
+-- is keyed by; `channel` is its MAPRADIO_* dial position, the byte a wall
+-- radio's `setval` passes to the MapRadio special.  Position 0 is not a
+-- station: it resolves by region and time of day, so no record claims it.
+R.radio_channels = {
+  semantics = "record",
+  fields = {
+    channel = f.int(0, 255),
+    -- the name quoted in the text box; without one the Pokegear's own
+    -- STATION_NAMES row is used, which is where the vanilla eight get theirs
+    name = f.opt(f.str),
+  },
+  example = 'mod.content.radio_channels:register("PIRATE_RADIO", '
+    .. '{ channel = 9, name = "PIRATE RADIO" })',
 }
 
 -- ------- persistence

@@ -396,10 +396,14 @@ local function encodeStatus(status)
   return 0
 end
 
+-- Def rows share a generated table's top level with provenance scalars on
+-- some data sets (src/import/RomExtractorGen2.lua stamps `generation` and
+-- `source` beside the entries), so every pairs(defs) walk here must keep
+-- to table rows: indexing a scalar row raises instead of skipping it.
 local function buildIndexCrosswalk(defs)
   local byIndex, byId = {}, {}
   for id, def in pairs(defs or {}) do
-    if def.index ~= nil then
+    if type(def) == "table" and def.index ~= nil then
       byIndex[def.index] = id
       byId[id] = def.index
     end
@@ -420,7 +424,8 @@ end
 local function buildDexCrosswalk(defs)
   local byDex, dexOf = {}, {}
   for id, def in pairs(defs or {}) do
-    local n = def.source and tonumber(def.source:match("BaseStats%[(%d+)%]"))
+    local n = type(def) == "table" and def.source
+      and tonumber(def.source:match("BaseStats%[(%d+)%]"))
     if n then
       byDex[n] = id
       dexOf[id] = n
@@ -438,7 +443,8 @@ end
 -- per slot -- i.e. HM01=196+.. , TM01=201+(number-1).
 local function addMachineIndices(defs, byIndex, byId)
   for id, def in pairs(defs or {}) do
-    if byId[id] == nil and def.machine and def.machine.number then
+    if type(def) == "table" and byId[id] == nil
+       and def.machine and def.machine.number then
       local base = def.machine.kind == "HM" and 195 or 200
       local idx = base + def.machine.number
       byIndex[idx] = id

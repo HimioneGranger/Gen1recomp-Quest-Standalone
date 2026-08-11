@@ -400,15 +400,24 @@ M.POKEMON_FAN_CLUB = {
     TEXT_POKEMONFANCLUB_CHAIRMAN = {
       { "face_player" },                                          -- 1
       { "check_flag", "EVENT_RECEIVED_BIKE_VOUCHER" },            -- 2
-      { "jump_if_true", 9 },                                      -- 3
-      { "show_text", "_PokemonFanClubChairmanIntroText" },        -- 4
-      { "show_text", "_PokemonFanClubChairmanStoryText" },        -- 5
+      { "jump_if_true", "nothing_left" },                         -- 3
+      -- YesNoChoice (scripts/PokemonFanClub.asm): NO forfeits the voucher (#1050)
+      { "ask", "_PokemonFanClubChairmanIntroText" },              -- 4
+      { "jump_if_false", "no_story" },                            -- 5
+      { "show_text", "_PokemonFanClubChairmanStoryText" },        -- 6
       -- give-then-print like scripts/PokemonFanClub.asm (GiveItem
       -- fills wStringBuffer; the received text reads it)
-      { "give_item", "BIKE_VOUCHER", 1, false },                  -- 6
-      { "show_text", "_PokemonFanClubReceivedBikeVoucherText" },  -- 7
-      { "set_flag", "EVENT_RECEIVED_BIKE_VOUCHER" },              -- 8
-      { "show_text", "_PokemonFanClubExplainBikeVoucherText" },   -- 9
+      { "give_item", "BIKE_VOUCHER", 1, false },                  -- 7
+      { "show_text", "_PokemonFanClubReceivedBikeVoucherText" },  -- 8
+      { "set_flag", "EVENT_RECEIVED_BIKE_VOUCHER" },              -- 9
+      { "show_text", "_PokemonFanClubExplainBikeVoucherText" },   -- 10
+      { "jump", "end" },                                          -- 11
+      { "label", "no_story" },                                    -- 12
+      { "show_text", "_PokemonFanClubNoStoryText" },              -- 13
+      { "jump", "end" },                                          -- 14
+      -- .nothingleft: the gift is done, he only reminisces now
+      { "label", "nothing_left" },                                -- 15
+      { "show_text", "_PokemonFanClubChairFinalText" },           -- 16
     },
   },
 }

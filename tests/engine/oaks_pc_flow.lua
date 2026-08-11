@@ -118,8 +118,9 @@ for _, item in ipairs(menu.items) do
   if item.label == "PROF.OAK's PC" then oak = item end
 end
 T.check(oak ~= nil, "PROF.OAK's PC is offered once the Pokédex is had")
-plays = {} -- drop the menu's Turn_On_PC; the session's jingle is what counts
 oak.onSelect()
+-- drop the menu's Turn_On_PC and the row's Enter_PC
+plays = {}
 T.eq(pushed[2].kind, "text", "selection opens the access text")
 T.check(tostring(pushed[2].text):find("Accessed", 1, true) ~= nil,
   "first session box is the access text")

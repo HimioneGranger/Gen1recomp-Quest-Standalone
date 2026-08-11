@@ -9,6 +9,7 @@ Subcommands:
     translation <id> [--language NAME] [--base auto|fixture|imported]
               [--refresh] [--dest DIR] [--pixel-font]
     validate  <id|path> [--strict] [--base auto|fixture|imported]
+    gen2check <id|path> [<id|path>...] [--strict] [--notes]
     lint      <id|path>
     pack      <mod-dir> [-o out.modpkg]
     bounce    <song-id|--all> [--seconds N] [--out DIR]
@@ -29,6 +30,15 @@ fixture that rule is reported as skipped rather than guessed at.
 
 lint is the no-ROM-content distribution gate (MK3xx); pack runs both at
 --strict, so any finding -- warning included -- refuses the package.
+
+gen2check (MK4xx) answers whether a mod runs on a Gen 2 game and how far it
+gets: the manifest gate, then a static read of the mod's Lua against what
+src/mods/Gen2Compat.lua actually backs, member by member.  It is a scan, not
+an interpreter -- what it could not follow is listed as unresolved rather
+than guessed at -- and it exits non-zero on a finding it calls fatal.  Mods
+named together are read as one install set, so a mod and its dependencies
+answer each other; --notes adds the adapter's own line for every backed
+member the mod touches.
 """
 
 import argparse
@@ -333,6 +343,7 @@ MANIFEST_TEMPLATE = """{
   "optional_dependencies": [],
   "conflicts": [],
   "incompatible": [],
+  "games": [{{games}}],
   "experimental": {{experimental}},{{github_line}}
   "description": "TODO: one line about {{id}}"{{extra}}
 }
@@ -458,6 +469,14 @@ A `{{profile}}` mod for the LOVE2D Pokemon Red engine (mod api 2).
 """
 
 
+# manifest "games": the version ids / gen tokens a mod declares
+# (src/mods/ModTargets.lua).  Emitted as a JSON array body.
+def games_list(value):
+    tokens = [t.strip().lower() for t in str(value or "").split(",")]
+    tokens = [t for t in tokens if t]
+    return ", ".join('"%s"' % t for t in (tokens or ["gen1"]))
+
+
 def cmd_scaffold(args, repo):
     profile = args.profile
     dest_root = args.dest or os.path.join(repo, "mods")
@@ -491,6 +510,7 @@ def cmd_scaffold(args, repo):
         "{{github_line}}": github_line,
         "{{experimental}}": "true" if getattr(args, "experimental", False)
         else "false",
+        "{{games}}": games_list(getattr(args, "games", "gen1")),
     }
 
     def emit(rel, template):
@@ -716,7 +736,7 @@ def run_loader(repo, mod_dir, findings, base="fixture", notes=None):
         driver_path = handle.name
     try:
         proc = subprocess.run([LUAJIT, driver_path], cwd=repo,
-                              capture_output=True, text=True, timeout=120)
+                              capture_output=True, text=True, encoding="utf-8", timeout=120)
     except FileNotFoundError:
         findings.append(Finding("MK100", "error",
                                 f"cannot run {LUAJIT} (install luajit or "
@@ -1056,7 +1076,7 @@ def check_data_dump(repo, path, base, rel):
     driver = DUMP_DRIVER % (lua_quote(path), lua_quote(vanilla))
     try:
         proc = subprocess.run([LUAJIT, "-e", driver], cwd=repo,
-                              capture_output=True, text=True, timeout=60)
+                              capture_output=True, text=True, encoding="utf-8", timeout=60)
     except FileNotFoundError:
         # the gate must fail closed: a missing interpreter is a broken
         # environment, not a clean mod
@@ -1416,7 +1436,7 @@ def dump_dataset(repo, base):
     handle.close()
     try:
         proc = subprocess.run([os.environ.get("LUA", "luajit"), handle.name],
-                              cwd=repo, capture_output=True, text=True)
+                              cwd=repo, capture_output=True, text=True, encoding="utf-8")
     finally:
         os.unlink(handle.name)
     if proc.returncode != 0:
@@ -1985,6 +2005,1446 @@ def cmd_docs(args, repo):
     return 0
 
 
+# ------------------------------------------------ gen2 compatibility (MK4xx)
+#
+# What the adapter backs is read out of the engine, never restated here:
+# src/mods/Gen2Compat.lua's coverage API is the source of truth and
+# docs/mod-api-gen2-compat.md is its prose.  The contract this consumes is
+# Gen2Compat.coverage(name) -> { kind = "facade"|"alias", target = <module>,
+# members = { [member] = "backed"|"warned"|"absent" }, notes = { [member] =
+# "one line" } }, with COVERAGE_VERSION naming the vocabulary.  Nothing below
+# hardcodes a module, a member or a status, so the tool cannot drift from the
+# adapter; when the accessor is missing the fallback says so in the notes and
+# reports what it could not decide instead of guessing.
+#
+#   MK400 claims no Gen 2 game           MK405 member degrades, and says so
+#   MK401 a dependency claims none       MK406 the signature moved under it
+#   MK402 no adapter for the module      MK407 upvalue surgery with no target
+#   MK403 Gold runs a different module   MK408 upvalue surgery, unresolved
+#   MK404 member has no Gen 2 backing    MK409 a mod-side edit no adapter can
+#                                              make for it
+#                                        MK410 the entry chunk holding a
+#                                              member of a game not up yet
+
+COVERAGE_DUMP = '''\
+package.path = "./?.lua;./?/init.lua;" .. package.path
+local G = require("src.mods.Gen2Compat")
+local function emit(...)
+  local row = {}
+  for i = 1, select("#", ...) do
+    row[i] = tostring((select(i, ...))):gsub("%s+", " ")
+  end
+  print(table.concat(row, "\\t"))
+end
+emit("VERSION", G.COVERAGE_VERSION or 0)
+for name, spec in pairs(G.ADAPTERS or {}) do
+  emit("ADAPTER", name, type(spec) == "string" and spec or "")
+  local row = G.coverage and G.coverage(name)
+  if row then
+    emit("COVER", name, row.kind or "", row.target or "")
+    for member, status in pairs(row.members or {}) do
+      emit("MEMBER", name, member, status)
+    end
+    for member, note in pairs(row.notes or {}) do
+      emit("NOTE", name, member, note)
+    end
+  end
+end
+'''
+
+# the one status that is a hard stop; the others are named by the adapter
+ABSENT = "absent"
+
+
+def module_path(repo, name):
+    return os.path.join(repo, *name.split(".")) + ".lua"
+
+
+def _module_exists(repo, name):
+    """Is there a file behind this module name, either way package.path spells
+    it (conf.lua sets ?.lua and ?/init.lua)."""
+    return os.path.isfile(module_path(repo, name)) \
+        or os.path.isfile(os.path.join(repo, *name.split("."), "init.lua"))
+
+
+def _lua_close(text, index):
+    """Index of the bracket closing the one at `index`, honouring literals;
+    None when the file does not balance (a scan limit, not a finding)."""
+    depth, i = 0, index
+    while i < len(text):
+        char = text[i]
+        if char in "\"'":
+            quote, i = char, i + 1
+            while i < len(text):
+                if text[i] == "\\":
+                    i += 2
+                    continue
+                if text[i] == quote:
+                    break
+                i += 1
+        elif char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+    return None
+
+
+def _lua_args(text, index):
+    """(count, varargs) for the call whose '(' is at index; (None, False) when
+    the parentheses do not balance."""
+    close = _lua_close(text, index)
+    if close is None:
+        return None, False
+    inner = text[index + 1:close]
+    if not inner.strip():
+        return 0, False
+    depth, count, i = 0, 1, 0
+    while i < len(inner):
+        char = inner[i]
+        if char in "\"'":
+            quote, i = char, i + 1
+            while i < len(inner):
+                if inner[i] == "\\":
+                    i += 2
+                    continue
+                if inner[i] == quote:
+                    break
+                i += 1
+        elif char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        elif char == "," and depth == 0:
+            count += 1
+        i += 1
+    return count, inner.rstrip().endswith("...")
+
+
+LUA_API_CACHE = {}
+
+
+def lua_api(path):
+    """member -> {"params": [...] or None, "line": n} for a module file: what
+    it hangs off its own table, plus the fields its constructor writes onto
+    `self`.  Regex over source, so a name assembled at runtime is missed --
+    which is why the adapter's own coverage table decides what is backed and
+    this only ever answers "under what parameters"."""
+    if path in LUA_API_CACHE:
+        return LUA_API_CACHE[path]
+    try:
+        text = strip_lua(open(path, encoding="utf-8", errors="replace").read())
+    except OSError:
+        LUA_API_CACHE[path] = None
+        return None
+    returns = re.findall(r"^return\s+([A-Za-z_]\w*)\s*$", text, re.M)
+    module = returns[-1] if returns else None
+    if not module:
+        counts = {}
+        for name in re.findall(r"^function\s+([A-Z]\w*)[.:]", text, re.M):
+            counts[name] = counts.get(name, 0) + 1
+        module = max(counts, key=counts.get) if counts else None
+    api = {}
+    if module:
+        def put(member, params, offset, kind):
+            api.setdefault(member, {"params": params, "kind": kind,
+                                    "line": text.count("\n", 0, offset) + 1})
+
+        for match in re.finditer(
+                r"^function\s+%s([.:])(\w+)\s*\(([^)]*)\)" % module, text,
+                re.M):
+            params = [p.strip() for p in match.group(3).split(",") if p.strip()]
+            if match.group(1) == ":":
+                params.insert(0, "self")
+            put(match.group(2), params, match.start(), "function")
+        for match in re.finditer(
+                r"^\s*%s\.(\w+)\s*=\s*(function\s*\(([^)]*)\))?" % module,
+                text, re.M):
+            params = None
+            if match.group(2):
+                params = [p.strip() for p in match.group(3).split(",")
+                          if p.strip()]
+            put(match.group(1), params, match.start(),
+                "function" if params is not None else "value")
+        # written onto the instance, never onto the module table: the members
+        # that only exist once a game is running
+        for match in re.finditer(r"\bself\.(\w+)\s*=(?!=)", text):
+            put(match.group(1), None, match.start(), "field")
+    LUA_API_CACHE[path] = api
+    return api
+
+
+def gen1_only_modules(repo):
+    """The Gen 1 modules a Gold boot never instantiates, read from the loader
+    so this tool and the require shim cannot disagree (Loader.lua)."""
+    try:
+        src = open(os.path.join(repo, "src", "mods", "Loader.lua"),
+                   encoding="utf-8").read()
+    except OSError:
+        return set()
+    block = re.search(r"GEN1_ONLY_MODULES\s*=\s*\{(.*?)\n\}", src, re.S)
+    return set(re.findall(r'\["([^"]+)"\]', block.group(1))) if block else set()
+
+
+def _adapters_from_source(repo):
+    """ADAPTERS as name -> alias target ("" for a built facade), for the
+    checkout where the coverage accessor cannot be run."""
+    try:
+        src = strip_lua(open(os.path.join(repo, "src", "mods",
+                                          "Gen2Compat.lua"),
+                             encoding="utf-8").read())
+    except OSError:
+        return {}
+    block = re.search(r"ADAPTERS\s*=\s*\{(.*?)\n\}", src, re.S)
+    if not block:
+        return {}
+    return {m.group(1): m.group(2) or "" for m in re.finditer(
+        r'\["([^"]+)"\]\s*=\s*(?:"([^"]+)"|\w+)', block.group(1))}
+
+
+def gen2_coverage(repo, notes):
+    """name -> {kind, target, members, notes, declared}, straight off
+    Gen2Compat.coverage.  `members` is None where nothing could answer, which
+    every check below treats as "unknown", never as "backed"."""
+    rows = []
+    with tempfile.NamedTemporaryFile("w", suffix=".lua", delete=False,
+                                     encoding="utf-8") as handle:
+        handle.write(COVERAGE_DUMP)
+        dump_path = handle.name
+    try:
+        proc = subprocess.run([LUAJIT, dump_path], cwd=repo,
+                              capture_output=True, text=True, timeout=60)
+        if proc.returncode == 0:
+            rows = proc.stdout.splitlines()
+        else:
+            notes.append("could not read the adapter table through %s (%s)"
+                         % (LUAJIT, (proc.stderr or "").strip()[-120:]))
+    except (OSError, subprocess.SubprocessError):
+        notes.append("could not run %s, so the adapter table was read from "
+                     "the Lua source instead" % LUAJIT)
+    finally:
+        os.unlink(dump_path)
+
+    coverage = {}
+    for row in rows:
+        parts = row.split("\t")
+        if parts[0] == "ADAPTER" and len(parts) >= 3:
+            coverage.setdefault(parts[1], {
+                "kind": "alias" if parts[2] else "facade",
+                "target": parts[2], "members": None, "notes": {},
+                "declared": False})
+        elif parts[0] == "COVER" and len(parts) >= 4:
+            record = coverage.setdefault(parts[1], {"notes": {}})
+            record.update({"kind": parts[2], "target": parts[3],
+                           "members": {}, "declared": True})
+        elif parts[0] == "MEMBER" and len(parts) >= 4:
+            coverage[parts[1]]["members"][parts[2]] = parts[3]
+        elif parts[0] == "NOTE" and len(parts) >= 4:
+            coverage[parts[1]]["notes"][parts[2]] = "\t".join(parts[3:])
+    if not coverage:
+        for name, alias in _adapters_from_source(repo).items():
+            coverage[name] = {"kind": "alias" if alias else "facade",
+                              "target": alias, "members": None, "notes": {},
+                              "declared": False}
+    undeclared = sorted(n for n, r in coverage.items() if not r["declared"])
+    if undeclared:
+        notes.append("no coverage row for %s: this scan can say the adapter "
+                     "serves the name and nothing about its members"
+                     % ", ".join(undeclared))
+    return coverage
+
+
+# ------------------------------------------------------------ mod use scan
+
+class Use:
+    def __init__(self, rel, line, module, ident, chain, kind, argc, varargs,
+                 guarded, top):
+        self.rel, self.line, self.module = rel, line, module
+        self.ident, self.chain = ident, chain    # chain: ["data", "field"]
+        self.kind = kind                         # "call" | "read" | "write"
+        self.argc, self.varargs = argc, varargs
+        # `X.y and X.y(...)` is feature detection, not a nil call
+        self.guarded = guarded
+        # at file scope, so it runs while the entry chunk does
+        self.top = top
+
+    @property
+    def member(self):
+        return ".".join(self.chain)
+
+    def where(self):
+        return f"{self.rel}:{self.line}"
+
+
+# every engine module name the mod spells, however it reaches for it: each one
+# is either resolved below or comes back as an unresolved note
+MODULE_LITERAL = re.compile(r"""["'](src[./][\w./]+)["']""")
+HEAD_PCALL = re.compile(r"""\bpcall\s*\(\s*require\s*,\s*$""")
+HEAD_REQUIRE = re.compile(r"""\brequire\s*\(?\s*$""")
+HEAD_CALL = re.compile(r"""\b([A-Za-z_][\w.:]*)\s*\(\s*$""")
+# the name at the tail of one slot of an assignment's name list
+BIND_NAME = re.compile(
+    r"""(?:^|[\s=({,;])(?:local\s+)?([A-Za-z_]\w*)\s*$""")
+# require("src.world.Map").waterTiles(1) and its bracket twin
+TAIL_MEMBER = re.compile(r"""^\s*\)?\s*([.:])\s*(\w+)""")
+TAIL_INDEX = re.compile(r"""^\s*\)?\s*\[\s*["'](\w+)["']\s*\]""")
+# local F = Follower: a module carried on through a second name
+ALIAS_BIND = re.compile(
+    r"""(?:^|[\s;])(?:local\s+)?([A-Za-z_]\w*)\s*=\s*([A-Za-z_]\w*)\s*"""
+    r"""(?=[\r\n;]|$)""", re.M)
+# local function tryRequire(path) return require(path) end: a mod's own wrapper,
+# which the call sites below are followed through
+WRAPPER_DEF = re.compile(
+    r"""\blocal\s+(?:function\s+([A-Za-z_]\w*)\s*\(\s*([A-Za-z_]\w*)"""
+    r"""|([A-Za-z_]\w*)\s*=\s*function\s*\(\s*([A-Za-z_]\w*))""")
+# patchUpvalue(Follower.update, "shouldSpawn", fn): the shape a mod reaches an
+# engine file-local through, and the only place the upvalue is named
+UPVALUE_CALL = re.compile(
+    r"\bdebug\s*\.\s*(?:setupvalue|getupvalue|upvaluejoin)\b")
+UPVALUE_ARGS = re.compile(
+    r"""^\s*([A-Za-z_]\w*)\s*\.\s*(\w+)\s*,\s*["'](\w+)["']""")
+VERSION_MATCH = re.compile(
+    r"""[=~]=\s*["'](red|blue|yellow)["']|["'](red|blue|yellow)["']\s*[=~]=""")
+
+
+def _line_of(body, offset):
+    return body.count("\n", 0, offset) + 1
+
+
+BLOCK_WORD = re.compile(r"\b(function|do|if|repeat|end|until)\b")
+
+
+def _blank_strings(text):
+    """The same text with literal bodies blanked, positions intact: a string
+    holding the word `end` must not close a block."""
+    out, index, size = [], 0, len(text)
+    while index < size:
+        char = text[index]
+        if char in "\"'":
+            quote, start = char, index
+            index += 1
+            while index < size:
+                if text[index] == "\\":
+                    index += 2
+                    continue
+                index += 1
+                if text[index - 1] == quote:
+                    break
+            chunk = text[start:index]
+            out.append(quote + " " * (len(chunk) - 2) + quote
+                       if len(chunk) > 1 else chunk)
+            continue
+        out.append(char)
+        index += 1
+    return "".join(out)
+
+
+def _function_spans(text):
+    """Byte ranges a function body covers, so a use inside one can be told
+    from a use at file scope.  Keyword counting rather than parsing: every
+    `function` / `do` / `if` / `repeat` is closed by exactly one `end` or
+    `until`, which is all this has to get right."""
+    stack, spans = [], []
+    for match in BLOCK_WORD.finditer(_blank_strings(text)):
+        word = match.group(1)
+        if word in ("end", "until"):
+            if stack:
+                kind, start = stack.pop()
+                if kind == "function":
+                    spans.append((start, match.end()))
+        else:
+            stack.append(("function" if word == "function" else "block",
+                          match.start()))
+    return spans
+
+
+def _local_functions(body, spans):
+    """(name, parameters, body) for every `local function f(x, y)` and `local f
+    = function(x, y)` in the file, the body bounded by the function's own span
+    so a call further down the file is never read as part of it."""
+    ends = dict(spans)
+    out = []
+    for match in WRAPPER_DEF.finditer(body):
+        keyword = body.find("function", match.start(), match.end())
+        stop = ends.get(keyword)
+        inner = body[match.end():stop] if stop else ""
+        params = [match.group(2) or match.group(4)]
+        close = inner.find(")")
+        if close >= 0:
+            params += [p.strip() for p in inner[:close].split(",") if p.strip()]
+        out.append((match.group(1) or match.group(3), params, inner))
+    return out
+
+
+def _require_wrappers(files):
+    """The names a mod gives its own require wrapper (`local function
+    tryRequire(p) return require(p) end`), read across the whole mod so a
+    wrapper declared in one file is followed at call sites in another."""
+    names = set()
+    for body, spans in files:
+        for name, params, inner in _local_functions(body, spans):
+            if re.search(r"\brequire\s*[(,]\s*%s\b" % re.escape(params[0]),
+                         inner):
+                names.add(name)
+    return names
+
+
+def _call_args(text, start):
+    """The arguments of the call whose name ends at `start`, split at depth 0;
+    None when the parentheses do not balance."""
+    paren = text.find("(", start)
+    if paren < 0 or text[start:paren].strip():
+        return None
+    close = _lua_close(text, paren)
+    if close is None:
+        return None
+    args = text[paren + 1:close]
+    cuts = _depth_commas(_blank_strings(args))
+    return [args[a + 1:b].strip()
+            for a, b in zip([-1] + cuts, cuts + [len(args)])]
+
+
+def _forwards_upvalue_name(inner, params):
+    """Does this helper's second parameter really reach the debug call as an
+    upvalue NAME: handed straight to the name slot, or matched against what
+    getupvalue answers to find the index.  A parameter that only ever lands in
+    the value slot names nothing, so its call sites are not upvalue surgery."""
+    if len(params) < 2:
+        return False
+    name, taken = params[1], False
+    for match in UPVALUE_CALL.finditer(inner):
+        args = _call_args(inner, match.end())
+        if not args or args[0] != params[0]:
+            continue
+        if len(args) >= 2 and args[1] == name:
+            return True
+        taken = True
+    return taken and bool(re.search(r"\bdebug\s*\.\s*getupvalue\b", inner)) \
+        and bool(re.search(r"(?:[=~]=\s*%s|%s\s*[=~]=)\b"
+                           % (re.escape(name), re.escape(name)), inner))
+
+
+def _upvalue_helpers(files):
+    """(confirmed, suspect) helper names.  Confirmed is a local function that
+    forwards its own (function, name) parameters into a debug upvalue call, so
+    its call sites really do name an engine local; anything else that touches
+    the debug library is a suspect, whose call sites come back unresolved
+    rather than being read as named upvalue surgery."""
+    names, suspects = set(), set()
+    for body, spans in files:
+        for name, params, inner in _local_functions(body, spans):
+            if not (UPVALUE_CALL.search(inner) or "upvalue" in name.lower()):
+                continue
+            (names if _forwards_upvalue_name(inner, params)
+             else suspects).add(name)
+    return names, suspects - names
+
+
+def _upvalue_calls(body, helpers, suspects=()):
+    """(offset, argument text, confirmed) for every call that reaches an
+    upvalue: the debug library itself and the mod's own helpers around it.
+    Only these sites name a local of an engine module, so no other `X.y, "z"`
+    shape is read as upvalue surgery."""
+    calls = []
+    names = [r"debug\s*\.\s*(?:setupvalue|getupvalue|upvaluejoin)"] + \
+        [re.escape(name) for name in sorted(set(helpers) | set(suspects))]
+    for match in re.finditer(r"\b(%s)\s*\(" % "|".join(names), body):
+        if re.search(r"\bfunction\s+$", body[:match.start()]):
+            continue    # the helper's own definition, not a call of it
+        close = _lua_close(body, match.end() - 1)
+        if close is None:
+            continue
+        calls.append((match.start(), body[match.end():close],
+                      match.group(1) not in suspects))
+    return calls
+
+
+def _depth_commas(text):
+    """Offsets of the commas at bracket depth 0 in already-blanked text."""
+    depth, out = 0, []
+    for index, char in enumerate(text):
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        elif char == "," and depth == 0:
+            out.append(index)
+    return out
+
+
+def _name_list(head):
+    """(names left to right, truncated) for the assignment whose `=` this text
+    ends before.  Read straight back as tokens, so `a, b, c =` is three names
+    and the walk stops the moment a name slot holds anything else (`t.x`,
+    `t[1]`, a table field left of the one being written)."""
+    names, text = [], head
+    while True:
+        match = BIND_NAME.search(text)
+        if not match:
+            return list(reversed(names)), True
+        before = text[:match.start(1)].rstrip()
+        if before[-1:] in (".", ":", "]", ")"):
+            return list(reversed(names)), True    # t.x and friends: not a name
+        names.append(match.group(1))
+        if not before.endswith(","):
+            return list(reversed(names)), False
+        text = before[:-1]
+
+
+def _bind_target(pre, slot=0):
+    """The name a require's result takes, paired positionally so
+    `local A, B = require(X), require(Y)` gives X to A and Y to B.  `slot` is
+    where the value sits among its own call's returns (1 for the module a
+    pcall hands back).  (name, None), or (None, why) when no pair can be made,
+    which the caller turns into an unresolved note rather than a guess."""
+    blank = _blank_strings(pre).rstrip()
+    # the value sits in an assignment only if it follows that `=` or a comma
+    # in its value list; anything else (`return require(...)`) binds nothing
+    if not (blank.endswith(",")
+            or (blank.endswith("=") and blank[-2:-1] not in ("=", "~", "<",
+                                                             ">"))):
+        return None, "unbound"
+    depth, eq, index = 0, None, len(blank) - 1
+    while index >= 0:
+        char = blank[index]
+        if char in ")]}":
+            depth += 1
+        elif char in "([{":
+            depth -= 1
+            if depth < 0:
+                return None, "unbound"
+        elif (char == "=" and depth == 0
+              and blank[index - 1:index] not in ("=", "~", "<", ">")
+              and blank[index + 1:index + 2] != "="):
+            eq = index
+            break
+        index -= 1
+    if eq is None:
+        return None, "unbound"
+    position = slot + len(_depth_commas(blank[eq + 1:]))
+    names, truncated = _name_list(blank[:eq])
+    if truncated and (position or len(names) != 1):
+        return None, "unpaired"
+    if position >= len(names):
+        return None, "unpaired"
+    return names[position], None
+
+
+def _module_literals(body, wrappers):
+    """Split every `src.` module name this file spells into what the scan can
+    attach to a name (binds), what it can attach straight to a member (inline)
+    and what it cannot follow at all (unfollowed), so no reach falls out
+    silently.  Returns binds, inline, unfollowed."""
+    binds, inline, unfollowed = {}, [], []
+    for match in MODULE_LITERAL.finditer(body):
+        module = match.group(1).replace("/", ".")
+        head, after = body[:match.start()], body[match.end():]
+        pcall_head = HEAD_PCALL.search(head)
+        require_head = None if pcall_head else HEAD_REQUIRE.search(head)
+        call_head = None
+        if pcall_head:
+            pre = head[:pcall_head.start()]
+        elif require_head:
+            pre = head[:require_head.start()]
+        else:
+            call_head = HEAD_CALL.search(head)
+            callee = re.split(r"[.:]", call_head.group(1))[-1] \
+                if call_head else None
+            if callee in wrappers:
+                pre = head[:call_head.start()]
+            elif call_head:
+                unfollowed.append((match.start(), "engine module names "
+                                   "handed to a call this scan does not "
+                                   "follow"))
+                continue
+            else:
+                unfollowed.append((match.start(), "engine module names "
+                                   "spelled in a literal this scan cannot tie "
+                                   "to a require"))
+                continue
+        colon, member, consumed = False, None, 0
+        tail = TAIL_MEMBER.match(after)
+        index = None if tail else TAIL_INDEX.match(after)
+        if tail:
+            colon, member, consumed = tail.group(1) == ":", tail.group(2), \
+                tail.end()
+        elif index:
+            member, consumed = index.group(1), index.end()
+        if pcall_head:
+            # only the last value of a list keeps its second return
+            paren = head.find("(", pcall_head.start())
+            close = _lua_close(body, paren) if paren >= 0 else None
+            bind, why = (None, "unpaired") \
+                if close is None or body[close + 1:close + 64].lstrip()[:1] == "," \
+                else _bind_target(pre, 1)
+        else:
+            bind, why = _bind_target(pre)
+        if member:
+            inline.append((len(pre), module, colon, member,
+                           match.end() + consumed))
+            # only worth saying when something later reaches off that name
+            if bind and re.search(r"\b%s\s*[.:]" % re.escape(bind),
+                                  after[consumed:]):
+                unfollowed.append((match.start(), "names bound to a member "
+                                   "of an engine module and not the module, "
+                                   "so reaches off them are not followed"))
+        elif bind:
+            binds.setdefault(bind, []).append((match.start(), module, True))
+        elif why == "unpaired":
+            unfollowed.append((match.start(), "requires in a multiple "
+                               "assignment whose value this scan cannot pair "
+                               "to a name"))
+        else:
+            unfollowed.append((match.start(), "requires whose result is "
+                               "neither bound to a name nor indexed here, so "
+                               "where the module goes is not followed"))
+    return binds, inline, unfollowed
+
+
+def _alias_binds(body, binds):
+    """`local F = Follower` carries a module on to a second name.  Repeated to
+    a fixpoint so a chain of hops resolves, and only ever backwards: a name is
+    bound at the point the alias is written."""
+    while True:
+        added = False
+        for match in ALIAS_BIND.finditer(body):
+            ident, source = match.group(1), match.group(2)
+            if ident == source or source not in binds:
+                continue
+            module = module_at(binds[source], match.start(2))
+            site = (match.start(1), module)
+            if module and site not in binds.get(ident, []):
+                binds.setdefault(ident, []).append(site)
+                added = True
+        if not added:
+            break
+    for sites in binds.values():
+        sites.sort()
+    return binds
+
+
+def _member_use(body, spans, rel, module, ident, start, end, member, colon):
+    """One Use from a reach: `start`..`end` covers the name and the member
+    taken off it, whether that name is a local, a bracket index or the require
+    call itself."""
+    rest = body[end:]
+    head = body[:start].rstrip()
+    chain = [member]
+    tail = re.match(r"((?:\.\w+){1,2})", rest)
+    if tail:
+        chain += tail.group(1).lstrip(".").split(".")
+        rest = rest[tail.end():]
+    argc, varargs = None, False
+    if head.endswith("function") or re.match(r"\s*=(?!=)", rest):
+        kind = "write"
+    elif re.match(r"\s*\(", rest):
+        kind = "call"
+        argc, varargs = _lua_args(body,
+                                  len(body) - len(rest) + rest.index("("))
+        if colon and argc is not None:
+            argc += 1
+    elif re.match(r"""\s*["'{]""", rest):
+        kind, argc = "call", 1 + (1 if colon else 0)
+    else:
+        kind = "read"
+    guarded = bool(re.match(r"\s*(and|or|then|\)|~=|==)", rest)) \
+        or bool(re.search(r"\b(if|and|or|not)\s*$", head))
+    top = not any(begin <= start < stop for begin, stop in spans)
+    return Use(rel, _line_of(body, start), module, ident, chain, kind, argc,
+               varargs, guarded, top)
+
+
+def _dynamic_requires(body):
+    """Offsets of the requires whose name this scan cannot take whole: one
+    handed in as a value, and any argument list that concatenates, however it
+    starts (`require("src" .. tail)` is as unfollowable as `require(name)`)."""
+    out = []
+    for match in re.finditer(r"\brequire\s*\(", body):
+        close = _lua_close(body, match.end() - 1)
+        if close is None:
+            out.append(match.start())
+            continue
+        args = _blank_strings(body[match.end():close])
+        if ".." in args or not re.match(r"""\s*["']""", args):
+            out.append(match.start())
+    return out
+
+
+RAW_ACCESS = "engine modules reached with %s, which goes straight to the " \
+    "table the require shim hands back: where a Gen 2 boot serves the module " \
+    "through a Gen2Compat facade, that %s the facade and not the module " \
+    "behind it"
+
+
+def _raw_access(body, ident, sites):
+    """rawget/rawset on a bound module: the one reach that skips the facade's
+    metatable, so it never sees the Gen 2 module the adapter stands in for."""
+    out = []
+    for match in re.finditer(r"\braw(get|set)\s*\(\s*%s\s*[,)]"
+                             % re.escape(ident), body):
+        if module_at(sites, match.start()):
+            out.append((match.start(), RAW_ACCESS % (
+                "rawset", "is where the write lands, on")
+                if match.group(1) == "set" else RAW_ACCESS % (
+                "rawget", "is all the read sees,")))
+    return out
+
+
+def _value_reads(body, ident, sites, followed):
+    """Occurrences of a bound module name in none of the shapes this scan
+    follows: parked on a table, passed to a call, delegated to through a
+    metatable.  The module escapes there, so what is reached off it later is
+    not this scan's to see."""
+    out, blank = [], _blank_strings(body)
+    aliased = {match.start(2) for match in ALIAS_BIND.finditer(body)
+               if match.group(2) == ident}
+    for match in re.finditer(r"(?<![\w.:])%s\b" % re.escape(ident), blank):
+        start, rest = match.start(), blank[match.end():]
+        if start in followed or start in aliased \
+                or not module_at(sites, start):
+            continue
+        if re.match(r"\s*[.:\[]", rest) or re.match(r"\s*=(?!=)", rest) \
+                or re.search(r"\braw(?:get|set)\s*\(\s*$", blank[:start]):
+            continue    # followed above, rebound here, or noted as a raw reach
+        line = blank.rfind("\n", 0, start) + 1
+        before = blank[line:start]
+        while line > 0 and re.match(r"\s*(and|or|not)\b", before):
+            line = blank.rfind("\n", 0, line - 1) + 1
+            before = blank[line:start]    # a condition carried over a line
+        if re.search(r"(?<![\w.:])%s\s*(?:[.:]\s*\w+|\[[^\]\n]*\])\s*\(\s*$"
+                     % re.escape(ident), before):
+            continue    # M.f(M): the explicit self of a reach already followed
+        if re.search(r"\bfunction\b[^()\n]*\([^)\n]*$", before):
+            continue    # a parameter of that name shadowing the module here
+        test = re.search(r"\b(if|elseif|while|until)\b", before)
+        if test and not re.search(r"[^=~<>]=(?!=)|\breturn\b",
+                                  before[test.end():]):
+            continue    # a presence test: nothing escapes a condition
+        out.append((start, "engine modules read as a value rather than "
+                    "indexed, so where the module goes from there (a table "
+                    "field, a call argument, a metatable's __index) is not "
+                    "followed"))
+    return out
+
+
+def scan_module_uses(mod_dir):
+    """Every reach the mod makes at an engine module, every member it then
+    touches, and every upvalue it names beside one.
+
+    This is a regex over source, not an interpreter.  It follows a require
+    bound to a name (by position, so one statement may bind several), a
+    require the mod wraps in its own helper, a require indexed on the spot, a
+    bracket index with a literal name and a module carried on through a second
+    local.  What it cannot follow -- a name built at runtime or concatenated,
+    a value it cannot pair to a name, a module read as a value, a raw index
+    past the facade, an index whose key is computed, a helper it cannot
+    confirm names an upvalue -- comes back as an unresolved note, so silence
+    over a reach is never this tool's approval of it."""
+    requires, uses, upvalues, notes = [], [], [], []
+    dynamic, blind, unsure, unfollowed = [], [], [], []
+    files = [rel for rel in mod_files(mod_dir)
+             if os.path.splitext(rel)[1].lower() == ".lua"]
+    bodies = {}
+    for rel in files:
+        body = strip_lua(open(os.path.join(mod_dir, rel), encoding="utf-8",
+                              errors="replace").read())
+        bodies[rel] = (body, _function_spans(body))
+    wrappers = _require_wrappers(bodies.values())
+    helpers, suspects = _upvalue_helpers(bodies.values())
+    for rel in files:
+        body, spans = bodies[rel]
+        binds, inline, unresolved = _module_literals(body, wrappers)
+        for offset, why in unresolved:
+            unfollowed.append((why, "%s:%d" % (rel, _line_of(body, offset))))
+        for offset, module, colon, member, end in inline:
+            if not module.startswith("src."):
+                continue
+            requires.append((rel, _line_of(body, offset), module))
+            uses.append(_member_use(body, spans, rel, module,
+                                    module.split(".")[-1], offset, end,
+                                    member, colon))
+        for ident, sites in binds.items():
+            for offset, module, literal in sites:
+                if literal and module.startswith("src."):
+                    requires.append((rel, _line_of(body, offset), module))
+        binds = {ident: [(offset, module) for offset, module, _ in sites
+                         if module.startswith("src.")]
+                 for ident, sites in binds.items()}
+        binds = {ident: sites for ident, sites in binds.items() if sites}
+        binds = _alias_binds(body, binds)
+        for offset in _dynamic_requires(body):
+            dynamic.append("%s:%d" % (rel, _line_of(body, offset)))
+        for ident, sites in binds.items():
+            followed = []
+            for match in re.finditer(
+                    r"\b%s\s*(?:([.:])\s*(\w+)|\[\s*[\"'](\w+)[\"']\s*\])"
+                    % re.escape(ident), body):
+                module = module_at(sites, match.start())
+                if not module:
+                    continue
+                followed.append(match.start())
+                uses.append(_member_use(
+                    body, spans, rel, module, ident, match.start(),
+                    match.end(), match.group(2) or match.group(3),
+                    match.group(1) == ":"))
+            for match in re.finditer(r"\b%s\s*\[\s*(?![\"'])" % re.escape(ident),
+                                     body):
+                if module_at(sites, match.start()):
+                    followed.append(match.start())
+                    unfollowed.append((
+                        "engine modules indexed with a key this scan cannot "
+                        "read",
+                        "%s:%d" % (rel, _line_of(body, match.start()))))
+            for offset, why in _raw_access(body, ident, sites) \
+                    + _value_reads(body, ident, sites, followed):
+                unfollowed.append((why, "%s:%d" % (rel, _line_of(body, offset))))
+        for offset, args, confirmed in _upvalue_calls(body, helpers, suspects):
+            pair = UPVALUE_ARGS.match(args) if confirmed else None
+            module = module_at(binds.get(pair.group(1), []), offset) \
+                if pair else None
+            if module:
+                upvalues.append((rel, _line_of(body, offset), module,
+                                 pair.group(2), pair.group(3)))
+            elif confirmed:
+                blind.append("%s:%d" % (rel, _line_of(body, offset)))
+            else:
+                unsure.append("%s:%d" % (rel, _line_of(body, offset)))
+    if dynamic:
+        notes.append("unresolved: %s building a require name at runtime, "
+                     "which this scan cannot follow (%s)"
+                     % (_count(len(dynamic), "site"), _places(dynamic)))
+    for why in sorted({why for why, _ in unfollowed}):
+        places = [place for reason, place in unfollowed if reason == why]
+        notes.append("unresolved: %s: %s (%s)"
+                     % (_count(len(places), "site"), why, _places(places)))
+    if blind:
+        notes.append("unresolved: %s whose target function this scan could "
+                     "not tie to an engine module, so the local they reach "
+                     "could not be resolved (%s)"
+                     % (_count(len(blind), "debug upvalue call"),
+                        _places(blind)))
+    if unsure:
+        notes.append("unresolved: %s through a mod helper this scan could not "
+                     "confirm carries an upvalue name through to the debug "
+                     "call, so what they patch is unknown (%s)"
+                     % (_count(len(unsure), "call"), _places(unsure)))
+    return requires, uses, upvalues, notes
+
+
+def _places(items, limit=4):
+    """A file:line list that stays one line however many there are."""
+    shown = ", ".join(items[:limit])
+    return shown if len(items) <= limit else \
+        "%s and %d more" % (shown, len(items) - limit)
+
+
+def module_at(sites, offset):
+    """The module the name was bound to at this point in the file."""
+    module = None
+    for start, name in sites:
+        if start <= offset:
+            module = name
+    return module
+
+
+# ------------------------------------------------------------- the checks
+
+GEN2_IDS_DUMP = '''\
+package.path = "./?.lua;./?/init.lua;" .. package.path
+print(table.concat(require("src.mods.ModTargets").generationVersions(2), " "))
+'''
+
+_GEN2_IDS = None
+
+
+def gen2_version_ids(repo):
+    """The Gen 2 version ids, read out of the engine (src/mods/ModTargets.lua)
+    rather than restated here.  Empty when luajit cannot answer, which leaves
+    the "gen2"/"all" tokens to decide alone."""
+    global _GEN2_IDS
+    if _GEN2_IDS is None:
+        _GEN2_IDS = []
+        try:
+            proc = subprocess.run([LUAJIT, "-e", GEN2_IDS_DUMP], cwd=repo,
+                                  capture_output=True, text=True, timeout=30)
+            if proc.returncode == 0:
+                _GEN2_IDS = proc.stdout.split()
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return _GEN2_IDS
+
+
+def declares_gen2(repo, manifest):
+    """Does this manifest claim a Gen 2 game: the `games` list, or the legacy
+    gen2compat flag it is derived from (src/mods/Manifest.lua)."""
+    if not manifest:
+        return False
+    if manifest.get("gen2compat"):
+        return True
+    games = manifest.get("games")
+    if not isinstance(games, list):
+        return False
+    ids = set(gen2_version_ids(repo))
+    for token in games:
+        if isinstance(token, str) and (
+                token.strip().lower() in ("gen2", "all")
+                or token.strip().lower() in ids):
+            return True
+    return False
+
+
+def check_gen2_manifest(repo, mod_dir, manifest, named):
+    """MK400/MK401: what the loader decides before a line of the mod runs
+    (src/mods/Loader.lua's generation gate).  `named` is every mod on this
+    command line, so checking a mod together with its dependencies reads them
+    as one install set."""
+    findings, notes = [], []
+    if not declares_gen2(repo, manifest):
+        findings.append(Finding(
+            "MK400", "error",
+            "no Gen 2 game in \"games\" (and no gen2compat), so a Gen 2 boot "
+            "skips this mod; the rest of this report is what it would hit "
+            "once it claims one",
+            "manifest.json"))
+    deps = manifest.get("dependencies") or []
+    for dep in deps if isinstance(deps, list) else []:
+        if not isinstance(dep, str):
+            continue
+        found = named.get(dep) or find_mod_by_id(repo, mod_dir, dep)
+        if found is None:
+            notes.append("unresolved: dependency %s is not installed beside "
+                         "this mod, so its games list could not be read" % dep)
+        elif not declares_gen2(repo, found):
+            findings.append(Finding(
+                "MK401", "error",
+                f"depends on {dep}, which claims no Gen 2 game; the "
+                f"loader disables a mod whose dependency a Gen 2 boot skipped",
+                "manifest.json"))
+    return findings, notes
+
+
+def find_mod_by_id(repo, mod_dir, mod_id):
+    """The manifest of another installed mod, or None.  An install root is
+    one directory of <id>/manifest.json, which is all the loader itself walks,
+    so this looks beside the mod and in the repo's mods/ and no deeper: a
+    second copy under some build tree is not what would load."""
+    roots = [os.path.dirname(os.path.abspath(mod_dir)),
+             os.path.join(repo, "mods")]
+    seen = set()
+    for root in roots:
+        if not os.path.isdir(root) or root in seen:
+            continue
+        seen.add(root)
+        for name in sorted(os.listdir(root)):
+            path = os.path.join(root, name, "manifest.json")
+            if name in SKIP_DIRS or not os.path.isfile(path):
+                continue
+            try:
+                found = json.load(open(path, encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if found.get("id") == mod_id:
+                return found
+    return None
+
+
+def check_gen2_requires(repo, coverage, requires):
+    """MK402: a Gen 1 module a Gen 2 boot never instantiates and no adapter
+    backs -- the require succeeds, the patch lands on dead code, and the
+    loader says so in the manager's error feed.  MK403: the same silence
+    without the loader's warning, spotted from the gen2/ sibling that runs
+    instead."""
+    findings, notes = [], []
+    gen1_only = gen1_only_modules(repo)
+    seen = set()
+    for rel, line, module in requires:
+        if module in coverage or (rel, module) in seen:
+            continue
+        seen.add((rel, module))
+        if module not in gen1_only and not _module_exists(repo, module):
+            notes.append("unresolved: %s:%d names %s, which is neither an "
+                         "adapter nor a module in this checkout, so nothing "
+                         "reached off it was checked" % (rel, line, module))
+            continue
+        if module in gen1_only:
+            findings.append(Finding(
+                "MK402", "error",
+                f"requires {module}, which a Gen 2 boot never runs and "
+                f"src/mods/Gen2Compat.lua has no adapter for; take the game "
+                f"from the game.ready payload and mod.world instead",
+                f"{rel}:{line}"))
+            continue
+        parts = module.split(".")
+        if len(parts) < 3:
+            continue
+        sibling = ".".join(parts[:-1] + ["gen2", parts[-1]])
+        if os.path.isfile(module_path(repo, sibling)):
+            findings.append(Finding(
+                "MK403", "warn",
+                f"requires {module}, but a Gen 2 game runs {sibling}; the "
+                f"require succeeds and hands back a module nothing "
+                f"instantiates",
+                f"{rel}:{line}"))
+    return findings, notes
+
+
+def check_gen2_members(repo, coverage, uses, advise=False):
+    """MK404: a member the adapter says has no Gen 2 backing, so the read is
+    nil and the call raises.  MK405: one that is there and degrades, in the
+    adapter's own words.  MK406: one whose parameters moved under it -- the
+    trap an alias sets, because it runs and means something else."""
+    findings, notes = [], []
+    owned = {(use.module, use.member) for use in uses if use.kind == "write"}
+    for use in uses:
+        record = coverage.get(use.module)
+        if not record:
+            continue    # a shared module, or one the requires pass noted
+
+        members = record["members"]
+        if members is None:
+            notes.append("unresolved: no coverage row for %s, so %s.%s could "
+                         "not be checked" % (use.module, use.ident,
+                                             use.member))
+            continue
+        member, status = _resolve_member(members, use.chain)
+        note = _plain_note(record["notes"].get(member)) if member else None
+        target = record["target"] or "the adapter"
+        if status is None:
+            gen1 = lua_api(module_path(repo, use.module)) or {}
+            api = lua_api(module_path(repo, record["target"])) or {} \
+                if record["target"] else {}
+            if use.chain[0] in api or (use.module, use.chain[0]) in owned:
+                continue    # the Gen 2 module carries it, or the mod put it there
+            if use.chain[0] not in gen1:
+                continue    # the mod's own field on a table it did not declare
+            notes.append("unresolved: %s.%s is a Gen 1 member the coverage "
+                         "table does not classify" % (use.ident, use.member))
+            continue
+        if status == ABSENT:
+            findings.append(Finding(
+                "MK404", "warn" if use.guarded else "error",
+                "%s.%s has no Gen 2 backing: %s"
+                % (use.ident, use.member, note or "%s has no %s"
+                   % (target, member))
+                + ("; the guarded branch never runs" if use.guarded
+                   else "; nothing on a Gen 2 boot reads this write"
+                   if use.kind == "write" else "; this reads nil"
+                   + (" and the call raises" if use.kind == "call" else "")),
+                use.where()))
+            continue
+        if status != "backed":
+            findings.append(Finding(
+                "MK405", "warn",
+                "%s.%s is %s on a Gen 2 boot: %s"
+                % (use.ident, use.member, status,
+                   note or "it answers nil and names itself once in the log"),
+                use.where()))
+            continue
+        held = _held_at_file_scope(repo, record, use)
+        if held:
+            findings.append(held)
+            continue
+        shapes = _signature_diff(repo, record, use)
+        if shapes:
+            # an alias hands the mod the Gen 2 module itself: no shim stands
+            # between this call and the parameters that moved under it
+            findings.append(Finding(
+                "MK406", "warn",
+                shapes + ("; " + note if note else ""), use.where()))
+        elif advise and note:
+            notes.append("%s.%s: %s" % (use.ident, use.member, note))
+    return findings, notes
+
+
+def _held_at_file_scope(repo, record, use):
+    """MK410: the entry chunk reading a member the Gen 1 module only ever
+    writes onto the running game.  A facade resolves against the live instance
+    at read time and there is none yet while the mod is loading, so the value
+    captured is nil for the life of the process; the same read from inside a
+    hook or an event is correct (docs/mod-api-gen2-compat.md, "live, never a
+    snapshot")."""
+    if not use.top or use.kind == "write" or record["kind"] != "facade":
+        return None
+    entry = (lua_api(module_path(repo, use.module)) or {}).get(use.chain[0])
+    if not entry or entry["kind"] != "field":
+        return None
+    return Finding(
+        "MK410", "warn",
+        f"reads {use.ident}.{use.member} at file scope, where a Gen 2 boot "
+        f"has no game yet: the facade answers nil until one exists, so take "
+        f"this from the game.ready payload instead of the entry chunk",
+        use.where())
+
+
+def _plain_note(note):
+    """The adapter writes a status word in front of some of its notes; the
+    finding already carries the status, so it is not said twice."""
+    if not note:
+        return None
+    return re.sub(r"^(ABSENT|WARNED|BACKED)\b[:.]?\s*", "", note.strip())
+
+
+def _resolve_member(members, chain):
+    """Longest dotted path the coverage table classifies: Game.save.money is a
+    row of its own where Game.save is another."""
+    for size in range(len(chain), 0, -1):
+        name = ".".join(chain[:size])
+        if name in members:
+            return name, members[name]
+    return None, None
+
+
+def _signature_diff(repo, record, use):
+    """The sentence for a call whose parameters moved: the Gen 2 module spells
+    them in an order the Gen 1 call site cannot survive, or takes a different
+    number of them.  Equal shape with different names is a rename as often as
+    a change, and this tool does not guess between the two.
+
+    An alias only: a facade is free to override the member with the Gen 1
+    shape (src/mods/Gen2Compat.lua's Boxes.deposit does exactly that), so the
+    Gen 2 module's parameters are not what the mod would be calling."""
+    if (use.kind != "call" or record["kind"] != "alias"
+            or not record["target"] or len(use.chain) != 1):
+        return None
+    want = (lua_api(module_path(repo, record["target"])) or {}).get(
+        use.member, {}).get("params")
+    have = (lua_api(module_path(repo, use.module)) or {}).get(
+        use.member, {}).get("params")
+    if want is None or have is None or want == have:
+        return None
+    shapes = ("%s.%s is (%s) on a Gen 2 boot and (%s) on Gen 1"
+              % (use.ident, use.member, ", ".join(want), ", ".join(have)))
+    if _reordered(want, have):
+        return shapes + "; the shared parameters sit in different places"
+    if (use.argc is not None and not use.varargs
+            and use.argc == len(have) and use.argc != len(want)):
+        return shapes + "; this call passes the Gen 1 argument list"
+    return None
+
+
+def _reordered(want, have):
+    """True when the two parameter lists share names sitting in different
+    places."""
+    shared = [name for name in want if name in have and name != "self"]
+    return any(want.index(name) != have.index(name) for name in shared)
+
+
+UPVALUE_DUMP = '''\
+package.path = "./?.lua;./?/init.lua;" .. package.path
+local ok, G = pcall(require, "src.mods.Gen2Compat")
+if not ok then os.exit(3) end
+for line in io.lines() do
+  local module, member = line:match("^(%S+)\\t(%S+)$")
+  if module then
+    local status, names = "nomodule", {}
+    local got, adapter = pcall(G.resolve, module)
+    if got and type(adapter) == "table" then
+      local read, value = pcall(function() return adapter[member] end)
+      if not read then status = "nomember"
+      elseif value == nil then status = "nomember"
+      elseif type(value) ~= "function" then status = "notfunction"
+      else
+        status = "ok"
+        local i = 1
+        while true do
+          local name = debug.getupvalue(value, i)
+          if not name then break end
+          names[#names + 1] = name
+          i = i + 1
+        end
+      end
+    end
+    print(module .. "\\t" .. member .. "\\t" .. status .. "\\t"
+      .. table.concat(names, " "))
+  end
+end
+'''
+
+_UPVALUE_CACHE = {}
+
+
+def gen2_upvalues(repo, queries):
+    """(status, upvalue names) for each (module, member) a mod reaches, taken
+    by resolving the adapter the way src/mods/Loader.lua does and enumerating
+    the function's real upvalues.  A pair luajit could not answer for stays out
+    of the table, which the caller reports as unknown and never as landing."""
+    wanted = sorted({pair for pair in queries
+                     if pair[0] and pair not in _UPVALUE_CACHE})
+    if not wanted:
+        return _UPVALUE_CACHE
+    with tempfile.NamedTemporaryFile("w", suffix=".lua", delete=False,
+                                     encoding="utf-8") as handle:
+        handle.write(UPVALUE_DUMP)
+        dump_path = handle.name
+    try:
+        proc = subprocess.run(
+            [LUAJIT, dump_path], cwd=repo, capture_output=True, text=True,
+            timeout=60,
+            input="".join("%s\t%s\n" % pair for pair in wanted))
+        if proc.returncode == 0:
+            for row in proc.stdout.splitlines():
+                parts = row.split("\t")
+                if len(parts) >= 4:
+                    _UPVALUE_CACHE[(parts[0], parts[1])] = (
+                        parts[2], parts[3].split())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    finally:
+        os.unlink(dump_path)
+    return _UPVALUE_CACHE
+
+
+def check_gen2_upvalues(repo, coverage, upvalues):
+    """MK407/MK408: reaching an engine function's file-local with
+    debug.setupvalue.  The function is resolved through the adapter and its
+    upvalues enumerated, so a member the Gen 2 arm does not carry is the error
+    it is at runtime and a local that is not an upvalue of it never reads as
+    landing."""
+    findings, notes = [], []
+    table = gen2_upvalues(repo, [(module, member) for _, _, module, member, _
+                                 in upvalues if module in coverage])
+    lands = {}
+    for rel, line, module, member, upvalue in upvalues:
+        record = coverage.get(module)
+        if not record:
+            continue    # a shared module, or one the requires pass noted
+
+        target = record["target"] or "the adapter"
+        status, names = table.get((module, member), (None, []))
+        if status in (None, "nomodule"):
+            findings.append(Finding(
+                "MK408", "warn",
+                f"reaches the upvalue {upvalue!r} on {member}; this scan could "
+                f"not resolve {module}.{member} on a Gen 2 boot, so whether "
+                f"the surgery lands is unknown",
+                f"{rel}:{line}"))
+            continue
+        if status != "ok":
+            findings.append(Finding(
+                "MK407", "error",
+                f"reaches the upvalue {upvalue!r} on {member}, but a Gen 2 "
+                f"boot resolves {module}.{member} to "
+                + ("nil" if status == "nomember" else "a value that is not a "
+                   "function")
+                + f" ({target} carries no such function), so the "
+                f"debug.setupvalue call raises",
+                f"{rel}:{line}"))
+            continue
+        if upvalue in names:
+            lands.setdefault((upvalue, module, member), []).append(
+                "%s:%d" % (rel, line))
+            continue
+        setter = "set" + upvalue[:1].upper() + upvalue[1:]
+        api = lua_api(module_path(repo, record["target"])) or {} \
+            if record["target"] else {}
+        findings.append(Finding(
+            "MK407", "error",
+            f"reaches the upvalue {upvalue!r} on {member}, but on a Gen 2 boot "
+            f"{module}.{member} closes over "
+            + (", ".join(sorted(names)[:6]) if names else "nothing")
+            + ", so the surgery lands on nothing"
+            + (f"; {target.split('.')[-1]}.{setter} is the supported route"
+               if setter in api else ""),
+            f"{rel}:{line}"))
+    for (upvalue, module, member), places in sorted(lands.items()):
+        notes.append("%s.%s closes over %r on a Gen 2 boot, so the upvalue "
+                     "surgery at %s lands as it does on Gen 1"
+                     % (module, member, upvalue, _places(places)))
+    return findings, notes
+
+
+def check_gen2_patterns(repo, mod_dir):
+    """MK409: the two shapes no adapter is allowed to fix, because the mod
+    decided something about the game and a Gen 2 boot answers differently
+    (docs/mod-api-gen2-compat.md, "what the facades cannot fix")."""
+    findings = []
+    twins = gen2_screen_twins(repo)
+    for rel in mod_files(mod_dir):
+        if os.path.splitext(rel)[1].lower() != ".lua":
+            continue
+        body = strip_lua(open(os.path.join(mod_dir, rel), encoding="utf-8",
+                              errors="replace").read())
+        for match in VERSION_MATCH.finditer(body):
+            findings.append(Finding(
+                "MK409", "warn",
+                "allow-lists a Gen 1 version string, which excludes this mod "
+                "from a Gen 2 game by construction; test for the capability "
+                "the code needs instead of the version",
+                "%s:%d" % (rel, _line_of(body, match.start()))))
+        # the id itself, not a word in the line around it: `if id == "BoxMenu"`
+        # carries no screen-shaped word and is the shape the docs warn about
+        for match in re.finditer(r"""["'](\w+)["']""", body):
+            name = match.group(1)
+            if name not in twins:
+                continue
+            line = _line_of(body, match.start())
+            findings.append(Finding(
+                "MK409", "warn",
+                f"{name!r} is a Gen 1 screen id; a Gen 2 boot builds "
+                f"'Gen2{name}' (Screens.GEN2_IDS in src/ui/Screens.lua), so a "
+                f"screen compared or opened by this literal matches nothing "
+                f"there",
+                "%s:%d" % (rel, line)))
+    return findings
+
+
+def gen2_screen_twins(repo):
+    """Screen ids that exist in both generations, where Gen 2's carries the
+    Gen2 prefix (src/ui/Screens.lua)."""
+    try:
+        src = open(os.path.join(repo, "src", "ui", "Screens.lua"),
+                   encoding="utf-8").read()
+    except OSError:
+        return set()
+    block = re.search(r"^local GEN2 = \{(.*?)\n\}", src, re.S | re.M)
+    if not block:
+        return set()
+    return {name for name in re.findall(r'"(\w+)"', block.group(1))
+            if os.path.isfile(os.path.join(repo, "src", "ui", name + ".lua"))}
+
+
+# ------------------------------------------------------------- the command
+
+def _count(total, word):
+    return "" if not total else "%d %s%s" % (total, word,
+                                             "" if total == 1 else "s")
+
+
+def gen2_verdict(findings):
+    if any(f.severity == "error" for f in findings):
+        return "will not work"
+    return "will load but degrade" if findings else "will load"
+
+
+def report_gen2(results, args):
+    """report()'s shape plus the per-mod verdict this command exists to give.
+    One JSON document covers every mod named, so a CI step reads one object
+    however many it gated on."""
+    payload, ok = [], True
+    for mod_id, findings, notes, facts in results:
+        errors = findings if args.strict else \
+            [f for f in findings if f.severity == "error"]
+        if errors:
+            ok = False
+        payload.append({"id": mod_id, "verdict": gen2_verdict(findings),
+                        "errors": len(errors), "manifest": facts,
+                        "findings": [f.as_dict() for f in findings],
+                        "notes": notes})
+    if args.json:
+        print(json.dumps({"ok": ok, "mods": payload}))
+        return 0 if ok else 1
+    for index, (mod_id, findings, notes, facts) in enumerate(results):
+        if not args.quiet:
+            print(("" if index == 0 else "\n") + f"-- {mod_id}: {facts}")
+        for finding in findings:
+            print(finding.line())
+        if args.quiet:
+            continue
+        for note in notes:
+            print(f"modkit: {note}")
+        warns = sum(1 for f in findings if f.severity == "warn")
+        counts = ", ".join(part for part in (
+            _count(len(findings) - warns, "error"), _count(warns, "warning"))
+            if part)
+        print("%s %s on gen 2: %s%s"
+              % ("FAIL" if payload[index]["errors"] else "ok", mod_id,
+                 payload[index]["verdict"], " (%s)" % counts if counts else ""))
+    return 0 if ok else 1
+
+
+def cmd_gen2check(args, repo):
+    shared = []
+    coverage = gen2_coverage(repo, shared)
+    results = []
+    dirs, named = [], {}
+    for target in args.mod:
+        mod_dir = resolve_mod_dir(repo, target)
+        if not mod_dir:
+            print(f"modkit: no mod at {target!r}")
+            return 2
+        manifest, problem = read_manifest(mod_dir)
+        dirs.append((mod_dir, manifest, problem))
+        if manifest:
+            named[manifest["id"]] = manifest
+    for mod_dir, manifest, problem in dirs:
+        findings, notes = [], list(shared)
+        if problem:
+            findings.append(problem)
+        else:
+            manifest_findings, manifest_notes = check_gen2_manifest(
+                repo, mod_dir, manifest, named)
+            findings.extend(manifest_findings)
+            notes.extend(manifest_notes)
+            requires, uses, upvalues, scan_notes = scan_module_uses(mod_dir)
+            require_findings, require_notes = check_gen2_requires(
+                repo, coverage, requires)
+            findings.extend(require_findings)
+            member_findings, member_notes = check_gen2_members(
+                repo, coverage, uses, args.notes)
+            findings.extend(member_findings)
+            upvalue_findings, upvalue_notes = check_gen2_upvalues(
+                repo, coverage, upvalues)
+            findings.extend(upvalue_findings)
+            findings.extend(check_gen2_patterns(repo, mod_dir))
+            notes.extend(scan_notes + require_notes + member_notes
+                         + upvalue_notes)
+        mod_id = manifest.get("id") if manifest else os.path.basename(mod_dir)
+        results.append((mod_id, _order(_dedupe(findings)),
+                        _dedupe_notes(notes), _facts(manifest)))
+    return report_gen2(results, args)
+
+
+def _dedupe(findings):
+    """One line per fact: the same rule against the same place says the same
+    thing however many times the source repeats the shape."""
+    seen, out = set(), []
+    for finding in findings:
+        key = (finding.rule, finding.path, finding.message)
+        if key not in seen:
+            seen.add(key)
+            out.append(finding)
+    return out
+
+
+def _dedupe_notes(notes):
+    seen, out = set(), []
+    for note in notes:
+        if note not in seen:
+            seen.add(note)
+            out.append(note)
+    return out
+
+
+def _order(findings):
+    def key(finding):
+        path, _, line = (finding.path or "").rpartition(":")
+        return (finding.rule, path or finding.path or "",
+                int(line) if line.isdigit() else 0)
+    return sorted(findings, key=key)
+
+
+def _facts(manifest):
+    """The manifest fields a Gen 2 boot reads, echoed so the verdict says what
+    it was decided from rather than leaving the author to guess."""
+    if not manifest:
+        return ""
+    permissions = manifest.get("permissions") or []
+    deps = manifest.get("dependencies") or []
+    games = "+".join(g for g in (manifest.get("games") or [])
+                     if isinstance(g, str))
+    return ("api %s, profile %s, %s, permissions %s, %d dependencies, "
+            "game_version %s"
+            % (manifest.get("api", 1), manifest.get("profile", "content"),
+               ("games " + games) if games
+               else ("gen2compat" if manifest.get("gen2compat")
+                     else "no games declared"),
+               "+".join(p for p in permissions if isinstance(p, str)) or "none",
+               len(deps) if isinstance(deps, list) else 0,
+               manifest.get("game_version", "unset")))
+
+
 # ---------------------------------------------------------------- main
 
 def main(argv):
@@ -2013,6 +3473,9 @@ def main(argv):
                    help="optional owner/repo (enables launcher auto-update)")
     p.add_argument("--experimental", action="store_true",
                    help="mark the mod experimental (off until confirmed)")
+    p.add_argument("--games", default="gen1",
+                   help="games this mod is for: gen1, gen2, all, or a "
+                        "comma-separated list of version ids (red,gold,...)")
     p.add_argument("--dest")
     p.add_argument("--force", action="store_true")
 
@@ -2021,6 +3484,14 @@ def main(argv):
     p.add_argument("--strict", action="store_true")
     p.add_argument("--base", default="auto",
                    choices=["auto", "fixture", "imported"])
+
+    p = sub.add_parser("gen2check", parents=[shared],
+                       help="will this mod run on a Gen 2 game, and how far")
+    p.add_argument("mod", nargs="+")
+    p.add_argument("--strict", action="store_true")
+    p.add_argument("--notes", action="store_true",
+                   help="also print the adapter's note for every backed "
+                        "member the mod touches")
 
     p = sub.add_parser("lint", parents=[shared])
     p.add_argument("mod")
@@ -2086,6 +3557,7 @@ def main(argv):
     handler = {
         "scaffold": cmd_scaffold,
         "validate": cmd_validate,
+        "gen2check": cmd_gen2check,
         "lint": cmd_lint,
         "pack": cmd_pack,
         "bounce": cmd_bounce,

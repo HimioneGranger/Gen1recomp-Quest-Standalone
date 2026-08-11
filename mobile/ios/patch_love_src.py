@@ -27,6 +27,8 @@ NATIVE_SRC = IOS_DIR / "native"
 NATIVE_DST = LOVE_SRC / "platform" / "xcode" / "ios" / "native"
 WRAP_SYSTEM = LOVE_SRC / "src" / "modules" / "system" / "wrap_System.cpp"
 PBXPROJ = LOVE_SRC / "platform" / "xcode" / "love.xcodeproj" / "project.pbxproj"
+APPLE_MM = LOVE_SRC / "src" / "common" / "apple.mm"
+FILESYSTEM_CPP = LOVE_SRC / "src" / "modules" / "filesystem" / "physfs" / "Filesystem.cpp"
 ENTITLEMENTS_SRC = IOS_DIR / "overlays" / "love-ios.entitlements"
 
 NATIVE_FILES = ("GRPickerBridge.swift", "GRHealthBridge.swift", "GRBootstrap.m")
@@ -245,19 +247,20 @@ def fail(msg):
     sys.exit(1)
 
 
-def pristine(path: Path) -> str:
+def pristine(path: Path, patched_markers=None) -> str:
     """Text of `path` before any of our patching: backed by a `.orig` stash.
 
     The stash is only trusted if it is itself unpatched; that protects
     against a stash accidentally taken after an earlier patch run.
     """
+    patched_markers = tuple(patched_markers or (MARKER, ID_FILE_PICKER))
     orig = path.with_suffix(path.suffix + ".orig")
     if orig.is_file():
         text = orig.read_text()
-        if MARKER not in text and ID_FILE_PICKER not in text:
+        if not any(marker in text for marker in patched_markers):
             return text
     text = path.read_text()
-    if MARKER in text or ID_FILE_PICKER in text:
+    if any(marker in text for marker in patched_markers):
         fail(f"{path} is already patched and no pristine .orig stash exists;\n"
              f"  delete {LOVE_SRC} and re-run scripts/build_ios.sh --fetch")
     orig.write_text(text)
@@ -297,6 +300,62 @@ def patch_wrap_system():
     WRAP_SYSTEM.write_text(text)
     print("patch_love_src: wrap_System.cpp patched "
           "(pickFile/createFile/syncHealthSteps/httpDownload)")
+
+
+def patch_public_documents():
+    text = pristine(
+        APPLE_MM,
+        ("#ifdef LOVE_IOS\n"
+         "\t\t\tnsdir = NSDocumentDirectory;\n"
+         "#else\n",),
+    )
+    original = (
+        "\t\tcase USER_DIRECTORY_APPSUPPORT:\n"
+        "\t\t\tnsdir = NSApplicationSupportDirectory;\n"
+        "\t\t\tbreak;"
+    )
+    replacement = (
+        "\t\tcase USER_DIRECTORY_APPSUPPORT:\n"
+        "#ifdef LOVE_IOS\n"
+        "\t\t\tnsdir = NSDocumentDirectory;\n"
+        "#else\n"
+        "\t\t\tnsdir = NSApplicationSupportDirectory;\n"
+        "#endif\n"
+        "\t\t\tbreak;"
+    )
+    if original not in text:
+        fail(f"iOS app-support path anchor not found in {APPLE_MM}")
+    APPLE_MM.write_text(text.replace(original, replacement, 1))
+
+    filesystem_text = pristine(
+        FILESYSTEM_CPP,
+        ("#ifdef LOVE_IOS\n"
+         "\t\t\tsuffix.clear();\n"
+         "#else\n",),
+    )
+    filesystem_original = (
+        "\t\tstd::string suffix;\n"
+        "\t\tif (isFused())\n"
+        "\t\t\tsuffix = std::string(LOVE_PATH_SEPARATOR) + saveIdentity;\n"
+        "\t\telse\n"
+        "\t\t\tsuffix = std::string(LOVE_PATH_SEPARATOR LOVE_APPDATA_FOLDER LOVE_PATH_SEPARATOR) + saveIdentity;"
+    )
+    filesystem_replacement = (
+        "\t\tstd::string suffix;\n"
+        "#ifdef LOVE_IOS\n"
+        "\t\t\tsuffix.clear();\n"
+        "#else\n"
+        "\t\tif (isFused())\n"
+        "\t\t\tsuffix = std::string(LOVE_PATH_SEPARATOR) + saveIdentity;\n"
+        "\t\telse\n"
+        "\t\t\tsuffix = std::string(LOVE_PATH_SEPARATOR LOVE_APPDATA_FOLDER LOVE_PATH_SEPARATOR) + saveIdentity;\n"
+        "#endif"
+    )
+    if filesystem_original not in filesystem_text:
+        fail(f"iOS save directory suffix anchor not found in {FILESYSTEM_CPP}")
+    FILESYSTEM_CPP.write_text(filesystem_text.replace(filesystem_original,
+                                                       filesystem_replacement, 1))
+    print("patch_love_src: iOS save directory routed to Documents root")
 
 
 def patch_pbxproj():
@@ -362,6 +421,7 @@ def main():
     if not LOVE_SRC.is_dir():
         fail("love-src/ missing; run scripts/build_ios.sh --fetch first")
     copy_native_files()
+    patch_public_documents()
     patch_wrap_system()
     patch_pbxproj()
 

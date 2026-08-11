@@ -104,17 +104,26 @@ end
 -- ------- warn: unsatisfied game_version range against Version.engine
 
 do
-  -- a range the -dev engine cannot satisfy (needs a released >=1.0.0)
+  -- Stamped like a shipped build, because the 0.0.0-dev placeholder is not a
+  -- compatibility statement and both LauncherMods and Loader.devEngine skip
+  -- the range check on it.  Unstamped, this row is "ok" on purpose.
+  local was = Version.engine
+  Version.engine = "1.4.0"
   local manifests = {
     mf({ id = "future", name = "Future", version = "1.0.0", entry = "m.lua",
-         game_version = ">=1.0.0" }),
+         game_version = ">=9.9.9" }),
   }
   local m = byId(LauncherMods.deriveList(manifests, { mods = {} }))
   eq(m.future.status, "warn", "engine outside the game_version range warns")
-  check(m.future.statusDetail:find(">=1.0.0", 1, true) ~= nil,
+  check(m.future.statusDetail:find(">=9.9.9", 1, true) ~= nil,
     "version warn detail quotes the required range")
-  check(m.future.statusDetail:find(Version.engine, 1, true) ~= nil,
+  check(m.future.statusDetail:find("1.4.0", 1, true) ~= nil,
     "version warn detail quotes the engine version")
+  Version.engine = was
+
+  -- and the dev placeholder agrees with the loader instead of warning
+  local dev = byId(LauncherMods.deriveList(manifests, { mods = {} }))
+  eq(dev.future.status, "ok", "a dev checkout does not warn where the loader loads")
 end
 
 -- ------- warn: hard dependency missing, disabled, or wrong version
@@ -164,6 +173,200 @@ do
   local m = byId(LauncherMods.deriveList(manifests, { mods = {} }))
   eq(m.alpha.status, "conflict",
     "conflict is reported ahead of a version warn on the same mod")
+end
+
+-- ------- which game a row is answered for (src/mods/ModTargets.lua)
+
+do
+  local manifests = {
+    mf({ id = "one", name = "One", version = "1.0.0", entry = "m.lua" }),
+    mf({ id = "two", name = "Two", version = "1.0.0", entry = "m.lua",
+         games = { "gen2" } }),
+    mf({ id = "both", name = "Both", version = "1.0.0", entry = "m.lua",
+         games = { "all" } }),
+  }
+  -- no game named: the pre-per-game view, where every row is just ready
+  local all = byId(LauncherMods.deriveList(manifests, { mods = {} }))
+  eq(all.one.targets, "GEN 1", "the chip says which games the mod is for")
+  eq(all.two.targets, "GEN 2", "for each of them")
+  eq(all.both.targets, "GEN 1+2", "including both")
+  eq(all.one.targetsHere, nil, "with no game to answer for, nothing is claimed")
+  eq(all.two.status, "ok", "and no row is judged against a game")
+
+  local onGold = byId(LauncherMods.deriveList(manifests, { mods = {} }, "gold"))
+  eq(onGold.one.status, "other_game", "a Gen 1 mod is not for Gold")
+  eq(onGold.one.statusDetail, "For Gen 1, not Gold", "and says so in one line")
+  eq(onGold.one.targetsHere, false, "the row carries the verdict too")
+  eq(onGold.two.status, "ok", "a Gen 2 mod is ready there")
+  eq(onGold.both.targetsHere, true, "and so is one that claims both")
+
+  local onRed = byId(LauncherMods.deriveList(manifests, { mods = {} }, "red"))
+  eq(onRed.two.status, "other_game", "the same rule points the other way")
+  eq(onRed.one.status, "ok", "without touching the Gen 1 mod")
+end
+
+-- ------- the row is a verdict, not a decoration: the loader enforces it
+--
+-- "For Blue, not Red" has to be what the boot does, per VERSION and not only
+-- per generation, or the panel is reporting a claim while the mod runs anyway.
+-- Real loader, real gate (Loader:_gateGeneration), no love.
+
+do
+  local Sdk = require("tests.modkit.sdk")
+  local GameVersion = require("src.core.GameVersion")
+  local function manifestFile(id, games)
+    return ("{\"id\":\"%s\",\"name\":\"%s\",\"version\":\"1.0.0\"," ..
+      "\"entry\":\"main.lua\",\"api\":2,\"games\":[\"%s\"]}"):format(id, id, games)
+  end
+  local FILES = {
+    ["mods/blueonly/manifest.json"] = manifestFile("blueonly", "blue"),
+    ["mods/blueonly/main.lua"] = "local mod = ...\n",
+    ["mods/goldonly/manifest.json"] = manifestFile("goldonly", "gold"),
+    ["mods/goldonly/main.lua"] = "local mod = ...\n",
+    ["mods/anygame/manifest.json"] = manifestFile("anygame", "all"),
+    ["mods/anygame/main.lua"] = "local mod = ...\n",
+  }
+  local paths = { "mods/blueonly", "mods/goldonly", "mods/anygame" }
+  local was = GameVersion.get()
+  GameVersion.set("red")
+  local run = Sdk.loadMods(paths, { fs = Sdk.memfs(FILES), generation = 1 })
+  local rows = byId(LauncherMods.deriveList({
+    mf({ id = "blueonly", name = "blueonly", version = "1.0.0",
+         entry = "main.lua", games = { "blue" } }),
+    mf({ id = "goldonly", name = "goldonly", version = "1.0.0",
+         entry = "main.lua", games = { "gold" } }),
+    mf({ id = "anygame", name = "anygame", version = "1.0.0",
+         entry = "main.lua", games = { "all" } }),
+  }, { mods = {} }, "red"))
+  for _, id in ipairs({ "blueonly", "goldonly", "anygame" }) do
+    local ran = run.loader.mods[id].state ~= "wrong_generation"
+    eq(ran, rows[id].targetsHere,
+      "the loader and the panel agree about " .. id .. " on Red")
+  end
+  eq(run.loader.mods.blueonly.state, "wrong_generation",
+    "a Blue-only mod does not run on Red")
+  eq(run.loader.mods.blueonly.skipReason, "For Blue, not Red",
+    "and the skip line is the launcher's own line")
+  eq(run.loader.mods.anygame.state, "loaded", "a mod for every game still runs")
+  run.release()
+
+  -- the override answers for ONE game.  A version-blind flag forced a mod
+  -- past the gate on a game whose owner was never asked (SaveData.modForced).
+  local Serializer = require("src.core.SaveSerializer")
+  local function bootWith(modsGen2, generation)
+    local fs = Sdk.memfs(FILES)
+    fs.write("options.lua", Serializer.encode({ mods = {}, modsGen2 = modsGen2 }))
+    local r = Sdk.loadMods(paths, { fs = fs, generation = generation })
+    local state = r.loader.mods.blueonly.state
+    r.release()
+    return state
+  end
+  eq(bootWith({ blueonly = { red = true } }, 1), "loaded",
+    "an override for Red runs the Blue-only mod on Red")
+  eq(bootWith({ blueonly = { blue = true } }, 1), "wrong_generation",
+    "an override for another game does not answer for Red")
+  eq(bootWith({ blueonly = true }, 1), "wrong_generation",
+    "a pre-per-game flag keeps its old meaning: Gen 2 only, never Red")
+
+  GameVersion.set("gold")
+  eq(bootWith({ blueonly = true }, 2), "loaded",
+    "and on the Gen 2 game it always meant, it still forces")
+  eq(bootWith({}, 2), "wrong_generation", "with no override the gate holds")
+  if was then GameVersion.set(was) end
+end
+
+do
+  -- the player's override is the one thing that outranks the author's claim,
+  -- and it must read as the untested thing it is (Loader:_gateGeneration)
+  local manifests = {
+    mf({ id = "one", name = "One", version = "1.0.0", entry = "m.lua" }),
+  }
+  local m = byId(LauncherMods.deriveList(manifests,
+    { mods = {}, modsGen2 = { one = true } }, "gold"))
+  eq(m.one.status, "warn", "a forced mod is a warning, not a wrong game")
+  check(m.one.statusDetail:find("Gold", 1, true) ~= nil,
+    "and the line names the game it was forced onto")
+  eq(m.one.targetsHere, true, "it will run there")
+end
+
+-- ------- enable flags: the panel reads exactly what the switch writes
+--
+-- One scope for both halves (SaveData.modScope).  While per-game flags are a
+-- preview the shared flag is the whole answer, so a modsByVersion overlay --
+-- which an imported .g1rmodlist can plant, ModProfile.restoreVersions -- can
+-- never leave the switch showing an answer no writer can reach.
+
+local SaveData = require("src.core.SaveData")
+
+local function flip(options, id, enabled, version)
+  SaveData.setModEnabled(options, id, enabled, SaveData.modScope(version))
+end
+
+do
+  local manifests = {
+    mf({ id = "one", name = "One", version = "1.0.0", entry = "m.lua",
+         games = { "all" } }),
+  }
+  local planted = { mods = { one = true },
+                    modsByVersion = { gold = { one = false } } }
+  local expected = SaveData.PER_VERSION_MODS and false or true
+  eq(byId(LauncherMods.deriveList(manifests, planted, "gold")).one.enabled,
+    expected, "the overlay is read exactly when a write can reach it")
+
+  -- the round trip, the thing the dead switch failed: flip it, re-derive
+  local options = { mods = {} }
+  for _, version in ipairs({ "red", "gold" }) do
+    flip(options, "one", false, version)
+    eq(byId(LauncherMods.deriveList(manifests, options, version)).one.enabled,
+      false, "switching off reads back off on " .. version)
+    flip(options, "one", true, version)
+    eq(byId(LauncherMods.deriveList(manifests, options, version)).one.enabled,
+      true, "and switching on reads back on on " .. version)
+  end
+
+  -- the same round trip through the planted overlay: no write is ignored
+  flip(planted, "one", false, "gold")
+  eq(byId(LauncherMods.deriveList(manifests, planted, "gold")).one.enabled,
+    false, "a planted overlay cannot outrank the player's own write")
+  flip(planted, "one", true, "gold")
+  eq(byId(LauncherMods.deriveList(manifests, planted, "gold")).one.enabled,
+    true, "in either direction")
+
+  -- and what the loader will do agrees with the row, per game
+  eq(SaveData.modEnabled(planted, "one", SaveData.modScope("gold")), true,
+    "the loader resolves the flag under the same scope the panel read")
+end
+
+-- ------- a dependency that does not run here is a dependency problem
+--
+-- The loader's target skip is contagious (Loader:_enforceDependencies), so a
+-- mod that runs on every game still does not run on Gold when the mod it
+-- needs is Gen 1 only.
+
+do
+  local manifests = {
+    mf({ id = "base", name = "Base", version = "1.0.0", entry = "m.lua",
+         games = { "gen1" } }),
+    mf({ id = "user", name = "User", version = "1.0.0", entry = "m.lua",
+         games = { "all" }, dependencies = { "base" } }),
+  }
+  local onGold = byId(LauncherMods.deriveList(manifests, { mods = {} }, "gold"))
+  eq(onGold.user.status, "warn",
+    "a dependency that cannot run here is a warning, not Ready")
+  check(onGold.user.statusDetail:find("base", 1, true) ~= nil
+    and onGold.user.statusDetail:find("Gold", 1, true) ~= nil,
+    "and the line names the dependency and the game")
+  eq(byId(LauncherMods.deriveList(manifests, { mods = {} }, "red")).user.status,
+    "ok", "while the same pair is Ready where both run")
+
+  -- the player's override on the DEPENDENCY clears it: same scope the loader
+  -- resolves the override under (SaveData.modForced)
+  local forced = { mods = {}, modsGen2 = { base = { gold = true } } }
+  eq(byId(LauncherMods.deriveList(manifests, forced, "gold")).user.status, "ok",
+    "forcing the dependency onto Gold clears the dependent's warning")
+  eq(byId(LauncherMods.deriveList(manifests,
+    { mods = {}, modsGen2 = { base = { red = true } } }, "gold")).user.status,
+    "warn", "an override for another game does not answer for this one")
 end
 
 -- ------- locateRoot: manifest at the archive root

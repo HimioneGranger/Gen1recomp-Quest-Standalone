@@ -105,6 +105,7 @@ local full = Manifest.validate({
   api = 2, profile = "overhaul", permissions = { "network" },
   dependencies = { "colorlib@^1.2" }, conflicts = { "always_noon" },
   options_schema = "options.lua", assets_transforms = "transforms.lua",
+  force_enable_env = "SOME_ENV",
 }, "mods/full")
 check(full.api == 2 and full.profile == "overhaul", "api and profile parse")
 check(full.affects_link == true, "overhaul defaults to affecting link play")
@@ -115,6 +116,7 @@ check(full.conflictSpecs[1].id == "always_noon" and full.conflictSpecs[1].range 
   "a bare conflict entry has no range")
 check(full.options_schema == "options.lua"
   and full.assets_transforms == "transforms.lua", "declared files are kept")
+check(full.force_enable_env == "SOME_ENV", "force_enable_env is kept")
 
 -- ------- github / experimental / incompatible
 local gh = Manifest.validate({
@@ -194,6 +196,13 @@ do
 end
 
 -- ------- game_version against the engine
+--
+-- Stamped, because the working tree carries the "0.0.0-dev" placeholder and
+-- Loader:_validate skips the range check against it on purpose (a placeholder
+-- sorts below every release, so a checkout would refuse every mod that names a
+-- floor).  What is under test here is the check a SHIPPED build runs.
+local realEngine = Version.engine
+Version.engine = "1.4.0"
 local versionLoader = Loader.new({ fs = memfs({
   ["mods/future/manifest.json"] = manifestJson("future", { game_version = '">=2.0"' }),
   ["mods/future/main.lua"] = "return function(mod) mod.content.items:register('NOPE', {}) end",
@@ -220,6 +229,17 @@ check(shelvedLoader:load({}) == true,
   "a switched-off mod that could not load is not a boot problem")
 check(statusById(shelvedLoader).future.state == "disabled",
   "a switched-off mod reports as disabled, not as invalid")
+
+-- and the placeholder itself: a dev checkout must not refuse a mod that names
+-- a floor, because the number it would be judged against is not a release
+Version.engine = realEngine
+local devLoader = Loader.new({ fs = memfs({
+  ["mods/floored/manifest.json"] = manifestJson("floored", { game_version = '">=0.1.0 <2.0.0"' }),
+  ["mods/floored/main.lua"] = NOOP,
+}) })
+check(devLoader:load({}) == true, "a dev checkout loads a mod that names a floor")
+check(statusById(devLoader).floored.state == "loaded",
+  "the 0.0.0-dev placeholder is not a compatibility statement")
 
 -- ------- conflicts refuse to co-enable
 local conflictLoader = Loader.new({ fs = memfs({

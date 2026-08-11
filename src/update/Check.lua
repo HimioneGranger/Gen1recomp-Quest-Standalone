@@ -52,8 +52,13 @@ end
 -- falls back to require.
 function Check.parseRelease(jsonText, Json)
   Json = Json or require("src.link.Json")
-  local doc = Json.decode(jsonText)
-  if type(doc) ~= "table" or not doc.tag_name then
+  local notJson = Json.describeUnexpected(jsonText)
+  if notJson then return nil, notJson end
+  local doc, decodeErr = Json.decode(jsonText)
+  if type(doc) ~= "table" then
+    return nil, decodeErr or "no tag_name in release json"
+  end
+  if not doc.tag_name then
     return nil, "no tag_name in release json"
   end
   local version = stripV(doc.tag_name)

@@ -1,0 +1,192 @@
+---- 30 > Snorlax and Pewter City Gym ----
+------------------------------------------
+
+Video Playthrough Link (Snorlax, Route 2, Pewter City, & Tin Tower):
+https://youtu.be/l9CjbBMD7Uk
+
+Video Playthrough Link (Ho-Oh, Pewter City Gym, Routes 1-4, & Pallet Town):
+https://www.youtube.com/watch?v=pFgyFZqai_I
+
+Anyway, head south onto Route 19...
+
+|--------|
+|Route 19|
+|--------|
+
+You'll find your way blocked. What happened? Well, boulders have washed ashore
+in a recent event. I'll tell you more about it later, it's a spoiler kinda. Now
+fly back to Vermilion City.
+
+|-------|
+|Snorlax|
+|-------|
+
+Using your upgraded radio, go east to Diglett's Cave. Keep around those four
+Ultra Balls from before, you'll need them. When you're up to the Snorlax, save
+(wow, I haven't said that for ages). You'll find out that Snorlax is sleeping.
+Wake it up by going into your Pokegear option and going to your radio. Turn the
+radio up to 20, the maximum frequency, then exit the Pokegear menu. Then press A
+and talk to Snorlax. That maximum frequency is the PoKeFlute, so the Snorlax
+will wake up in an angry mood.
+
+Keep it down at red HP or low yellow HP and throw as many Ultra Balls at it. If
+you can use a status move like paralysis on it (e.g. Dragonair's Thunder Wave),
+that helps, or catch Snorlax while it's still asleep from Rest. But it might
+take a few resets. 
+
+Snorlax is a great Pokémon to catch. It is one of the best Pokémon in the game,
+and it's Level 50. You'll be able to add this to your team immediately. It is
+highly defensive and bulky, and it can sleep for two turns using Rest to heal
+all of its HP and status effects. Snorlax also comes with Leftovers, an amazing
+item that heals a bit of HP after every attack. You can replace its Rollout move
+with HM Strength to inflict extra damage.
+
+After the battle with Snorlax, the route is cleared to Diglett's Cave and
+through Route 8. Go back to the Pokémon Center in Vermilion City to withdraw the
+Snorlax so that it is part of your lineup. It already has a Leftovers attached!
+Now, enter the cave entrance that Snorlax blocked. This is Diglett's Cave.
+
+|--------------|
+|Diglett's Cave|
+|--------------|
+
+Pokémon in Diglett's Cave:
+
+#050 Diglett
+#051 Dugtrio
+
+There are no trainers in here, but you can capture both Diglett and Dugtrio here
+if you'd like. Head down the ladder, then ride your bike up and then up that
+ladder. Exit the door and you'll be on Route 2.
+
+|-------|
+|Route 2|
+|-------|
+
+Items on Route 2:
+
+Carbos
+Dire Hit
+Elixir
+Nugget
+PSNCure Berry
+
+Welcome to the western part of Kanto. Head up and right to grab the Carbos.
+Then, go down to the house and talk to the guy inside for a Nugget for being a
+visitor. Cut the tree to the south and shift past the route-changing house.
+You'll still be in Route 2. Keep heading down and you'll get an Elixir. Then,
+cut the tree just left of it and head north and you'll face a trainer.
+
+Bug Catcher Rob
+Level 32 Beedrill (1089 EXP)
+Level 32 Butterfree (1096 EXP)
+You get: 512G
+
+Keep moving up.
+
+Bug Catcher Doug
+Level 34 Ariados (975 EXP)
+You get: 544G
+
+Continue moving up and you can get Dire Hit, a PSNCure Berry, and even a Max
+Potion in Viridian Forest. Keep moving up.
+
+Bug Catcher Ed
+Level 30 Beedrill (1021 EXP)
+Level 30 Beedrill (1021 EXP)
+Level 30 Beedrill (1021 EXP)
+You get: 480G
+
+If you keep heading north, you'll end up in Pewter City.
+
+|-----------|
+|Pewter City|
+|-----------|
+
+Items in Pewter City:
+
+Ice Berry
+Mint Berry
+Rainbow/Silver Wing
+
+Welcome to Pewter City! Talk to the man just to the right of the Pokemart and
+you'll get the Silver Wing, which will allow you to go back to
+Johto and catch the other Pokémon (Lugia or Ho-Oh) that you haven't already
+caught. Now heal and deposit any items you'd like. The Pokémon Center has a lady
+that allows you to trade a Gloom for a Rapidash. The northeast side of town has
+an Ice Berry and a Mint Berry. And the northwest side has the former Museum of
+Science which is now closed. They even filled the doorway in. So sad.
+
+If you have a team that focuses on leveling up your starter, you might have
+something like this:
+
+Level 77 Feraligatr
+Level 50 Snorlax
+Level 40 Lugia
+Level 33 Donphan (Silver)
+Level 30 Gyarados
+Level 28 Raticate
+
+If you're fielding more of a balanced lineup, you might have a lineup like this:
+
+Level 51 Espeon
+Level 50 Snorlax
+Level 48 Starter Evolution
+Level 47 Gyarados
+Level 46 Dragonair
+Level 46 Sudowoodo
+
+For this gym, you'll ideally want to use your starter (if Meganium or
+Feraligatr) for this gym, and use their highest-powered grass or water moves.
+
+Camper Jerry
+Level 37 Sandslash (1291 EXP)
+You get: 740G
+
+Save, heal at the Pokemon Center and come back, then talk to Brock to fight him
+for the 14th gym badge. Rock types may have a lot of defense, but not against
+grass or water moves. If you have Typhlosion as your starter and a lower-level
+Lugia (from SoulSilver), Brock may take you a bit longer to beat. All of Brock's
+Pokémon are 10-11 levels higher than in the original.
+
+---
+GYM LEADER BROCK
+Level 41 Graveler (1176 EXP)
+Level 42 Omastar (1791 EXP)
+Level 41 Rhyhorn (1185 EXP)
+Level 44 Onix (1017 EXP)
+Level 42 Kabutops (1809 EXP)
+You get: Boulder Badge, 4,200G
+---
+
+Strategy VERSUS Graveler: Use your highest-powered move from your highest level
+Pokémon. Ideally, this would be a grass or water move (Razor Leaf/SolarBeam or
+Surf/Hydro Pump) rather than a fire or normal move.
+
+Strategy VERSUS Omastar: Use your highest-powered move from your highest level
+Pokémon. Ideally this is a grass move, not a fire or normal move. Omastar is a
+water and rock type, but a water move will still do regular damage against it.
+
+Strategy VERSUS Rhyhorn: Use your highest-powered move from your highest level
+Pokémon. Ideally, this would be a grass or water move (Razor Leaf/SolarBeam or
+Surf/Hydro Pump) rather than a fire or normal move.
+
+Strategy VERSUS Onix: Use your highest-powered move from your highest level
+Pokémon. Ideally, this would be a grass or water move (Razor Leaf/SolarBeam or
+Surf/Hydro Pump) rather than a fire or normal move.
+
+Strategy VERSUS Kabutops: Use your highest-powered move from your highest level
+Pokémon. Ideally this is a grass move, not a fire or normal move. Omastar is a
+water and rock type, but a water move will still do regular damage against it.
+
+There you have it: 14 badges! You are then given the Boulder Badge and some
+money. The badge makes your Pokémon even more powerful. Like the other gym
+leaders, Brock is a little upset that you beat his "hard-rock defense, but happy
+to have battled you. Now exit the gym and heal at the Pokémon Center.
+
+==============================================================================
+==============================================================================
+==============================================================================
+
+(c31)
+----------------------------------------------

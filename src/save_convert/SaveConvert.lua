@@ -214,6 +214,15 @@ SaveConvert.mergeDefaults = mergeDefaults
 -- Public API
 -- ------------------------------------------------------------------
 
+-- GenSave models Gen 1 SRAM and nothing else: a Gen 2 cart save is a
+-- different bank map, party struct and checksum scheme (pokegold
+-- ram/sram.asm sOptions/sCheckValue1/sPlayerData/sBox1-sBox14 vs
+-- pokered's single sPlayerName..sMainDataCheckSum window), and no Gen 2
+-- codec exists yet.  Both directions answer with a plain message the
+-- launcher's save card renders as-is, instead of pushing a Gen 2 save
+-- table through Gen 1 offsets and surfacing a codec traceback.
+local GEN2_SAV_UNSUPPORTED = { gold = "Pokemon Gold" }
+
 -- importSav(bytes, version, gameVersion) -> saveTable, err
 -- bytes: the raw 32768-byte SRAM string. Validates size and the main-data
 -- checksum, decodes through GenSave, and returns a save table fully merged
@@ -225,6 +234,10 @@ SaveConvert.mergeDefaults = mergeDefaults
 function SaveConvert.importSav(bytes, version, gameVersion)
   if type(bytes) ~= "string" then
     return nil, "expected raw save bytes as a string"
+  end
+  local gen2Name = GEN2_SAV_UNSUPPORTED[gameVersion]
+  if gen2Name then
+    return nil, gen2Name .. " uses a Gen 2 cart save; importing one is not supported yet."
   end
   if #bytes ~= GenSave.SAVE_SIZE then
     return nil, ("save must be %d bytes, got %d"):format(GenSave.SAVE_SIZE, #bytes)
@@ -257,6 +270,10 @@ end
 function SaveConvert.exportSav(saveTable, gameVersion)
   if type(saveTable) ~= "table" then
     return nil, "expected a save table"
+  end
+  local gen2Name = GEN2_SAV_UNSUPPORTED[gameVersion]
+  if gen2Name then
+    return nil, gen2Name .. " uses a Gen 2 cart save; exporting one is not supported yet."
   end
   local data, derr = ensureData(gameVersion)
   if not data then return nil, derr end

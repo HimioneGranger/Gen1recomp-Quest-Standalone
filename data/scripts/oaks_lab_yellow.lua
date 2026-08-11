@@ -45,6 +45,8 @@ return {
       { "stop_music" },
       { "play_music", "Music_MeetRival" },
       { "show_text", "_OaksLabRivalGrampsText" },
+      -- callfar OaksLabPikachuMovementScript, before ShowObject (#1021)
+      { "pikachu_make_way" },
       { "show_object", "OAKS_LAB", "OAKSLAB_RIVAL" },
       { "place_npc", RIVAL, 4, 7, "up" },
       { "move_npc_to", RIVAL, 4, 3 },
@@ -192,12 +194,13 @@ return {
       end
       rows[#rows + 1] = { "face_player_dir", "up" }
       rows[#rows + 1] = { "face_object", OAK1, "down" }
-      -- OaksLabPlayerReceivedMonText: no nickname prompt -- the starter
-      -- Pikachu keeps its species name
+      -- OaksLabPlayerReceivedMonText clears wMonDataLocation, so AskName runs (#1013)
       rows[#rows + 1] = { "show_text", "_OaksLabOakGivesText" }
       rows[#rows + 1] = { "play_sound", "Get_Key_Item" }
       rows[#rows + 1] = { "show_text", "_OaksLabReceivedText", { RAM = "PIKACHU" } }
-      rows[#rows + 1] = { "give_pokemon", "PIKACHU", 5, true }
+      rows[#rows + 1] = { "give_pokemon", "PIKACHU", 5 }
+      -- DisablePikachuOverworldSpriteDrawing keeps it in the ball (#1009)
+      rows[#rows + 1] = { "set_field", "pikachuInBall", true }
       rows[#rows + 1] = { "set_flag", "EVENT_GOT_STARTER" }
       rows[#rows + 1] = { "set_flag", "EVENT_CHOSE_PIKACHU" }
       ow.runner:run(rows, { npc = npc, onDone = done })
@@ -296,9 +299,9 @@ return {
       table.insert(rows, { "move_npc_to", RIVAL, 4, 11 })
       table.insert(rows, { "hide_object", "OAKS_LAB", "OAKSLAB_RIVAL" })
       table.insert(rows, { "play_music", "Music_OaksLab" })
-      -- OaksLabPikachuEscapesPokeballScript: Pikachu hates its ball.
-      -- The overworld follower itself is still an open port
-      -- (docs/yellow-version.md runtime backlog); the story beat plays.
+      -- OaksLabPikachuEscapesPokeballScript: the follower reaches the map (#1009)
+      table.insert(rows, { "face_player_dir", "up" })
+      table.insert(rows, { "set_field", "pikachuInBall", false })
       table.insert(rows, { "play_cry", "PIKACHU" })
       table.insert(rows, { "show_text", "_OaksLabPikachuDislikesPokeballsText1" })
       table.insert(rows, { "show_text", "_OaksLabPikachuDislikesPokeballsText2" })

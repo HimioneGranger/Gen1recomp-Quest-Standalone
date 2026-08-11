@@ -45,6 +45,9 @@ local ALLOWED = {
     .. "(POKEPORT_LAUNCHER_PROF's frame timings)" },
   { pattern = '== "\\v"', why = "comparing against a marker, not printing it" },
   { pattern = "txBuf", why = "newline-delimited wire framing, not text" },
+  { pattern = "local PAGE, SCROLL, LINE",
+    why = "naming the three text-control markers so the code that splits a "
+      .. "decoded stream into pages can compare against them" },
 }
 
 -- Whole files inside a watched directory that are exempt, with the reason.

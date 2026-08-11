@@ -1,8 +1,6 @@
--- Renders Reference-Registries.md from Schemas.REGISTRIES so the reference
--- page cannot drift from the engine.  Run from the repo root:
---   luajit tools/gen_registry_docs.lua [outputDir]
---
--- The book lives in the GitHub wiki, so the target is a wiki checkout:
+-- Renders the registry reference from Schemas.REGISTRIES so the page cannot
+-- drift from the engine.  Run from the repo root:
+--   luajit tools/gen_registry_docs.lua            -- in-repo, the default
 --   luajit tools/gen_registry_docs.lua ../gen1recomp.wiki
 --   POKEPORT_DOCS_DIR=../project.wiki luajit tools/gen_registry_docs.lua
 -- The full doc pipeline moves into the modkit CLI later; this is the
@@ -11,19 +9,22 @@ package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local Schemas = require("src.mods.Schemas")
 
--- the book lives in the GitHub wiki, so the default target is a sibling
--- wiki checkout; pass a directory or set POKEPORT_DOCS_DIR to override
-local DEFAULT_DIR = "../gen1recomp.wiki"
-local FILE = "Reference-Registries.md"
+-- No argument writes INSIDE the repo (a default landing in a sibling dir
+-- creates one on the first run); `modkit docs` reads this exact path
+local DEFAULT_DIR = "docs/modding/reference"
+local DEFAULT_FILE = "registries.md"
+-- an explicit target is the GitHub wiki checkout, whose page names are flat
+local WIKI_FILE = "Reference-Registries.md"
 
--- precedence: argv, env, default -- so a wiki checkout is one flag away and
--- a CI job can set it once for every generator that grows this convention
+-- precedence: argv, env, in-repo default -- so a wiki checkout is one flag
+-- away and a CI job can set it once for every generator on this convention
 local outDir = (... or nil)
 if outDir == nil or outDir == "" then outDir = os.getenv("POKEPORT_DOCS_DIR") end
-if outDir == nil or outDir == "" then outDir = DEFAULT_DIR end
+local explicit = outDir ~= nil and outDir ~= ""
+if not explicit then outDir = DEFAULT_DIR end
 outDir = outDir:gsub("/+$", "")
 
-local OUT = outDir .. "/" .. FILE
+local OUT = outDir .. "/" .. (explicit and WIKI_FILE or DEFAULT_FILE)
 
 local names = {}
 for name in pairs(Schemas.REGISTRIES) do names[#names + 1] = name end
@@ -44,19 +45,16 @@ line("")
 line("# Registry reference")
 line("")
 line("One section per registry: merge semantics, the `Data` table the merge")
-line("writes, and the value schema. Concepts and verbs:")
+line("writes, and the value schema. Where Gold differs -- a different table, a")
+line("different record, or no home at all -- the registry carries a Gen 2")
+line("subsection built from the same catalog entry. Concepts and verbs:")
 line("[Concepts: Registries](Concepts-Registries).")
 
-for _, name in ipairs(names) do
-  local spec = Schemas.REGISTRIES[name]
-  line("")
-  line("## %s", name)
-  line("")
-  line("- semantics: `%s`", spec.semantics)
-  line("- target: %s", spec.target and ("`Data." .. spec.target .. "`") or "none")
-  if spec.deprecated then
-    line("- **deprecated** -- use %s", spec.deprecated.useInstead)
-  end
+-- the value schema of one spec, whichever generation's shape it carries.
+-- Schemas.check reads keys/keyValue, then value, then fields in that order,
+-- so this renders them in the same order or the page would describe a branch
+-- that never runs.
+local function renderSchema(spec)
   if spec.keys then
     line("")
     line("Id = a top-level key of the target table. Keys not listed here are")
@@ -91,19 +89,78 @@ for _, name in ipairs(names) do
   elseif spec.value then
     line("- value: %s", spec.value.desc)
   end
-  if spec.example then
+end
+
+-- prose a registry needs beyond its schema (resolution order, the guarantees
+-- a value carries).  It lives on the spec rather than in the page because
+-- this file is regenerated: hand-written paragraphs in the output are deleted
+-- by the next run.
+local function renderExample(example, notes)
+  if example then
     line("")
     line("```lua")
-    line("%s", spec.example)
+    line("%s", example)
     line("```")
   end
-  -- prose a registry needs beyond its schema (resolution order, the
-  -- guarantees a value carries).  It lives on the spec rather than in the
-  -- page because this file is regenerated: hand-written paragraphs in the
-  -- output are deleted by the next run.
-  if spec.notes then
+  if notes then
     line("")
-    line("%s", spec.notes)
+    line("%s", notes)
+  end
+end
+
+for _, name in ipairs(names) do
+  local spec = Schemas.REGISTRIES[name]
+  line("")
+  line("## %s", name)
+  line("")
+  line("- semantics: `%s`", spec.semantics)
+  line("- target: %s", spec.target and ("`Data." .. spec.target .. "`") or "none")
+  if spec.deprecated then
+    line("- **deprecated** -- use %s", spec.deprecated.useInstead)
+  end
+  -- The mirror of the Gen 2 gating below.  Six registries exist because GOLD
+  -- does (the phone book, the decorations, the radio dial), so they carry no
+  -- Gen 1 target and "- target: none" on its own reads as a broken entry
+  -- rather than as the deliberate one-generation registry it is.
+  if Schemas.gatedFor(name, 1) then
+    line("")
+    line("Gen 2 only: Red, Blue and Yellow have no such system, so there is no")
+    line("Gen 1 table to merge into and a write here on a Gen 1 boot is dropped")
+    line("and reported. See the Gold subsection below for where it does land.")
+  end
+  renderSchema(spec)
+  renderExample(spec.example, spec.notes)
+
+  -- Gold.  The registry NAME and the verbs are shared across generations, so
+  -- what a Gen 2 subsection says is only ever WHERE the merge lands and what
+  -- a record there looks like -- or that there is nowhere to land, which is a
+  -- write the loader drops and reports rather than a name a mod may not use.
+  local gen2Target = Schemas.targetFor(name, spec, 2)
+  local shaped = Schemas.hasGen2Shape(spec)
+  if Schemas.gatedFor(name, 2) then
+    line("")
+    line("### On Gold (Gen 2)")
+    line("")
+    line("No Gen 2 home: Gold reimplements this system without reading the")
+    line("registry, so a write here is dropped and reported on a Gold boot.")
+    line("`docs/mod-api-gen2-compat.md` in the engine repo lists what is left")
+    line("to do for each one.")
+  elseif gen2Target ~= spec.target or shaped then
+    local gen2 = Schemas.shapeFor(name, spec, 2)
+    line("")
+    line("### On Gold (Gen 2)")
+    line("")
+    line("- semantics: `%s`", gen2.semantics)
+    line("- target: `Data.%s`", gen2Target)
+    if shaped then
+      line("")
+      line("The record differs; the registry name, the verbs and the id space")
+      line("do not.")
+      renderSchema(gen2)
+      renderExample(spec.gen2Example, spec.gen2Notes)
+    else
+      renderExample(spec.gen2Example, spec.gen2Notes)
+    end
   end
 end
 

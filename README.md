@@ -62,13 +62,14 @@ supplied by the player.
 
 
 This project does not include a ROM, emulate the Game Boy, transpile assembly,
-or download a disassembly. A canonical US Poke Red, Blue, or Yellow ROM is the
-only game content input.
+or download a disassembly. A canonical US Poke Red, Blue, Yellow, or Gold ROM
+is the only game content input.
 
 The ROM is verified, used during import, and then released from memory. It is
 not copied into the cache. Later launches load the private generated cache and
-do not ask for the ROM again. Red, Blue, and Yellow can all be imported and
-played side by side.
+do not ask for the ROM again. Red, Blue, Yellow, and Gold can all be imported
+side by side. Gold is Gen 2 Phase 1 (import + launcher; see
+`docs/gold-phase1.md`): the Gen 2 engine is still under construction.
 
 ## Quick Start
 
@@ -76,12 +77,13 @@ Open the desktop app. On first boot, choose your legally obtained `.gb` /
 `.gbc` file or drop it onto the window. Import takes a few seconds and the
 game starts automatically.
 
-Only the canonical 1 MiB US Red, Blue, and Yellow ROMs are accepted. The
-importer verifies SHA-1 before creating any game data:
+Only the canonical US Red, Blue, Yellow (1 MiB), and Gold (2 MiB) ROMs are
+accepted. The importer verifies SHA-1 before creating any game data:
 
 - Red: `ea9bcae617fdf159b045185467ae58b2e4a48b9a`
 - Blue: `d7037c83e1ae5b39bde3c30787637ba1d4c48ce2`
 - Yellow: `cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1`
+- Gold: `d8b8a3600a465308c9953dfa04f0081c05bdcb94`
 
 The packaged app contains neither a ROM nor pre-extracted game data. Music,
 sound effects, and cries are synthesized while the game runs from compact

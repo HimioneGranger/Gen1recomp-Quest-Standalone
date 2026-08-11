@@ -1,0 +1,468 @@
+---- 29 > Routes 11-19 and Fuchsia City Gym ----
+------------------------------------------------
+
+Video Playthrough Link (Routes 11-13):
+https://www.youtube.com/watch?v=bZQxBI2v0As
+
+Video Playthrough Link (Routes 14-15):
+https://www.youtube.com/watch?v=-zeVjtH0UWI
+
+Video Playthrough Link (Routes 16-19 & Fuchsia City Gym):
+https://www.youtube.com/watch?v=YYq_0WosMX4
+
+|--------|
+|Route 12|
+|--------|
+
+Pokémon on Route 12:
+
+#072 Tentacool (water)
+#129 Magikarp (water)
+
+Fly to Lavender Town, then go south. If you talk to the fishermen, you'll
+distract them from their fishing and they'll fight you with their catches from
+their fishing rods.
+
+Fisher Kyle
+Level 28 Seaking (1020 EXP)
+Level 31 Poliwhirl (870 EXP)
+Level 31 Seaking (1128 EXP)
+You get: 1240G
+
+Fisher Martin
+Level 32 Remoraid (534 EXP)
+Level 32 Remoraid (534 EXP)
+You get: 1280G
+
+After fighting Fisher Martin, you'll have a chance to take the route westward.
+Do so.
+
+|--------|
+|Route 11|
+|--------|
+
+Pokémon on Route 11:
+
+#019 Rattata
+#096 Drowzee
+#097 Hypno
+
+Items on Route 11:
+
+Berry
+Revive
+
+Follow the curvy road and you'll fight four trainers. Why did the road have to
+be so curvy? No idea. You could have at least gotten a roller coaster experience
+out of it or something.
+
+Psychic Herman
+Level 30 Exeggcute (630 EXP)
+Level 30 Exeggutor (1362 EXP)
+Level 30 Exeggcute (630 EXP)
+You get: 960G
+
+Keep going left and you'll run into your old classmate Owen. Did you forget who
+he was? Yeah, me too.
+
+Youngster Owen
+Level 35 Growlithe (682 EXP)
+You get: 560G
+
+Young trainer, follow the route up and left and you will find salvation. Or at
+least another youngster just like yourself.
+
+Youngster Jason
+Level 33 Sandslash (1152 EXP)
+Level 33 Crobat (1441 EXP)
+You get: 528G
+
+If you take the path up and then right, you can grab a Berry and also a Revive
+from the bush. Your parents probably told you not to pick up wild berries, and
+yet, here we are, disobeying our parents. Nice work. Now, head back towards
+Youngster Jason and go further west and you'll face one more trainer.
+
+Psychic Fidel
+Level 34 Xatu (1245 EXP)
+You get: 1088G
+
+Head west and you'll find that a Snorlax is blocking you from entering Diglett's
+Cave or reaching Vermilion. Remember this. You'll come back to that later, my
+dear friend. Now, head back east to Route 12.
+
+|--------|
+|Route 12|
+|--------|
+
+Items on Route 12:
+
+Calcium
+Super Rod
+
+Head down, then talk to the fisherman.
+
+Fisher Stephen
+Level 25 Magikarp (106 EXP)
+Level 25 Magikarp (106 EXP)
+Level 31 Qwilfish (663 EXP)
+Level 31 Tentacruel (1360 EXP)
+You get: 1240G
+
+Head south and go into the house. Talk to the guy who is the Fishing Guru's
+younger brother. Answer Yes to his question and you'll get a Super Rod! Woot.
+Anyway, keep heading down Route 12.
+
+Fisher Barney
+Level 30 Gyarados (1375 EXP)
+Level 30 Gyarados (1375 EXP)
+Level 30 Gyarados (1375 EXP)
+You get: 1200G
+
+Head down the path and you'll see an item that is blocked by a tree. Cut down
+the tree so you can get a single item: Calcium. I'm sure that was worth all the
+environmental damage you just caused. Now, head south onto Route 13.
+
+|--------|
+|Route 13|
+|--------|
+
+Pokémon on Route 13:
+
+#017 Pidgeotto
+#030 Nidorina
+#187 Hoppip
+
+Head south. Fight the left one first.
+
+Bird Keeper Perry
+Level 34 Farfetch'd (684 EXP)
+You get: 816G
+
+Then the right guy.
+
+Bird Keeper Bret
+Level 32 Pidgeotto (774 EXP)
+Level 32 Fearow (1110 EXP)
+You get: 768G
+
+Now the left guy. It's like a dance. Left, right, left. It takes two to tango.
+This third trainer hoards mice.
+
+PoKeFan Joshua
+Level 23 Pikachu (403 EXP)
+Level 23 Pikachu (403 EXP)
+Level 23 Pikachu (403 EXP)
+Level 23 Pikachu (403 EXP)
+Level 23 Pikachu (403 EXP)
+Level 23 Pikachu (403 EXP)
+You get: 1840G
+
+Head around that trainer, then head left.
+
+PoKeFan Alex
+Level 29 Nidoking (1210 EXP)
+Level 29 Slowking (1018 EXP)
+Level 29 Seaking (1056 EXP)
+You get: 2320G
+
+Head left again in the weird maze to face a hiker.
+
+Hiker Kenny
+Level 27 Sandslash (942 EXP)
+Level 29 Graveler (832 EXP)
+Level 31 Golem (1174 EXP)
+Level 29 Graveler (832 EXP)
+You get: 928G
+
+|--------|
+|Route 14|
+|--------|
+
+Pokémon on Route 14:
+
+#030 Nidorina
+#195 Quagsire
+
+Welcome to Route 14. If you need to heal on HP and PP, feel free to fly back to
+Lavender Town, heal at the Pokemon Center, and then bike back down. Otherwise,
+you can keep going. You'll spot a trainer as you ride down. Just above him,
+there's a tree that can be cut. Cut it and go left for a fight.
+
+PoKeFan Trevor
+Level 33 Psyduck (565 EXP)
+You get: 2640G
+
+Cut the tree above him and you have a chance to trade a Chansey for an
+Aerodactyl with the female trainer there. You can also try to catch wild Pokémon
+in this small patch of grass. Otherwise, head right to face the trainer you
+skipped.
+
+PoKeFan Carter
+Level 29 Bulbasaur (397 EXP)
+Level 29 Squirtle (409 EXP)
+Level 29 Charmander (403 EXP)
+You get: 2320G
+
+Head down to face...
+
+Bird Keeper Roy
+Level 29 Fearow (1006 EXP)
+Level 35 Fearow (1215 EXP)
+You get: 840G
+
+Head left and cut the tree, onto...
+
+|--------|
+|Route 15|
+|--------|
+
+Pokémon on Route 15:
+
+#017 Pidgeotto
+#030 Nidorina
+#033 Nidorino
+
+Cut the tree on your way west. Grab the PP Up as you ride west, then bike back
+to where you cut the tree, go down, and then go west to fight six straight
+trainers. You discovered a whole line of teachers and schoolboys on a field
+trip. They're way too excited to get into schoolyard fights with you.
+
+Schoolboy Johnny
+Level 29 Bellsprout (522 EXP)
+Level 33 Victreebel (1350 EXP)
+Level 31 Weepinbell (1002 EXP)
+You get: 1056G
+
+Teacher Colette
+Level 36 Clefairy (523 EXP)
+You get: 2592G
+
+Schoolboy Billy
+Level 27 Paras (405 EXP)
+Level 27 Paras (405 EXP)
+Level 27 Poliwhirl (757 EXP)
+Level 35 Ditto (457 EXP)
+You get: 1120G
+
+Teacher Hillary
+Level 32 Aipom (643 EXP)
+Level 36 Cubone (670 EXP)
+You get: 2592G
+
+Schoolboy Tommy
+Level 32 Xatu (1171 EXP)
+Level 34 Alakazam (1354 EXP)
+You get: 1088G
+
+Schoolboy Kipp
+Level 27 Voltorb (595 EXP)
+Level 27 Magnemite (514 EXP)
+Level 31 Voltorb (684 EXP)
+Level 31 Magneton (1069 EXP)
+You get: 992G
+
+|------------|
+|Fuchsia City|
+|------------|
+
+Item in Fuchsia City:
+
+Burnt Berry
+
+You'll learn from various people that the Safari Zone in Fuchsia City has closed
+since three years ago when Red, Blue, and Yellow took place. The warden fled the
+premises. If you go to the building, even the door is gone. What happened to it?
+You can still pick up a Burnt Berry as a consolation prize in the northwest part
+of town. 
+
+You can heal at the Pokémon Center and go fight the gym. Or you can heal and
+then get more experience first on Routes 16, 17 (Cycling Road), and 18. The
+choice is up to you. I'm not your teacher. Well, I guess I might be, if you're
+reading this guide. I'd suggest checking out Routes 16-18 to check it out, if
+nothing else. The new Kanto region is worth exploring.
+
+|--------|
+|Route 16|
+|--------|
+
+Pokémon on Route 16:
+
+#022 Fearow
+#088 Grimer
+
+Fly to Celadon City and go west. You can use Cut on the tree to reach it; it's
+north of the route-changing building. If you enter the one building there and
+come back out, the tree will grow back and you'll have to cut it again. Guess
+that environmental destruction doesn't actually last that long in this world.
+
+|--------|
+|Route 17|
+|--------|
+
+Pokémon on Route 17: 
+
+#022 Fearow
+#088 Grimer
+
+You could skip Route 16 and go straight through the route-changing building to
+Route 17. This is Cycling Road, so get on your bike. Remember you need to
+advertise for your friend, the Goldenrod City Bike Shop dude. It's still
+possible to bike uphill but you're better off biking downhill. Bike down and
+you'll run into your first biker. Possibly literally. It's okay, because
+trainers in this world can get hit by a bike and hold you back like they're a
+wall.
+
+Biker Riley
+Level 34 Weezing (1260 EXP)
+You get: 1088G
+
+After this point, there will be branching left and right paths. Head down the
+left route and you'll fight your next biker.
+
+Biker Glenn
+Level 28 Koffing (684 EXP)
+Level 30 Magmar (1072 EXP)
+Level 32 Weezing (1185 EXP)
+You get: 1024G
+
+You'll get another chance to stay left or go right. When you see a bridge across
+the river to the right, cross it and fight the next biker.
+
+Biker Joel
+Level 32 Magmar (1144 EXP)
+Level 32 Magmar (1144 EXP)
+You get: 1024G
+
+If you talk to him afterwards, he says, "I look cool, but I'm weak, so I'm not
+really cool." I'm not sure that's how the coolness factor works but I have no
+reason to question him. Now, keep rolling down until you run into the last
+trainer.
+
+Biker Charles
+Level 30 Koffing (732 EXP)
+Level 30 Weezing (1111 EXP)
+Level 30 Charmeleon (912 EXP)
+You get: 960G
+
+Roll down to the end of Cycling Road and you'll be on Route 18.
+
+|--------|
+|Route 18|
+|--------|
+
+Pokémon on Route 18:
+
+#022 Fearow
+#088 Grimer
+
+Head east and you'll face some guy that...hey, he almost has my name!
+
+Bird Keeper Bob
+Level 34 Noctowl (1179 EXP)
+You get: 816G
+
+He tells you that the shortcut to Celadon is the uphill Cycling Road. That
+doesn't sound wise. Now head down into the grass to fight the last trainer on
+the road to Fuchsia City.
+
+Bird Keeper Boris
+Level 30 Doduo (616 EXP)
+Level 32 Dodrio (1083 EXP)
+Level 28 Doduo (576 EXP)
+You get: 768G
+
+Now head east into Fuchsia City!
+
+|------------|
+|Fuchsia City|
+|------------|
+
+Fuchsia is such a hard color to spell. I always think the s is before the c.
+Anyway, you can go to the southwest part of town again to heal at the Pokémon
+Center, and then enter the gym. Head in and you'll find that everyone looks the
+same. They're all imitating Janine. Janine's located in the middle-left side of
+the gym. But it's good to battle everyone for the experience and we can sort of
+see the walls.
+
+High-powered moves and psychic moves are good for Janine's gym. Head up and talk
+to the first trainer.
+
+Lass Linda
+Level 30 Bulbasaur (411 EXP)
+Level 34 Venusaur (1515 EXP)
+Level 32 Ivysaur (966 EXP)
+You get: 816G
+
+Now head to the gym entrance (but don't exit the gym) and head to the far right
+and up. Then, fight that trainer. Ignore the fact that she says she's Janine.
+She isn't.
+
+Picnicker Cindy
+Level 36 Nidoqueen (1495 EXP)
+You get: 720G
+
+Head up then left, then talk to that trainer. It should be obvious by now that
+the real Janine wouldn't be spinning around. :P
+
+Camper Barry
+Level 36 Nidoking (1503 EXP)
+You get: 720G
+
+Now head down and face the fourth trainer.
+
+Lass Alice
+Level 30 Gloom (847 EXP)
+Level 34 Arbok (1071 EXP)
+Level 30 Gloom (847 EXP)
+You get: 720G
+
+At this point, you'll see the real Janine. Save, and heal if you need to. Janine
+is Koga's daughter, and has taken over for Dad after he joined the Elite Four.
+Janine fights like a weaker version of Koga. 
+
+---
+GYM LEADER JANINE
+Level 36 Crobat (1573 EXP)
+Level 33 Ariados (946 EXP)
+Level 39 Venomoth (1152 EXP)
+Level 36 Weezing (1333 EXP)
+Level 36 Weezing (1333 EXP)
+You get: Soul Badge, 3,900G, TM06 (Toxic)
+---
+
+Strategy VERSUS Crobat: Use the highest-powered move from your starter, keeping
+in mind that Meganium will be weak against poison moves in this gym. Also
+acceptable are psychic moves which have a type advantage against poison.
+Crobat's also a flying type, so you can also use ice and electric moves like
+Blizzard or Thunder.
+
+Strategy VERSUS Espeon: Unleash psychic from Espeon. Use the highest-powered
+move from your starter. Also acceptable are psychic moves which have a type
+advantage against poison.
+
+Strategy VERSUS Ariados: Use the highest-powered move from your starter, keeping
+in mind that Meganium will be weak against poison moves in this gym. Also
+acceptable are psychic moves which have a type advantage against poison. Ariados
+is also a bug, so fire moves from a Pokémon like Ho-Oh (e.g., Sacred Fire) or
+Typhlosion (e.g., Flame Wheel) will be super effective.
+
+Strategy VERSUS Venomoth: Use the highest-powered move from your starter,
+keeping in mind that Meganium will be weak against poison moves in this gym.
+Also acceptable are psychic moves which have a type advantage against poison.
+Venomoth is also a bug, so fire moves from a Pokémon like Ho-Oh (e.g., Sacred
+Fire) or Typhlosion (e.g., Flame Wheel) will be super effective. 
+
+Strategy VERSUS Weezings: Use the highest-powered move from your starter,
+keeping in mind that Meganium will be weak against poison moves in this gym.
+Also acceptable are psychic moves which have a type advantage against poison.
+
+Thirteen gyms down, three to go. You have defeated Janine. Congrats! She'll even
+give you TM06 Toxic, which is a poison that zaps enemy HP. She hopes to become
+better than Koga and you.
+
+==============================================================================
+==============================================================================
+============================================================================== 
+
+(c30)
+------------------------------------------

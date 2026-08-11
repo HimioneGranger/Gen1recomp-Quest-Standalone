@@ -7,11 +7,13 @@
 -- the text is exhausted and A is pressed, then calls onDone.
 
 local Font = require("src.render.Font")
+local Runtime = require("src.mods.Runtime")
 local Theme = require("src.ui.Theme")
 local Timing = require("src.core.Timing")
 
 local TextBox = {}
 TextBox.__index = TextBox
+TextBox.isTextBox = true
 
 -- theme-free fallbacks; geometry resolves against Theme.textBox at
 -- construction time, so an unthemed boot stays byte-identical
@@ -49,6 +51,11 @@ function TextBox.new(game, text, onDone, opts)
   self.choiceNoSound = opts and opts.noSound
   self.auto = opts and opts.auto
   self.stay = opts and opts.stay
+  -- opts.instant: put the LAST page up already typed, with no typewriter and
+  -- no page waits.  A `yesorno` follows a `writetext` that has already been
+  -- read, so re-typing the line under the YES/NO box would be wrong -- the
+  -- cart never closed the box in the first place.
+  self.instant = opts and opts.instant
   local box = Theme.textBox or {}
   self.boxTx = box.tx or BOX_TX
   self.boxTy = box.ty or BOX_TY
@@ -68,6 +75,25 @@ function TextBox.new(game, text, onDone, opts)
   self.contAdvance = false
   self.done = false
   self.blink = 0
+  if self.instant then
+    self.pageIndex = #self.pages
+    -- Both lines of the page at once, which is what the box looks like the
+    -- moment before the prompt appears.
+    local page = self.pages[self.pageIndex] or {}
+    -- The page's LAST two lines, which is what the box is holding.  A `cont`
+    -- inside the page ran _ContTextNoPause (home/text.asm:442): TextScroll
+    -- twice, then the next line is written at TEXTBOX_INNERY + 2, i.e. the
+    -- bottom row.  Taking the first two would walk the text backwards the
+    -- instant the prompt appears.
+    for index = math.max(1, #page - 1), #page do
+      self.shown[#self.shown + 1] = Font.encode(page[index])
+    end
+    self.lineIndex = #page
+    self.codes = self.shown[#self.shown] or {}
+    self.charIndex = #self.codes
+    self.done = true
+    return self
+  end
   self:beginLine()
   return self
 end
@@ -79,7 +105,27 @@ end
 -- (home/give.asm), and it stays set afterwards.
 TextBox.TOKENS = {
   PLAYER = function(game) return game.save.player.name or "RED" end,
-  RIVAL = function(game) return game.save.player.rival or "BLUE" end,
+  -- A Gen 1 save keeps the rival on player.rival; a Gold save keeps him at
+  -- save.rival.name, seeded "???" by InitializeNPCNames and written by the
+  -- NameRival special, whose own InitName fallback (not the seed) is where
+  -- "SILVER" comes from (pokegold engine/events/specials.asm
+  -- NameRival .DefaultName).  The Gen 1
+  -- default must not leak into a Gold textbox: the cart's officer never says
+  -- BLUE.  The tail therefore splits by generation rather than ending on the
+  -- Gen 1 literal.  A Gold save with no rival record at all is one that never
+  -- reached the naming screen, and wRivalName is then still what
+  -- InitializeNPCNames seeded it with, "???"
+  -- (pokegold engine/menus/intro_menu.asm .Rival).
+  RIVAL = function(game)
+    local gold = game.save.generation == 2 or game.save.version == "gold"
+    return game.save.player.rival
+      or (game.save.rival and game.save.rival.name)
+      or (gold and "???" or "BLUE")
+  end,
+  -- Gen 2's TX_RAM points at wStringBuffer2, which getstring / getmonname /
+  -- getitemname fill.  An unset buffer prints nothing, the same as the cart's
+  -- freshly `@`-filled buffer.
+  STRBUF = function(game) return game.stringBuffer end,
   RAM = function(game, arg)
     if arg == "wStringBuffer" then return game.stringBuffer end
     if arg == "wBoxNumString" then return game.boxNumString end
@@ -344,6 +390,11 @@ function TextBox:update(dt)
 end
 
 function TextBox:draw()
+  if Runtime.wantsHook("battle.bottom_ui_visible")
+      and Runtime.call("battle.bottom_ui_visible", function() return true end,
+                       self) == false then
+    return
+  end
   -- The dialogue box belongs against the bottom of the screen, not floating
   -- in the middle of a zoomed-out letterbox.  Declared per frame; the
   -- renderer blits this region to the screen edge and the rest of the UI
@@ -353,7 +404,15 @@ function TextBox:draw()
     r:setUIAnchor(self.boxTx * 8, self.boxTy * 8,
                   self.boxTw * 8, self.boxTh * 8, "bottom")
   end
-  Font.drawBox(self.boxTx, self.boxTy, self.boxTw, self.boxTh)
+  -- The box's own tiles are all font-page ($79-$7e frame, ' ' $7f interior),
+  -- so they take whatever BG palette 0 colour 0 the screen UNDER the box is
+  -- using.  On every Gen 1 screen and nearly every Gold one that is white and
+  -- this is nil; the Pokegear's is a pale cream, and a call's pushed textbox
+  -- has to sit on the gear's paper rather than paint a white band across it
+  -- (pokegold engine/pokegear/pokegear.asm TownMapPals sends every tile
+  -- >= $60 to palette 0).  Gen 1's Game has no textboxPaper, so it stays nil.
+  local paper = self.game and self.game.textboxPaper and self.game:textboxPaper()
+  Font.drawBox(self.boxTx, self.boxTy, self.boxTw, self.boxTh, paper)
   love.graphics.setColor(0, 0, 0, 1)
   if self.scrollPx and self.scrollPx > 0 then
     self.scrollPx = self.scrollPx - 2

@@ -16,6 +16,9 @@ static void GRBootstrapInstall(void)
                      queue:[NSOperationQueue mainQueue]
                 usingBlock:^(NSNotification *note) {
         Class bridge = NSClassFromString(@"GRPickerBridge");
+        if ([bridge respondsToSelector:@selector(preparePublicDocuments)]) {
+            [bridge performSelector:@selector(preparePublicDocuments)];
+        }
         if ([bridge respondsToSelector:@selector(sweepInbox)]) {
             [bridge performSelector:@selector(sweepInbox)];
         }

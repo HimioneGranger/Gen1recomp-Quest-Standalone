@@ -20,6 +20,11 @@ local Font = {}
 
 local GLYPH = 8
 
+-- engine/gfx/load_font.asm:29 LoadFrame: TEXTBOX_FRAME_TILES tiles at $79, one
+-- row of Frames per wTextboxFrame.
+local FRAME_BASE = 0x79
+local FRAME_TILES = 6
+
 -- TTF glyph codes are the Unicode codepoint offset far above any page base,
 -- so they flow through the same span/encode/drawCode pipeline as tiles.
 local TTF_BASE = 0x400000
@@ -35,6 +40,7 @@ Font.PLAINPIXEL_SIZE = 15
 
 local state
 local loadedFrom
+local currentFrame = 1
 
 -- the two vanilla pages as the legacy def spells them, so a cache that
 -- predates the pages table still loads and a mod that registers only one
@@ -48,6 +54,17 @@ local function pagesOf(def)
   if def.imageExtra then
     pages.extra = { image = def.imageExtra, base = def.extraBase or 0x60,
                     glyphsPerRow = def.glyphsPerRow or 16 }
+  end
+  -- Gen 2 keeps two sheets for the same VRAM slot: LoadFontsExtra puts
+  -- FontExtra at $60 and LoadFontsBattleExtra puts FontBattleExtra there
+  -- instead.  They are genuinely different glyphs -- $6e is "Lv" in one and
+  -- the bold ":L" in the other -- so the battle sheet is loaded as its own
+  -- page and Font.useBattleExtra swaps which one $60 resolves to.
+  if def.imageBattleExtra then
+    pages.battleExtra = { image = def.imageBattleExtra,
+                          base = def.extraBase or 0x60,
+                          glyphsPerRow = def.glyphsPerRow or 16,
+                          inactive = true }
   end
   for id, page in pairs(def.pages or {}) do
     if type(page) == "table" and page.image then pages[id] = page end
@@ -100,9 +117,34 @@ function Font.load(data)
       local entry = { id = id, image = img, quads = quads,
                       base = page.base, advance = page.advance or GLYPH }
       state.pages[id] = entry
-      state.order[#state.order + 1] = entry
+      -- An inactive page is loaded but not in the resolution order until
+      -- something swaps it in; see Font.useBattleExtra.
+      if not page.inactive then
+        state.order[#state.order + 1] = entry
+      end
     end
   end
+  -- Frames as its own sheet, one row per style (gfx/font.asm:10).  Without it
+  -- the extra page's baked-in row 0 answers $79-$7e, which is frame 1.
+  state.frameBase = def.frameBase or FRAME_BASE
+  state.frameTiles = def.frameTiles or FRAME_TILES
+  if def.imageFrames then
+    local ok, img = pcall(Assets.image, def.imageFrames)
+    if ok and img then
+      local iw, ih = img:getDimensions()
+      state.framePages = {}
+      for row = 0, math.floor(ih / GLYPH) - 1 do
+        local quads = {}
+        for t = 0, state.frameTiles - 1 do
+          quads[t] = love.graphics.newQuad(t * GLYPH, row * GLYPH,
+            GLYPH, GLYPH, iw, ih)
+        end
+        state.framePages[row + 1] = { id = "frames", image = img,
+          quads = quads, base = state.frameBase, advance = GLYPH }
+      end
+    end
+  end
+
   -- highest base first: a code resolves against the last page that starts
   -- at or below it, which is exactly what the old main/extra chain did
   table.sort(state.order, function(a, b) return a.base > b.base end)
@@ -137,8 +179,10 @@ function Font.load(data)
   -- typo'd path degrades exactly like a missing page image does above.
   if type(def.ttf) == "table" then
     local file = def.ttf.file or Font.PLAINPIXEL
-    local ok, obj = pcall(love.graphics.newFont, file,
-                          def.ttf.size or Font.PLAINPIXEL_SIZE, "mono")
+    local size = def.ttf.size or Font.PLAINPIXEL_SIZE
+    -- The game renders into a pixel-exact canvas, so keep the TTF rasterizer
+    -- on that same 1x grid instead of inheriting the window DPI on mobile.
+    local ok, obj = pcall(love.graphics.newFont, file, size, "mono", 1)
     if ok and obj then
       -- nearest keeps the pixel font crisp under the integer UI scale
       if obj.setFilter then pcall(obj.setFilter, obj, "nearest", "nearest") end
@@ -186,13 +230,59 @@ end
 
 Assets.register(Font.invalidate)
 
+-- How many tiles LoadFontsBattleExtra actually swaps: `lb bc, BANK(...), 25`
+-- covers $60-$78 and then `jr LoadFrame` puts the textbox frame back at
+-- $79-$7e and the blank at $7f (engine/gfx/load_font.asm).  The border glyphs
+-- are therefore the SAME tiles on a battle-sheet screen as everywhere else,
+-- which is why the swap stops short of them.
+local BATTLE_EXTRA_TILES = 25
+
 -- the page a glyph code draws from, or nil when nothing covers it
 local function pageFor(code)
   if not state then return nil end
+  -- LoadFrame runs after both extra sheets, so $79-$7e is the selected frame
+  -- whatever else holds the $60 slot (load_font.asm:20, :27).
+  local frames = state.framePages
+  if frames and code >= state.frameBase
+      and code < state.frameBase + state.frameTiles then
+    local page = frames[currentFrame]
+    if page then return page end
+  end
+  if state.battleExtra and state.pages.battleExtra then
+    local swap = state.pages.battleExtra
+    if code >= swap.base and code < swap.base + BATTLE_EXTRA_TILES then
+      return swap
+    end
+  end
   for _, page in ipairs(state.order) do
     if code >= page.base then return page end
   end
   return nil
+end
+
+-- LoadFontsBattleExtra / LoadFontsExtra: which sheet the $60-$7f slot holds.
+-- The battle screen and the party menu load the battle sheet, everything else
+-- the normal one.  Returns the previous setting so a caller can restore it.
+function Font.useBattleExtra(on)
+  if not state then return false end
+  local was = state.battleExtra or false
+  state.battleExtra = on and true or false
+  return was
+end
+
+function Font.battleExtraActive()
+  return state ~= nil and state.battleExtra == true
+end
+
+-- engine/menus/options_menu.asm:475 UpdateFrame -> LoadFontsExtra -> LoadFrame.
+-- Module state, not `state`: applyOptions runs before Font.load on boot
+-- (src/core/Game2.lua Game2:load).
+function Font.setFrame(index)
+  currentFrame = math.floor(tonumber(index) or 1)
+end
+
+function Font.frameIndex()
+  return currentFrame
 end
 
 local SPACE = 0x7F
@@ -240,6 +330,15 @@ local function ttfChar(ttf, code)
   return ch
 end
 
+-- Text commands that place a fixed string rather than one tile.  '#' is
+-- charmap.asm $54, and home/text.asm's handler for it writes the four
+-- characters "POKé" -- which is why the cart's own strings spell POKéMON as
+-- `db "      #MON"` (data/credits_strings.asm Credits_Staff) and why a
+-- hand-ported string in this port may too.  One glyph per replacement
+-- character comes back out of Font.split, all of them pinned to the byte the
+-- command sits on so a cut never lands inside the expansion.
+local MACRO_TEXT = { ["#"] = "POK\xc3\xa9" }
+
 -- Segment text into glyph spans: `{ from, to, code }` byte ranges, one per
 -- drawn glyph, code nil when the charmap has nothing.  A span is a whole
 -- charmap sequence, so a multi-byte char ("é", "♂") and an ASCII ligature
@@ -258,46 +357,58 @@ function Font.split(text)
   local ttf = state and state.ttf
   local i, n = 1, #text
   while i <= n do
-    local span
-    local candidates = state and state.byFirstByte[text:byte(i)]
-    if candidates then
-      for _, entry in ipairs(candidates) do
-        local len = #entry.seq
-        if text:sub(i, i + len - 1) == entry.seq then
-          if ttf and not ttf.tiles[entry.seq] then
-            -- single characters belong to the TTF; only multi-character
-            -- sequences (ligatures, <PK> macros) keep their tile mapping,
-            -- plus anything the mod named in ttf.tiles (see Font.load)
-            local cp, last = utf8Decode(entry.seq, 1)
-            if cp and last == len then break end
+    -- A charmap entry for the same byte wins: a font that ships '#' as a real
+    -- glyph is describing its own sheet, and the macro is only the fallback
+    -- the vanilla charmap leaves room for.
+    local macro = not (state and state.byFirstByte[text:byte(i)])
+      and MACRO_TEXT[text:sub(i, i)]
+    if macro then
+      for _, sub in ipairs(Font.split(macro)) do
+        spans[#spans + 1] = { from = i, to = i, code = sub.code }
+      end
+      i = i + 1
+    else
+      local span
+      local candidates = state and state.byFirstByte[text:byte(i)]
+      if candidates then
+        for _, entry in ipairs(candidates) do
+          local len = #entry.seq
+          if text:sub(i, i + len - 1) == entry.seq then
+            if ttf and not ttf.tiles[entry.seq] then
+              -- single characters belong to the TTF; only multi-character
+              -- sequences (ligatures, <PK> macros) keep their tile mapping,
+              -- plus anything the mod named in ttf.tiles (see Font.load)
+              local cp, last = utf8Decode(entry.seq, 1)
+              if cp and last == len then break end
+            end
+            span = { from = i, to = i + len - 1, code = entry.code }
+            break
           end
-          span = { from = i, to = i + len - 1, code = entry.code }
-          break
         end
       end
-    end
-    if not span and ttf then
-      local cp, last = utf8Decode(text, i)
-      if cp and cp >= 0x20 then
-        span = { from = i, to = last, code = TTF_BASE + cp }
-      end
-    end
-    if not span then
-      -- Nothing matched.  Still keep a UTF-8 sequence whole, so a cut never
-      -- lands mid-character even for a glyph we cannot draw.
-      local last = i
-      if text:byte(i) >= 0xC0 then
-        local k = i + 1
-        while k <= n do
-          local b = text:byte(k)
-          if b < 0x80 or b > 0xBF then break end
-          last, k = k, k + 1
+      if not span and ttf then
+        local cp, last = utf8Decode(text, i)
+        if cp and cp >= 0x20 then
+          span = { from = i, to = last, code = TTF_BASE + cp }
         end
       end
-      span = { from = i, to = last }
+      if not span then
+        -- Nothing matched.  Still keep a UTF-8 sequence whole, so a cut never
+        -- lands mid-character even for a glyph we cannot draw.
+        local last = i
+        if text:byte(i) >= 0xC0 then
+          local k = i + 1
+          while k <= n do
+            local b = text:byte(k)
+            if b < 0x80 or b > 0xBF then break end
+            last, k = k, k + 1
+          end
+        end
+        span = { from = i, to = last }
+      end
+      spans[#spans + 1] = span
+      i = span.to + 1
     end
-    spans[#spans + 1] = span
-    i = span.to + 1
   end
   return spans
 end
@@ -404,8 +515,19 @@ Font.BORDER = {}
 for key, code in pairs(Font.DEFAULT_BORDER) do Font.BORDER[key] = code end
 
 -- Draw a Game Boy style bordered box in tile coordinates.
-function Font.drawBox(tx, ty, tw, th)
-  -- The white interior is a fill, so it needs the color; everything after it
+--
+-- `fill` is an optional {r,g,b} in 0..255 for the interior.  White is the
+-- right answer everywhere in Gen 1 and on nearly every Gold screen, because
+-- the box is drawn from font-page tiles ($79-$7e plus the ' ' $7f interior,
+-- all >= $60) and those take BG palette 0, whose colour 0 is white there.  A
+-- host screen whose palette 0 colour 0 is NOT white has to say so: the
+-- Pokegear's is `RGB 28, 31, 20` and its tile-attribute map sends everything
+-- >= $60 to palette 0 (pokegold engine/pokegear/pokegear.asm TownMapPals,
+-- gfx/pokegear/pokegear.pal), so a box pushed over the gear must come out on
+-- the gear's cream paper, not as a white band.  Default stays white so no
+-- existing call site changes.
+function Font.drawBox(tx, ty, tw, th, fill)
+  -- The interior is a fill, so it needs the color; everything after it
   -- is a glyph and needs the caller's.  Restoring is not cosmetic: the tile
   -- pages are black glyphs on transparent, so they come out black whatever
   -- the color is, and leaking white here was invisible for as long as every
@@ -414,7 +536,11 @@ function Font.drawBox(tx, ty, tw, th)
   -- white.  On the summary screen that erased ATTACK/DEFENSE/SPEED/SPECIAL
   -- and TYPE1/TYPE2 while the numbers beside them, still tiles, stayed put.
   local r, g, b, a = love.graphics.getColor()
-  love.graphics.setColor(1, 1, 1, 1)
+  if type(fill) == "table" and fill[1] and fill[2] and fill[3] then
+    love.graphics.setColor(fill[1] / 255, fill[2] / 255, fill[3] / 255, 1)
+  else
+    love.graphics.setColor(1, 1, 1, 1)
+  end
   love.graphics.rectangle("fill", tx * 8, ty * 8, tw * 8, th * 8)
   love.graphics.setColor(r, g, b, a)
   local B = Font.BORDER

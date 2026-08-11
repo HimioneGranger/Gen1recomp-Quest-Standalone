@@ -66,12 +66,33 @@ function Catalog.events()
   return events
 end
 
+-- A hook whose Runtime.call lives in a shared raiser rather than at the site
+-- that decides the value.  Gold's trainer art is not in field.playerPics, so
+-- its screens resolve their own path and hand it to Sprites.playerPic
+-- (src/pokemon/Sprites.lua); those callers are player.sprite sites and the
+-- generation gate has to see them as such.
+local INDIRECT_HOOKS = {
+  ["player.sprite"] = "playerPic%(",
+}
+
 function Catalog.hooks()
   if not hooks then
     hookSites = scan({ "src" }, {
       'Runtime%.call%("([%w%._]+)"',
       'hooks:call%("([%w%._]+)"',
     })
+    for name, pattern in pairs(INDIRECT_HOOKS) do
+      local list = hookSites[name] or {}
+      hookSites[name] = list
+      for _, path in ipairs(luaFilesUnder("src")) do
+        local handle = io.open(path, "r")
+        if handle then
+          local body = handle:read("*a")
+          handle:close()
+          if body:match(pattern) then list[#list + 1] = path end
+        end
+      end
+    end
     hooks = sortedKeys(hookSites)
   end
   return hooks

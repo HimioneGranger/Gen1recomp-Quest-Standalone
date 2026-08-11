@@ -49,7 +49,7 @@ rm -f "$OUTPUT"
 (cd "$ROOT" && zip -q -9 -r "$OUTPUT" \
   main.lua conf.lua src data assets tools/save-editor \
   tools/rom_manifest.json tools/rom_manifest_blue.json \
-  tools/rom_manifest_yellow.json \
+  tools/rom_manifest_yellow.json tools/rom_manifest_gold.json \
   -x '*.DS_Store' 'data/generated/*' 'assets/generated/*')
 
 if [ -n "$BUILD_INFO" ]; then
@@ -87,7 +87,7 @@ for required in tools/save-editor/App.lua tools/save-editor/Kit.lua \
                 tools/save-editor/PadInput.lua \
                 tools/save-editor/panels/Party.lua \
                 tools/rom_manifest.json tools/rom_manifest_blue.json \
-                tools/rom_manifest_yellow.json \
+                tools/rom_manifest_yellow.json tools/rom_manifest_gold.json \
                 src/ui/kit/Kit.lua \
                 src/import/LauncherView.lua; do
   grep -qxF "$required" "$LISTING" \

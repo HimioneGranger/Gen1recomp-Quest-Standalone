@@ -47,6 +47,20 @@ eq(bad, nil, "non-X.Y.Z tag rejected")
 check(badErr ~= nil, "rejection carries an error string")
 eq(Check.parseRelease(Json.encode({ foo = 1 })), nil, "missing tag_name rejected")
 
+-- Network failures can return a plain-text or HTML body instead of JSON. The
+-- launcher must describe that response rather than leaking the decoder's
+-- low-level "unexpected character 'E'" assertion.
+do
+  local release, err = Check.parseRelease("Error: API rate limit exceeded")
+  check(release == nil and tostring(err):find("not JSON", 1, true) ~= nil,
+    "plain-text update failure is reported as non-JSON")
+  release, err = Check.parseRelease("<!DOCTYPE html><html>502 Bad Gateway</html>")
+  check(release == nil and tostring(err):find("HTML", 1, true) ~= nil,
+    "HTML update failure is identified")
+  check(tostring(err):find("unexpected character", 1, true) == nil,
+    "decoder assertion is not exposed")
+end
+
 -- parseSums: shasum -a 256 format, tolerating the '*' binary marker, a './'
 -- prefix and CRLF line endings; unrelated lines are skipped
 local sums =

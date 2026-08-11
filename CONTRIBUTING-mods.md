@@ -138,7 +138,111 @@ qualifies only if every record it writes lands in `text`, `strings` or
 permission. Anything else and it is an ordinary content mod that happens to
 ship text.
 
-### 4. `mod.card`
+### 4. `games` (and the legacy `gen2compat`)
+
+Pokemon Gold is Gen 2, and it runs its own battle engine, overworld, script
+VM and save format. The mod API is shared across both generations (same hook
+names, same event names, same registry names) but Gold cannot serve all of it
+yet, so Gen 2 is opt-in. Say which games the mod is for:
+
+```json
+"games": ["gen1", "gen2"]
+```
+
+Each entry is a version id (`"red"`, `"blue"`, `"yellow"`, `"gold"`), a
+generation (`"gen1"`, `"gen2"`) or `"all"`;
+`src/mods/ModTargets.lua` resolves them off `GameVersion.ORDER` so nothing
+restates the game list. `python3 tools/modkit.py scaffold my_mod --games
+gen1,gen2` writes the key for you. The mod still installs to one directory,
+`mods/<id>/`, shared by every game -- targeting is declared, never filed.
+
+Absent means Gen 1 only, which is what every mod written before the key existed
+was tested as. `"gen2compat": true` is the legacy spelling, still accepted and
+purely additive (it *adds* the Gen 2 games), so no manifest can lose a game it
+already ran on. On a Gold boot a mod claiming no Gen 2 game is not loaded at
+all: the manager lists it as `ENABLED (NOT THIS GAME)` and says why, because a
+mod that half-applies reads as a broken mod. Claim Gen 2 once you have actually
+run your mod on Gold.
+
+Every token is enforced, per game: the loader gates on the same
+`ModTargets.supports` answer both mod surfaces draw, so `"games": ["blue"]`
+really does not load on Red and the skip line is the launcher's line, `For
+Blue, not Red`, and `"games": ["gold"]` alone does not load on Red either. A
+manifest with neither key still covers every Gen 1 game, so nothing written
+before the key existed changes behavior; list both generations or say `"all"`
+when you mean everywhere.
+
+`docs/mod-api-gen2-compat.md` is the compatibility matrix: what works on Gold
+today (40 of the 46 registries, 40 event and 43 hook names shared with Gen 1,
+and 24 Gen 2-only ones), which registries have no Gen 2 home and drop their
+writes with a report, and which hooks and events are still to come.
+`docs/preparing-your-mod-for-gen2.md` is the step-by-step migration guide for a
+Gen 1 mod, and it is the one to start from.
+
+Two consequences worth knowing before you claim Gen 2.
+
+**Dependencies are contagious.** A mod whose hard dependency does not run here
+is left out too, with the dependency's own wording (`depends on X, which does
+not run here (For Blue, not Red)`). It is reported as a skip, not as a failure,
+and neither mod lands on the boot error list, but the mod does not run, so
+every hard dependency has to cover the same games.
+
+**The player can override you.** The claim is yours, and a mod written before
+the key existed can never carry one, so the manager's detail pane offers
+`TRY HERE ANYWAY` for any mod that does not claim the game being played. It
+persists per game in `options.modsGen2[id][version]` and takes effect on the
+next boot; forcing a mod onto Red does not force it onto Gold. A forced mod
+loads normally and keeps a note saying its author never verified it here.
+
+**Prefer the API on Gold, but the Gen 1 names still work.** Gen 2 is a
+parallel module tree behind `src/core/Game2.lua`. In new code take the live
+game from `mod.game` (or the `game.ready` payload, or any `ui.*` hook's first
+argument) and the world from `mod.world`; both resolve per generation, and
+neither needs `engine_internals`.
+
+For the mods written before Gold existed, a require made from a mod's own file
+is answered on a Gold boot by an adapter presenting the Gen 1 API over Gen 2
+internals. Fifteen names are served -- `src.core.Game`,
+`src.world.OverworldController`, `src.world.Map`, `src.world.NPC`,
+`src.world.Collision`, `src.world.WorldAPI`, `src.world.PikachuFollower`,
+`src.world.FieldDefaults`, `src.pokemon.Boxes`, `src.script.ScriptRunner`,
+`src.ui.PartyMenu`, `src.ui.StartMenu`, `src.ui.OptionsMenu`, `src.ui.BoxMenu`
+and `src.battle.BattleState`. `src/mods/Gen2Compat.lua` is the full table and
+publishes what it covers through `Gen2Compat.coverage(name)`, whose members are
+`backed`, `warned` or `absent`. A name with no adapter (`src.script.Commands`,
+`src.ui.OptionRows`) is reported against the mod that required it, and a member
+an adapter cannot back is absent or logs once rather than answering wrongly.
+
+Things no adapter can fix, all mod-side: a hardcoded version allow-list
+(`GameVersion.get() == "red" or ...`) excludes you from Gold by construction;
+Gold's builtin screen ids carry a `Gen2` prefix, so a string match on
+`"BoxMenu"` matches nothing there; a write to a field on a live Gen 2 menu
+instance is inert; and `map.warpAt` is a table on Gen 1 and a method on Gold,
+so indexing it raises. Each has a route that works on both generations, in
+`docs/preparing-your-mod-for-gen2.md`.
+
+Check it statically, then load it headless:
+
+```sh
+python3 tools/modkit.py gen2check mods/my_mod
+```
+
+```lua
+local run = T.sdk.loadMod("mods/my_mod", { generation = 2 })
+T.eq(run.mod and run.mod.state, "loaded",
+  "runs on gen 2: " .. tostring(run.mod and run.mod.skipReason))
+T.eq(#run.errors, 0, "and loads with no boot errors")
+```
+
+Assert the state, not only the error count: a gate skip is deliberately not an
+error, so `#run.errors == 0` passes for a mod that never ran a line.
+
+`gen2check` answers `will load`, `will load but degrade` or `will not work`,
+with a `MK4xx` finding per site and an `unresolved:` note, with a file and a
+line, for every reach a static scan could not follow. Neither substitutes for a
+real Gold boot.
+
+### 5. `mod.card`
 
 The manifest is the *engine's* contract: identity, load order, dependencies,
 permissions, profile. The card is the *human-facing* one: who made this,
@@ -159,7 +263,7 @@ Two fields deserve their own note:
   distributed mod never carries ROM-derived bytes, not even in its preview
   images.
 
-### 5. Tags
+### 6. Tags
 
 Lowercase kebab strings, open vocabulary. The showcase generator
 lowercases and de-dupes. A recommended starting set: `beginner`,
@@ -217,12 +321,15 @@ registry or a new schema field lands with its catalog entry in the same PR
 and the generator runs clean:
 
 ```sh
-luajit tools/gen_registry_docs.lua                 # in-repo default
-luajit tools/gen_registry_docs.lua ../project.wiki # the wiki checkout
+luajit tools/gen_registry_docs.lua                 # docs/modding/reference/registries.md
+luajit tools/gen_registry_docs.lua ../project.wiki # Reference-Registries.md in a wiki checkout
 ```
 
-The prose reference lives in the GitHub wiki; the generated pages are
-written into a checkout of it, so they cannot drift from the engine.
+With no argument it writes inside the repo, which is the copy `python3
+tools/modkit.py docs` regenerates and `--out` copies from. Pass a directory
+(or set `POKEPORT_DOCS_DIR`) to write the wiki's flat page name into a wiki
+checkout instead. The prose reference lives in the GitHub wiki; both copies
+come off `src/mods/Schemas.lua`, so neither can drift from the engine.
 
 ### 5. Deprecation etiquette
 

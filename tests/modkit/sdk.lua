@@ -111,10 +111,13 @@ function Sdk.restoreRuntime()
   saved = nil
 end
 
--- opts.data   the merge target (defaults to a fresh fixture dataset)
--- opts.fs     override the filesystem entirely (e.g. Sdk.memfs)
--- opts.root   repo root the real paths are relative to
--- opts.dev    force the dev tripwire on
+-- opts.data        the merge target (defaults to a fresh fixture dataset)
+-- opts.fs          override the filesystem entirely (e.g. Sdk.memfs)
+-- opts.root        repo root the real paths are relative to
+-- opts.dev         force the dev tripwire on
+-- opts.generation  1 (default) or 2; loads as if Gold were the running game,
+--                  which is the seam the gen2compat gate and the registry
+--                  target routing are tested through without booting Gold
 function Sdk.loadMods(paths, opts)
   opts = opts or {}
   local data = opts.data or require("tests.modkit.fixtures").fresh()
@@ -127,7 +130,8 @@ function Sdk.loadMods(paths, opts)
   end
 
   Sdk.captureRuntime()
-  local loader = Loader.new({ fs = fs, dev = opts.dev })
+  local loader = Loader.new({ fs = fs, dev = opts.dev,
+                              generation = opts.generation })
   local ok, err = pcall(loader.load, loader, data)
   if not ok then
     Sdk.restoreRuntime()

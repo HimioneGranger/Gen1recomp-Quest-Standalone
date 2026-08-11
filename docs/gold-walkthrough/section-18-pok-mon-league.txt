@@ -1,0 +1,296 @@
+---- 24 > Pokémon League ----
+-----------------------------
+
+Video Playthrough Link Route 26 & Victory Road):
+https://www.youtube.com/watch?v=Jign264AzYI
+
+Video Playthrough Link (Elite Four & Champion Battles):
+https://www.youtube.com/watch?v=VcFLopf6A28
+
+|--------------|
+|POKEMON LEAGUE|
+|--------------|
+
+Route 32 is very short, and you'll immediately be at the Pokémon League building
+at the Indigo Plateau. You'll now be able to fly to this location directly. The
+left side of the building is the Pokémon Center, while the right side is the
+Pokemart. If you want to head back to Johto, you can talk to the old man with
+the Abra next to the Pokémon Center portion of Indigo Plateau's HQ and Abra will
+teleport you back.
+
+Now, your goal is to take on five powerful trainers in a row. You mostly want to
+have high-power moves of different types, plus priority moves (like Quick
+Attack), status moves (like paralysis or sleep), and recovery moves (like
+Recover or Leech Seed) in your lineup. Note that you do NOT need to have every
+HM in your lineup in these fights, so you can leave Cut and Whirlpool off the
+lineup for now.
+
+You don't need any Pokémon that can use HMs. However, certain HMs are great to
+teach to your Pokémon because they are also strong attacks. Surf is 95 Power,
+Strength is 80 Power, Waterfall is 80 Power, and Fly is 80 Power. Consider
+teaching these moves to every Pokémon in your six-Pokémon lineup if they can
+learn them. You can go back to the Move Deleter in Blackthorn City later in the
+game if you want to replace the moves later.
+
+Here's a potential lineup in which you're just leveling up your starters, along
+with their power levels:
+
+Feraligatr - SURF (95), STRENGTH (80), Hydro Pump (120), Bite (60)
+Lugia - Aero Blast (100/5 PP), SURF (95), FLY (80), Recover
+Donphan - STRENGTH (80), Fury Attack (15x2-5), Rollout (30), Flail
+Gyarados - Surf (95), WATERFALL (80), Strength (80), Bite (60 flinch)
+Raticate - Quick Attack (40), Hyper Fang (80 flinch), STRENGTH (80), CUT (50)
+Sudowoodo - Strength (80), Rock Throw (50), Low Kick (50 flinch), Flail
+
+If you want a balanced lineup, your Pokémon will all need to be at least Level
+40 or higher, because your next opponents will all have Pokemon from Level 40
+through Level 50. The best training ground would be back in Victory Road,
+although Routes 46 and 47 aren't bad, either. If you trade a Red Scale to Mr.
+Pokémon, he will give you EXP Share, which will share all EXP that you gain with
+every Pokémon in your lineup so you don't have to keep switching Pokémon back
+and forth.
+
+If you're leveling up an Eevee, put Eevee at the start of your lineup to
+increase its happiness towards an Espeon/Umbreon evolution. Eevee can evolve to
+Espeon (a psychic type) in the daytime, and an Umbreon (dark type) in the night
+time. This can take a while as you can only the requisite happiness through
+leveling up, walking around a lot, and visiting the Goldenrod City salon guy.
+Goldenrod City also has extra TMs you can buy, so you can buy Thunder Punch and
+Fire Punch and use it on Pokémon and still be able to reuse those TMs in the
+future.
+
+If you have a balanced lineup, your lineup to the Elite Four should be at least
+something like the following:
+
+Level 47 Espeon
+Level 41 Dragonair
+Level 40 Gyarados
+Level 40 Sudowoodo
+Level 40 Typhlosion
+Level 38 Raticate
+
+When you do feel ready for the ultimate challenge, make sure you have at least
+ten Hyper Potions, ten Revives, and ten Full Heals. You can sell any Potions,
+Super Potions, and Paralyz Heal/Awakenings etc. to make room for the more
+versatile Hyper Potions and Full Heals.
+
+You can't go back to the Pokémon Center to heal between battles, and no one will
+heal your Pokémon, so having items on hand will be helpful for HP loss, KOs, or
+paralysis situations. You've traveled across the land, searching far and wide.
+Now it's time. 
+
+Fully heal your Pokémon and save after every trainer battle at the Elite Four.
+Keep in mind that you cannot readily replenish your PP, as ethers are single
+use. You'll want to balance out your PP so that you don't run out of any move
+too early through the battles. Use type-advantaged moves were possible, and if
+you can use a lower-powered move to knock out a Pokémon, do that. It is a battle
+of endurance, and it is a grind. Allocate an hour to fighting the Pokémon
+League. The trainers will sap your energy.
+
+The first Elite Four member, Will, uses psychic Pokémon. Avoid fighting moves.
+Dark moves will be effective. 
+
+|-----------------------------|
+|Elite Four Will              |
+|Level 40 Xatu (1465 EXP)     |
+|Level 41 Jynx (1203 EXP)     |
+|Level 41 Slowbro (1440 EXP)  |
+|Level 42 Xatu (1539 EXP)     |
+|Level 41 Exeggutor (1861 EXP)|
+|You get: 4200G               |
+|-----------------------------|
+
+Strategy VERSUS Xatus: Use the most high-powered move that you've got that's not
+a fighting move.
+
+Strategy VERSUS Jynx: Use the most high-powered move that you've got. Jynx is
+also an ice type, so you can also use fire moves.
+
+Strategy VERSUS Slowbro: Use the most high-powered move that you've got. Slowbro
+is also a water type, so you can also use a strong electric type move.
+
+Strategy VERSUS Exeggutor: Use the most high-powered move that you've got.
+Exeggutor is also a grass type, so you can also use fire moves.
+
+Next up is Elite Four Koga. He was the poison type Fuchsia City Gym Leader in
+Red, Blue, and Yellow, and now he's become an Elite Four member. Poison types
+are super effective against grass types, so don't put a Meganium or other grass
+type in. Instead, focus on using ground and psychic type moves.
+
+|------------------------------|
+|Elite Four Koga               |
+|Level 40 Ariados (1147 EXP)   |
+|Level 43 Forretress (1086 EXP)|
+|Level 41 Venomoth (1212 EXP)  |
+|Level 42 Muk (1413 EXP)       |
+|Level 44 Crobat (1923 EXP)    |
+|You get: 4400G                |
+|------------------------------|
+
+Koga has three Full Restores that he may use.
+
+Strategy VERSUS Ariados - Ariados is both a poison and bug type. This means you
+can fry Ariados with fire or flying type moves alongside the typical psychic
+moves.
+
+Strategy VERSUS Forretress - Use the most high-powered move that you've got
+that's not a grass move. Psychic moves are super effective.
+
+Strategy VERSUS Venomoth - Use the most high-powered move that you've got that's
+not a grass move. Psychic moves are super effective. Since it's also a flying
+type, you can also use electric or ice moves to take it down. Beware of
+Venomoth's Confuse Ray. Not that you could stop it even if I told you it was
+coming.
+
+Strategy VERSUS Muk - Use the most high-powered move that you've got that's not
+a grass move. Psychic moves are super effective. Muk has Toxic, so Muk can
+poison your Pokémon.
+
+Strategy VERSUS Crobat - Use the most high-powered move that you've got that's
+not a grass move. Psychic moves are super effective. Since it's also a flying
+type, you can also use electric or ice moves to take it down.
+
+The third Elite Four member is Bruno. He has mostly fighting type Pokémon but
+threw in a rock type in his lineup just for funsies. Fighting types are super
+effective against normal, ice, rock, dark, and steel types. The best moves to
+use against them are flying and psychic type moves. Avoid using dark moves
+against fighting types.
+
+|------------------------------|
+|Elite Four Bruno              |
+|Level 42 Hitmontop (1242 EXP) |
+|Level 42 Hitmonchan (1260 EXP)|
+|Level 42 Hitmonlee (1242 EXP) |
+|Level 43 Onix (994 EXP)       |
+|Level 46 Machamp (1902 EXP)   |
+|You get: 4600G                |
+|------------------------------|
+
+Strategy VERSUS Hitmontop: The good news about battling fighting types is that
+you can use pretty much any move against them. Use your
+highest power move from your best Pokémon against it. Flying and psychic moves
+also work well.
+
+Strategy VERSUS Hitmonchan: Hitmonchan is still a fighting type, but it can be
+more of a challenge to fight if it gets off its electric, fire, or ice punches.
+The strategy otherwise holds. Use your highest power move from your best Pokémon
+against it. Flying and psychic moves also work well.
+
+Strategy VERSUS Hitmonlee: Hitmonlee's similar to Hitmontop. Use your highest
+power move from your best Pokémon against it. Flying and psychic moves also work
+well. Watch out for Swagger, which will confuse your Pokémon.
+
+Strategy VERSUS Onix: Onix is the one rock type. Use water, grass, fighting,
+ground, or steel moves to beat it. Use your highest power move from your best
+Pokémon that isn't a normal move.
+
+Strategy VERSUS Machamp: Machamp is the same as the other fighting types. Use
+your highest power move from your best Pokémon against it. Flying and psychic
+moves also work well.
+
+You've got one more Elite Four member to face. She wants to be entertained by
+you. I think you can handle that. Your Pokémon are quite entertaining and they
+can entertain by winning the battle!
+
+|-----------------------------|
+|Elite Four Karen             |
+|Level 42 Umbreon (1773 EXP)  |
+|Level 42 Vileplume (1656 EXP)|
+|Level 45 Gengar (1831 EXP)   |
+|Level 44 Murkrow (1008 EXP)  |
+|Level 47 Houndoom (2053 EXP) |
+|You get: 4700G               |
+|-----------------------------|
+
+Karen has one Full Restore that she can use.
+
+Strategy VERSUS Umbreon: Umbreon is a dark type. It is weak to fighting and bug
+moves and is immune to psychic moves. You should be able to just use your
+highest-powered attack to beat Umbreon. Beware of Umbreon's Confuse Ray, which
+will confuse your Pokémon.
+
+Strategy VERSUS Vileplume: Vileplume is a grass and poison type. It is weak to
+fire and psychic moves. You should be able to just use your highest-powered
+attack to beat Vileplume, which may be flame wheels from Typhlosion if that was
+your starter.
+
+Strategy VERSUS Gengar: Gengar's a ghost type that's weak against ghost and dark
+moves. Don't use any normal attacks on it because it has no effect. Otherwise,
+use your highest-powered attack that's not a normal, poison, or bug move against
+Gengar.
+
+Strategy VERSUS Murkrow: Murkrow's a dark and flying type. Like Umbreon, it is
+weak to flying and bug moves and immune to psychic moves. As a flying type,
+Murkrow is also immune to ground moves. Otherwise, you can use your
+highest-powered attack against Murkrow. Consider using ice or electric moves as
+they are super effective.
+
+Strategy VERSUS Houndoom: Houndoom's a fire and dark type who will be holding a
+Sitrus Berry. You should be able to just use your highest-powered attack if it's
+not a psychic, fire, or grass move.
+
+Congrats on beating the Elite Four. Guess you're now more elite than them now!
+Now, heal all your Pokémon. The final challenge for Pokémon League champion
+begins. Three of Champion Lance's Pokémon are actual dragon types, while the
+rest are essentially dragons but not dragon types.
+
+|------------------------------|
+|Champion Lance                |
+|Level 44 Gyarados (2017 EXP)  |
+|Level 47 Dragonite (2194 EXP) |
+|Level 47 Dragonite (2194 EXP) |
+|Level 46 Aerodactyl (1990 EXP)|
+|Level 46 Charizard (2059 EXP) |
+|Level 50 Dragonite (2335 EXP) |
+|You get: 5000G                |
+|------------------------------|
+
+Lance has three Full Restores on hand for the battle.
+
+Strategy VERSUS Gyarados: Gyarados is two levels higher than in the original
+game. Gyarados is a water and flying type, not a dragon type. Avoid using fire,
+water, or ground moves against it. Use the highest powered move from your
+highest level Pokémon otherwise. Electric and rock moves would be super
+effective.
+
+Strategy VERSUS Dragonites: Do not use fire, water, grass, or ground type moves
+due to Dragonite's dual dragon/flying typing. You can otherwise use the highest
+powered move of any other type from your highest level Pokémon. Ice and rock
+types are particularly useful moves against the Dragonites, especially because
+dragon and flying types are both weak against ice moves.
+
+The Dragonites are strong. They have a powerful Hyper Beam move (although it
+must recharge), it can paralyze your Pokémon with Thunder Wave, and it also has
+strong Dragon Rush and Thunder attacks. The Level 50 Dragonite has Safeguard and
+Outrage instead. Have Full Heals on hand 
+for the fight. One of the Dragonites may be holding a Sitrus Berry.
+
+Strategy VERSUS Aerodactyl: Aerodactyl is a rock and flying type, not a dragon
+type. Use the highest powered move from your highest level Pokémon otherwise.
+Ice and water moves are ideal.
+
+Strategy VERSUS Charizard: Charizard's weaknesses as a Fire/Flying type are
+Water, Electric, and Rock, especially Water and Rock.
+
+Congratulations! You have defeated the Elite Four! Lance doesn't seem angry that
+he lost but rather, happy that you were the one to become the new champ. He
+congratulates you.
+
+After defeating the Johto League Elite Four members, you've beaten the first
+half of the game. A news reporter named Mary wants to interview you, but Lance
+shoos you into the other room to be inducted into the Hall of Fame. Guess Mary
+won't get to interview you after all! Professor Oak also arrives just to hang
+out. Lance will then enter your entire Pokémon lineup into the Hall of Fame,
+even the ones that sat there on the bench and watched your Lv 66 starter do all
+the hard work.
+
+The credits will roll, while playing some snappy music, and finally the game
+will say "The End". Don't turn your DS off yet, because the game isn't actually
+over.
+
+==============================================================================
+==============================================================================
+==============================================================================
+
+(c25)
+-----------------------------------------------

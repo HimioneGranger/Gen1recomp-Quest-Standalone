@@ -24,9 +24,10 @@ for the launcher to acknowledge on refocus.
 
 `RomImporter` then imports on refocus / Choose:
 
-- **ROMs** via `findPendingRom`: only a 1 MiB `.gb` whose SHA-1 maps to a
-  version that is **not** yet ready counts as pending. A leftover
-  `picked_rom.gb` from Red therefore cannot block Blue's Choose (issue #167).
+- **ROMs** via `findPendingRom`: only a 1 MiB (Red/Blue/Yellow) or 2 MiB
+  (Gold) `.gb`/`.gbc` whose SHA-1 maps to a version that is **not** yet ready
+  counts as pending. A leftover `picked_rom.gb` from Red therefore cannot
+  block Blue's Choose (issue #167).
 - **Mods** via `findPendingMod`: Prefer `picked_mod.zip`, or (on Choose) any
   other `.zip` at the save-dir root (USB copy).
 - **Saves** via `findPendingSav`: Prefer `picked_save.sav`, or (on Choose) any
@@ -41,13 +42,15 @@ same system picker and install the chosen archive on return.
 
 ## Tab structure
 
-`self.tab` is one of `"red"`, `"blue"`, `"yellow"`, `"mods"`. The tab bar
-draws one chip per game plus a MODS chip and rebuilds `self.tabRects` every
-frame so `mousepressed` can dispatch clicks; switching tabs mid-import is
-allowed (a dropped ROM still routes by SHA-1 regardless of which tab shows).
-On **NX**, **Scan again** is stricter: it only starts an import whose SHA-1
-matches the open game tab, so a shared `imports/` folder with Red+Yellow
-cannot jump Yellow → Red.
+`self.tab` is one of `"red"`, `"blue"`, `"yellow"`, `"gold"`, `"mods"`,
+`"find"`. The tab bar draws one chip per game plus MODS / FIND chips and
+rebuilds `self.tabRects` every frame so `mousepressed` can dispatch clicks;
+switching tabs mid-import is allowed (a dropped ROM still routes by SHA-1
+regardless of which tab shows). Yellow uses the bright gold rail colour;
+Gold (Gen 2) uses a deeper amber so the two stay distinct. On **NX**,
+**Scan again** is stricter: it only starts an import whose SHA-1 matches the
+open game tab, so a shared `imports/` folder with Red+Yellow cannot jump
+Yellow → Red.
 
 - A game tab (`_drawGamePanel`) shows the ROM card, the SAVE FILES card, the
   Play button, and the SAVE SLOT card in a responsive two-column grid (see

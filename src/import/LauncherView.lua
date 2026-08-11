@@ -322,6 +322,7 @@ end
 -- the label is read.  Unknown versions fall back to the commit green.
 local CART_COLOR = {
   red = PAL.railRed, blue = PAL.railBlue, yellow = PAL.railGold,
+  gold = PAL.railAmber,
 }
 local function cartColor(version)
   return CART_COLOR[version] or PAL.green
@@ -330,7 +331,40 @@ end
 local function modStatusColor(status)
   if status == "ok" then return Strings("Ready"), PAL.green end
   if status == "conflict" then return Strings("Conflict"), PAL.red end
+  -- not a fault: the mod is intact, this is simply not a game it is for
+  -- (src/mods/ModTargets.lua)
+  if status == "other_game" then return Strings("Not for this game"), PAL.muted end
   return Strings("Incompatible"), PAL.yellow
+end
+
+-- MODS panel scope row: which game the list is answering for.  Drawn from
+-- GameVersion.ORDER so a new game needs nothing here.
+local function buildModScopeRow(imp, x, y, w, m)
+  local GameVersion = require("src.core.GameVersion")
+  local h = math.max(Kit.tapMin(), math.floor(26 * m.s))
+  local gap = math.floor(6 * m.s)
+  local label = Strings("Show for:")
+  Kit.text("small", label, x, y + (h - Kit.textHeight("small")) / 2, PAL.muted)
+  local cx = x + Kit.textWidth("small", label) + math.floor(10 * m.s)
+  local options = { { id = nil, label = Strings("All games") } }
+  for _, version in ipairs(GameVersion.ORDER) do
+    if imp.ready and imp.ready[version] then
+      options[#options + 1] =
+        { id = version, label = GameVersion.info(version).label }
+    end
+  end
+  if #options < 2 then return 0 end
+  for _, opt in ipairs(options) do
+    local cw = Kit.textWidth("micro", opt.label) + math.floor(18 * m.s)
+    if Kit.chip(cx, y, cw, h, opt.label, imp.modScope == opt.id, PAL.lineStrong,
+                "mod-scope-" .. tostring(opt.id or "all")) then
+      local want = opt.id
+      queueAction(imp, "mod-scope-" .. tostring(want or "all"),
+        function() imp:_setModScope(want) end)
+    end
+    cx = cx + cw + gap
+  end
+  return h + math.floor(8 * m.s)
 end
 
 local function findActionFor(entry, installedVersion)
@@ -465,28 +499,48 @@ local function buildHeader(imp, m)
     or love.graphics.newImage("assets/launcher/mods.png")
   imp._findIcon = imp._findIcon
     or love.graphics.newImage("assets/launcher/find.png")
-  -- The three game tabs keep their cartridge colours -- that is the one piece
-  -- of brand identity in the launcher, and "the red one" is how people
-  -- actually refer to these.  The colour rides the outline and the glyph at
-  -- rest and becomes the fill when active, the same rule the buttons follow.
+  -- Game tabs keep their cartridge colours -- that is the one piece of brand
+  -- identity in the launcher, and "the red one" is how people actually refer
+  -- to these.  The colour rides the outline and the glyph at rest and becomes
+  -- the fill when active, the same rule the buttons follow.  Yellow stays the
+  -- bright cart gold; Gold (Gen 2) uses the deeper amber so the two do not
+  -- collide.
   local tabs = {
     { id = "red",    letter = "R", label = Strings("RED"),    color = PAL.railRed },
     { id = "blue",   letter = "B", label = Strings("BLUE"),   color = PAL.railBlue },
     { id = "yellow", letter = "Y", label = Strings("YELLOW"), color = PAL.railGold },
+    { id = "gold",   letter = "G", label = Strings("GOLD"),   color = PAL.railAmber },
     { id = "mods",   icon = imp._modsIcon, label = Strings("MODS") },
     { id = "find",   icon = imp._findIcon, label = Strings("FIND MODS") },
   }
   local tabH = m.chip
   local tx = m.x + m.pad
   local ty = y + math.floor(6 * m.s)
+  -- Wrap the strip instead of running off the edge.
+  --
+  -- Six tabs used to escape a phone width when an active icon tab spelled its
+  -- name out (FIND MODS at 412x915).  Game tabs (R/B/Y/G) stay glyph-only even
+  -- when active; only MODS / FIND MODS expand.  Still wrap when the next tab
+  -- would not fit so the divider below moves with the row count.
+  local tabLeft = tx
+  local tabRight = m.x + m.w - m.pad
+  local tabGap = math.floor(6 * m.s)
+  local tabRowGap = math.floor(4 * m.s)
   for _, t in ipairs(tabs) do
     local active = imp.tab == t.id
     local key = "tab-" .. t.id
-    local labelW = Kit.textWidth("tab", t.label)
-    -- The active tab spells its name out; inactive tabs are the glyph alone,
-    -- so five tabs fit a phone width without wrapping.
-    local w = active and (tabH + math.floor(8 * m.s) + labelW + math.floor(12 * m.s))
+    -- Cartridge tabs stay square (letter only).  Icon tabs still expand to
+    -- show MODS / FIND MODS when selected.
+    local expand = active and t.icon ~= nil
+    local labelW = expand and Kit.textWidth("tab", t.label) or 0
+    local w = expand and (tabH + math.floor(8 * m.s) + labelW + math.floor(12 * m.s))
       or tabH
+    -- Never wrap the first tab of a row: if one tab alone is wider than the
+    -- panel there is nowhere better to put it, and wrapping would loop.
+    if tx > tabLeft and tx + w > tabRight then
+      tx = tabLeft
+      ty = ty + tabH + tabRowGap
+    end
     Kit._audit("control", tx, ty, w, tabH, key)
     local focused = Kit.focusable(key, tx, ty, w, tabH)
     local hot = focused or Kit.hover(tx, ty, w, tabH)
@@ -513,16 +567,17 @@ local function buildHeader(imp, m)
       Kit.textCenter("tab", t.letter, tx,
         ty + (tabH - Kit.textHeight("tab")) / 2, tabH, ink)
     end
-    if active then
+    if expand then
       Kit.text("tab", t.label, tx + tabH + math.floor(4 * m.s),
         ty + (tabH - Kit.textHeight("tab")) / 2, ink)
     end
     if Kit.press(tx, ty, w, tabH) or Kit._activateId == key then
       queueAction(imp, key, function() imp:_switchTab(t.id) end)
     end
-    tx = tx + w + math.floor(6 * m.s)
+    tx = tx + w + tabGap
   end
 
+  -- `ty` has walked down with the wraps, so this stays correct at one row too.
   y = ty + tabH + math.floor(8 * m.s)
   Theme.fill(m.x, y, m.w, 1, PAL.line, Theme.A.hairline)
   return y + math.floor(10 * m.s)
@@ -1143,6 +1198,8 @@ local function buildModsPanel(imp, x, y, w, availH, m)
   cy = cy + Kit.textWrapped("small", noticeText, x, cy, w, noticeCol, 2)
     + math.floor(8 * m.s)
 
+  cy = cy + buildModScopeRow(imp, x, cy, w, m)
+
   if #mods == 0 then
     Kit.emptyBox(x, cy, w, math.floor(110 * m.s), imp:_modsEmptyHint())
     return
@@ -1241,12 +1298,21 @@ local function buildModsPanel(imp, x, y, w, availH, m)
     local textW = inner - chipsW - math.floor(12 * m.s)
 
     local badgeW = Kit.textWidth("micro", mod.badge) + math.floor(12 * m.s)
+    -- the games the mod is for, beside its category: the same chip the
+    -- in-game manager shows (src/mods/ModTargets.lua)
+    local gamesW = mod.targets
+      and Kit.textWidth("micro", mod.targets) + math.floor(12 * m.s) or 0
     local nameShown = Kit.ellipsize("button", mod.name,
-      textW - badgeW - math.floor(8 * m.s))
+      textW - badgeW - gamesW - math.floor(12 * m.s))
     Kit.text("button", nameShown, px, ly, PAL.heading)
-    Kit.tag(px + Kit.textWidth("button", nameShown) + math.floor(8 * m.s), ly,
-      badgeW, Kit.textHeight("button"), mod.badge,
+    local tagX = px + Kit.textWidth("button", nameShown) + math.floor(8 * m.s)
+    Kit.tag(tagX, ly, badgeW, Kit.textHeight("button"), mod.badge,
       mod.experimental and PAL.yellow or PAL.muted)
+    if mod.targets then
+      Kit.tag(tagX + badgeW + math.floor(4 * m.s), ly, gamesW,
+        Kit.textHeight("button"), mod.targets,
+        mod.targetsHere == false and PAL.steel or PAL.blue)
+    end
     ly = ly + Kit.textHeight("button") + math.floor(4 * m.s)
 
     -- version + status + update state

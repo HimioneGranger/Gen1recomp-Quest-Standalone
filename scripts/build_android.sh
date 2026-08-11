@@ -207,7 +207,7 @@ pack_game_love() {
   (cd "$ROOT" && zip -q -9 -r "$LOVE_FILE" \
     main.lua conf.lua src data assets tools/save-editor \
     tools/rom_manifest.json tools/rom_manifest_blue.json \
-    tools/rom_manifest_yellow.json \
+    tools/rom_manifest_yellow.json tools/rom_manifest_gold.json \
     -x '*.DS_Store' -x '*/.git/*' -x '*/.DS_Store' \
     -x 'data/generated/*' -x 'assets/generated/*')
   # List once and match against the captured text: piping unzip straight into
@@ -227,6 +227,8 @@ pack_game_love() {
     || fail "game.love is missing the save editor (Edit on a save row would crash)"
   grep -qx "$YELLOW_MANIFEST_RELATIVE" <<< "$archive_entries" \
     || fail "game.love is missing the Yellow ROM import manifest"
+  grep -qx 'tools/rom_manifest_gold.json' <<< "$archive_entries" \
+    || fail "game.love is missing the Gold ROM import manifest"
   # This gate exists because the launcher's UI toolkit once lived outside
   # src/ (libs/flexlove) and was added to scripts/build.sh's payload and to
   # no other packager, so Android and iOS built an APK/IPA whose launcher

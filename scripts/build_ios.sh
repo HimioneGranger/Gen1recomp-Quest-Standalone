@@ -217,6 +217,14 @@ apply_ios_branding() {
   cp "$OVERLAY_PLIST" "$dest"
 }
 
+verify_documents_overlay() {
+  local sharing in_place
+  sharing="$(/usr/libexec/PlistBuddy -c 'Print :UIFileSharingEnabled' "$OVERLAY_PLIST" 2>/dev/null || true)"
+  in_place="$(/usr/libexec/PlistBuddy -c 'Print :LSSupportsOpeningDocumentsInPlace' "$OVERLAY_PLIST" 2>/dev/null || true)"
+  [ "$sharing" = "true" ] && [ "$in_place" = "true" ] \
+    || fail "iOS plist overlay must enable UIFileSharingEnabled and LSSupportsOpeningDocumentsInPlace"
+}
+
 apply_ios_icon() {
   local source="$ROOT/assets/logo/gen1recomp_cover.png"
   local target="$XCODE_DIR/Images.xcassets/iOS AppIcon.appiconset"
@@ -578,6 +586,25 @@ verify_native_bridge() {
   say "native bridge present (pickFile, createFile)"
 }
 
+verify_documents_configuration() {
+  local app="$1"
+  local plist="$app/Info.plist"
+  local sharing in_place
+  [ -f "$plist" ] || fail "built iOS app is missing Info.plist: $plist"
+  sharing="$(/usr/libexec/PlistBuddy -c 'Print :UIFileSharingEnabled' "$plist" 2>/dev/null || true)"
+  in_place="$(/usr/libexec/PlistBuddy -c 'Print :LSSupportsOpeningDocumentsInPlace' "$plist" 2>/dev/null || true)"
+  [ "$sharing" = "true" ] && [ "$in_place" = "true" ] \
+    || fail "built iOS app does not expose its Documents folder in $(basename "$app")"
+  say "public Documents exposure present (file sharing + in-place access)"
+}
+
+verify_game_payload() {
+  local app="$1"
+  [ -s "$app/game.love" ] \
+    || fail "built iOS app is missing game.love: $app"
+  say "game.love present ($(du -h "$app/game.love" | cut -f1))"
+}
+
 run_xcodebuild() {
   local config sdk destination
   if $RELEASE; then
@@ -618,6 +645,8 @@ run_xcodebuild() {
     PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID"
     MARKETING_VERSION="$marketing_version"
     CURRENT_PROJECT_VERSION="$project_version"
+    INFOPLIST_KEY_UIFileSharingEnabled=YES
+    INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace=YES
     ONLY_ACTIVE_ARCH=NO
     DISABLE_MANUAL_TARGET_ORDER_BUILD_WARNING=YES
   )
@@ -693,6 +722,8 @@ run_xcodebuild() {
     fi
   fi
 
+  verify_documents_configuration "$app"
+
   # Fuse even if the pbxproj wire-up failed,  LÖVE runs any bundled *.love.
   # Byte-compare, never just existence: xcodebuild's incremental Copy Bundle
   # Resources can leave a previous build's game.love in a surviving .app, and
@@ -703,6 +734,7 @@ run_xcodebuild() {
     cp "$LOVE_FILE" "$app/game.love"
   fi
 
+  verify_game_payload "$app"
   verify_native_bridge "$app"
 
   local dist_dir="$DIST/${config}-${sdk}"
@@ -774,6 +806,7 @@ install_to_device() {
 
 # --------------------------------------------------------------- main
 apply_ios_branding
+verify_documents_overlay
 apply_ios_icon
 say "applying iOS native bridge patches (picker/Files support)"
 python3 "$IOS_DIR/patch_love_src.py" || fail "patch_love_src.py failed"

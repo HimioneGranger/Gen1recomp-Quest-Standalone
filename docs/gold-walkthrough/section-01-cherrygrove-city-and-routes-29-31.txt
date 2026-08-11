@@ -1,0 +1,369 @@
+==============================================================================
+==============================================================================
+==============================================================================
+
+(c07)
+-----------------------------------------------
+---- 7 > Cherrygrove City and Routes 29-31 ----
+-----------------------------------------------
+
+Video Playthrough Link (Introduction through Violet City Gym):
+https://www.youtube.com/watch?v=dqJtkx8DcE0
+
+After you get your starting Pokémon, He says that Mr. Pokémon lives somewhere
+past Cherrygrove, the next city. Then you get Elm's phone number. He'll call you
+a few times over the course of the game. And just like in the Red, Blue, and
+Yellow games, the professor's assistant gives you something. In this case, it's
+a free potion. Potions can be used to heal your Pokémon up to 20 HP. Now leave
+the lab!
+
+|-------------|
+|New Bark Town|
+|-------------|
+
+After choosing your Pokémon carefully, it seems your stupid rival's still
+outside the lab. Head west onto Route 29, where your first battles with wild
+Pokémon will begin.
+
+|--------|
+|Route 29|
+|--------|
+
+Pokémon found on Route 29:
+
+#016 Pidgey
+#019 Rattata
+#161 Sentret
+#163 Hoothoot
+#187 Hoppip
+
+Items found on Route 29:
+
+Berry
+Pink Bow
+Potion
+
+|-----------|-----------|--------|------------------|
+| Chikorita | Cyndaquil |Totodile| THE              |
+|-----------|-----------|--------| STARTING         |
+| Tackle    | Tackle    | Scratch| Pokémon          |
+| Growl     | Leer      | Leer   | TYPES            |
+|-----------|-----------|--------|------------------|
+|Move    Type   PP Power Description                |
+|---------------------------------------------------|
+|Tackle  Normal 35 35    A full-body charge attack. |
+|Scratch Normal 35 40    Scratches with sharp claw. |
+|Growl   Normal 40 --    Reduces the foe's attack.  |
+|Leer    Normal 30 --    Reduces the foe's defense. |
+|---------------------------------------------------|
+
+Here you will fight all different varieties of Pokémon, depending what time of
+day it is, or what day it is. Note that the battle system looks all cool now
+because it looks far more obvious how much HP you have, and how much EXP you
+need your Pokémon to get before they advance to the next level. The EXP meter is
+below the HP meter. Also note the new gender differences in Pokémon. 
+
+In any case, you'll want your starting Pokémon to be at Level 8 by the time you
+reach Cherrygrove City, so keep training. If you're new to the Pokémon world,
+you might also want to talk to the trainers on the path, as they give good
+advice. When you're on Route 29, to the north is Route 46. You can go there and
+visit if you'd like, but it'll be a pain to defeat any Pokémon there because you
+only have normal moves. The berry is in the tree in the northwest, the potion is
+in the northeast.
+
+Thard_Verad adds, "Berry and Apricorn trees regenerate every day so don't be
+afraid to pick them. And go back tomorrow and pick them again!"
+
+Remember to have your starting Pokémon at Level 8 before you pass through
+Cherrygrove City. You really need the experience. Keep heading west until you
+arrive in...
+
+|----------------|
+|Cherrygrove City|
+|----------------|
+
+Items found in Cherrygrove City:
+
+Map Card
+
+See that man at the entrance to the city? Talk to him and he will show you
+around the city and some key Pokémon concepts, as well as places, like the
+Pokémon Center, the PoKeMart, the routes, the sea, and his house. Most
+importantly, you get the Map Card when he gives you it at the end. Then go into
+the Pokémon Center, and heal your starting Pokémon by talking to the nurse.
+Don't bother trying to get Pokeballs because they aren't being sold just yet. 
+
+Head west then north up Route 30 when you're at Level 8. If you're not, go back
+to Route 29, fight till your starter is about to faint, heal again at the
+Pokémon Center in Cherrygrove City , and then head up Route 30, since you can't
+buy anything from the PoKeMart yet.
+
+|--------|
+|Route 30|
+|--------|
+
+Pokémon found on Route 30:
+
+#010 Caterpie
+#011 Metapod
+#016 Pidgey
+#019 Rattata
+#165 Ledyba (Silver only, morning only)
+
+Items found on Route 30:
+
+Antidote
+Berry (2X)
+Mystery Egg
+PoKeDeX
+PSNCure Berry
+
+Welcome to Route 30! Reading the sign, you'll notice this is the midpoint route
+between Cherrygrove City and Violet City. On this route, your starter Pokémon
+should reach Level 10 by the time you get back to Cherrygrove City. Go a bit up
+from the sign and you'll find a house with a tree next to it. Grab the berry
+next to it and then enter the house for another berry.
+
+Don't actually use them, though. Potions are better most of the time. Just above
+the house is an Antidote. Take that and head up the right fork. On the left
+fork, you'd see a guy that will tell you that he trains his Pokémon, as well as
+two boys battling on the path. You can't pass that area just yet. Going up the
+right path, you'll eventually spot a house. To the left is a tree containing a
+PSNCure Berry. Take that, then enter the house. 
+
+You'll find Mr. Pokémon and Professor Oak inside. Mr. Pokémon gives you the
+Mystery Egg, which Professor Elm wants to see. Apparently, the Daycare Service
+gave Mr. Pokémon that Mystery Egg. This is the reason you must go back to
+Professor Elm later, because he knows the evolutionary stuff even better than
+Professor Oak! Wow, where'd he come from? Professor Oak wants you to help him
+track down more Pokémon, and gives you the Pokedex. How dependable you are! It's
+basically an encyclopedia, dictionary, and recorder all in one, if that makes
+any sense. Professor Oak has to go for a radio show in Goldenrod, but Mr.
+Pokémon will heal your Pokémon before you leave.
+
+Right when you leave the door, Professor Elm will give you a call on your cell
+phone. He tells you that something terrible has happened in the lab. Now that
+you're Professor Elm's 911 phone contact, you'll want to quickly head back to
+New Bark Town. Consider training up  your Pokémon to Level 10 before you even
+exit Cherrygrove City onto Route 29. Keep training and heal at Cherrygrove's
+Pokémon Center if you need to first.
+
+|----------------|
+|Cherrygrove City|
+|----------------|
+
+Heal at the Pokémon Center. Do not forget this. After your Level 10 Pokémon is
+prepared for combat, exit Cherrygrove City to the east. Something stops you. You
+notice that it's your rival. He is currently named ???. I've never met anyone
+with that name before. I wonder who named him that? He calls you a wimp, but I
+think he's the wimp around here. Your Level 10 Starter should completely destroy
+his Level 5 one. XD
+
+|------------------------|
+|Rival                   |
+|Level 5 Starter (84 EXP)|
+|You get: 300G           |
+|------------------------|
+
+Well, that was an easy battle. You probably lost less than 10HP. Now that you've
+beaten him, he gets past you and now you can exit to Route 29 again. No way
+he'll be the world's best Pokémon trainer.
+
+Moving forward, you will want to be cognizant of starter type weaknesses. Think
+of it like paper-rock-scissors. Water beats fire. Fire beats grass. And grass
+beats water. Your rival will always have the starter that can use super
+effective moves against your starter. Keep that in mind as you play through the
+game.
+
+|--------|
+|Route 29|
+|--------|
+
+Pokémon found on Route 29:
+
+#016 Pidgey
+#019 Rattata
+#161 Sentret
+#163 Hoothoot
+#187 Hoppip
+
+Keep heading east to New Bark Town. Keep training, too. Your starter should be
+Level 11 by the time you reach New Bark, go back through Route 29, and back to
+Cherrygrove.
+
+|-------------|
+|New Bark Town|
+|-------------|
+
+Go back to Professor Elm's laboratory and talk with the police officer in his
+lab. The police officer says he has talked to Professor Elm, and when you note
+that you've seen this person, you get to name your rival, the one who you just
+battled and had the Pokémon stolen from Professor Elm. Name him whatever name
+you feel like naming him. That's supposed to help the investigation, apparently.
+He goes by the name Silver in the Pokémon community, though.
+
+Talk to Professor Elm and give him the discovery from Mr. Pokémon, the Mystery
+Egg. Professor Elm is very surprised at you receiving a PoKeDeX. Only the
+trainers with the best potential get one, after all. You're amazing already!
+Professor Elm informs you that he thinks you have what it takes to try to get
+the eight badges for the Pokémon Johto League. 
+
+When you try to leave the lab, Professor Elm's aide will come up to you again
+and give you five Pokeballs to begin your journey. Excellent. Now go right to
+your home and talk to your mom, who will save your money for you. Now your
+journey truly begins. Head west back onto Route 29.
+
+|--------|
+|Route 29|
+|--------|
+
+Pokémon found on Route 29:
+
+#016 Pidgey
+#019 Rattata
+#161 Sentret
+#163 Hoothoot
+#187 Hoppip
+
+Start heading west back to Cherrygrove City again. Before you can even go
+anywhere, the first trainer will come up to you and teach you how to catch
+Pokémon, so if you need the tutorial, by all means let him teach you. It's a
+demonstration of him catching a Level 5 Rattata with a Pokeball. Nothing
+special, really. Catch both a Hoothoot and Rattata on this route or Route 46.
+Rattata's Super Fang can be a useful move early on. And Hoothoot can use the
+ater HM Fly.
+
+In the Items pocket, note that there are now 4 sections. The 2nd one contains
+the Pokeballs. Before you even fight a Pidgey, reach Level 11. Then, you are
+able to do more damage and keep the Level 3 Pidgey low on HP. Capture it. Don't
+go to Cherrygrove City yet. First, make a visit north onto Route 46.
+
+|--------|
+|Route 46|
+|--------|
+
+I know it doesn't look like much, but here there's a better chance of finding a
+Rattata. Don't use your Level 11 Starter to catch it, you'll just kill it in a
+hit. Instead, use Pidgey to weaken it, then capture it. An advanced strategy
+would be to keep leveling up your starter Pokémon and have an imbalanced Pokémon
+lineup. However, if you want to use a more balanced lineup, this could be your
+2nd Pokémon that you use in your game playthrough, as its super fang is super
+useful. Weaken it to the point where Pidgey is also weakened, then capture it.
+
+Head back onto Route 29, then west to Cherrygrove City.
+
+|----------------|
+|Cherrygrove City|
+|----------------|
+
+Heal at the Pokémon Center, then head north onto Route 30! If you want a more
+balanced Pokémon lineup where you level up more than one Pokémon, move that
+Pokémon to the #1 spot in your lineup. That way, Rattata will appear in battle
+first. You'll want to switch to your starter on turn 1, and then your starter
+will defeat the other Pokémon. Then both your Pokémon get equal experience and
+the Pokémon you are leveling up will grow quickly. Do this even in trainer
+battles.
+
+|--------|
+|Route 30|
+|--------|
+
+Pokémon found on Route 30:
+#010 Caterpie
+#011 Metapod
+#013 Weedle
+#014 Kakuna
+#016 Pidgey
+#042 Zubat
+#06? Poliwag
+#163 Hoot Hoot
+#165 Ledyba (Silver only, morning only)
+#167 Spinarak (Gold only, night only)
+
+OK, this time, you'll want to steer away from the right path but rather to the
+left path. On the left path, you'll meet some resistance. The two boys that were
+fighting earlier will both challenge you to battles, since they've already
+battled each other.
+
+Youngster Joey
+Level 4 Rattata (48 EXP)
+You get: 64G
+
+Note that now some of your money goes to your mom for safekeeping now. Move up
+to the next trainer for the next battle!
+
+Youngster Mikey
+Level 2 Rattata (24 EXP)
+Level 4 Rattata (48 EXP)
+You get: 64G
+
+Go pass the lady to the third trainer to fight!
+
+Bug Catcher Don
+Level 3 Caterpie (33 EXP)
+Level 3 Caterpie (33 EXP)
+You get: 48G
+
+Advance north onto Route 31.
+
+|--------|
+|Route 31|
+|--------|
+
+Pokémon found on Route 31:
+
+#010 Caterpie
+#011 Metapod
+#013 Weedle
+#014 Kakuna
+#016 Pidgey
+#042 Zubat
+#06? Poliwag
+#069 Bellsprout
+#163 Hoot Hoot
+#165 Ledyba (Silver only, morning only)
+#167 Spinarak (Gold only, night only)
+
+Items found on Route 31:
+
+Antidote
+Bitter Berry
+Pokeball
+Potion
+
+You'll find the entrance to Dark Cave at the beginning of Route 31, as well as a
+Potion. The Dark Cave won't really do you any good till you have the HM Flash,
+so wait it out and grab that Potion to the left of it. When you see two
+trainers, head south to where the item is and fight!
+
+Bug Catcher Wade
+Level 2 Caterpie (20 EXP)
+Level 2 Caterpie (20 EXP)
+Level 3 Weedle (33 EXP)
+Level 2 Caterpie (20 EXP)
+You get: 32G
+
+I'm not really clear on how these Bug Catchers are catching the bugs. Are they
+using their nets, or Pokeballs? Grab the Pokeball below the trainer, head back
+up to grab the Bitter Berry from the tree, then head west, through the house-ish
+entry, and into Violet City.
+
+|-----------|
+|Violet City|
+|-----------|
+
+Pokémon found in Violet City:
+
+#95 Onix
+
+Items found in Violet City:
+
+PRZCure Berry
+TM 31
+
+Heal your Pokémon. There is a GYM there in Violet City that uses Flying type
+Pokémon. Don't go there just yet, head over far north to a tower called the
+Sprout Tower. The experience you get up there will be very useful for the gym.
+
+(c08)
+-----------------------------------------------

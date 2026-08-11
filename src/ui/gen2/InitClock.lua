@@ -1,0 +1,364 @@
+-- The clock-setting screens (pokegold engine/rtc/timeset.asm).
+--
+-- Two screens out of one file, because the cart builds them out of one set of
+-- pieces: a Textbox with an up arrow above the value and a down arrow below
+-- it, the d-pad walking the value with wraparound, A confirming, and a YES/NO
+-- box that either takes the answer or drops back to the picker.
+--
+--   mode "clock"  InitClock, the first thing OakSpeech does
+--                 (engine/menus/intro_menu.asm OakSpeech: `farcall InitClock`).
+--                 Oak asks the hour, confirms it, asks the minutes, confirms
+--                 them, and reads the whole time back.
+--   mode "day"    SetDayOfWeek, the wheel Mom puts up when she hands over the
+--                 POKeGEAR (maps/PlayersHouse1F.asm `special SetDayOfWeek`).
+--
+-- Layout, transcribed from the hlcoord calls:
+--   clock hour     Textbox (3,7) 2x15, up arrow (11,7), down (11,10),
+--                  "<hour> o'clock" at (4,9)
+--   clock minutes  Textbox (11,7) 2x7, up arrow (15,7), down (15,10),
+--                  "<mm> min." at (12,9)
+--   day            Textbox (9,3) 2x9, up arrow (14,3), down (14,6),
+--                  the weekday at (10,5), question in the (0,12) 4x18 box
+--
+-- The answer is written through src/core/gen2/Clock.lua, which stores the same
+-- wStartHour / wStartMinute / wStartDay base the cart does.
+
+local Chrome = require("src.ui.gen2.Chrome")
+local Clock = require("src.core.gen2.Clock")
+local Strings = require("src.core.Strings")
+
+local InitClock = {}
+InitClock.__index = InitClock
+InitClock.isOpaque = true
+
+-- data/text/common_1.asm.  None of these are extracted: PrintText reaches them
+-- from engine code, so no script pointer walks them and the extractor never
+-- sees them.
+local TEXT = {
+  wokeUp = Strings.source(
+    "Zzz... Hm? Wha...?\nYou woke me up!"
+    .. "\fWill you check the\nclock for me?"),
+  whatTime = Strings.source("What time is it?"),
+  whatHours = Strings.source("What?\n%s?"),
+  howManyMinutes = Strings.source("How many minutes?"),
+  whoaMinutes = Strings.source("Whoa!\n%d min.?"),
+  -- OakText_ResponseToSetTime prints the time it has just been given and then
+  -- picks its line off the hour: NITE and before MORN_HOUR is "So dark...",
+  -- through DAY_HOUR is "I overslept!", and the rest of the day is "Yikes!".
+  soDark = Strings.source("%s!\nIt's so dark!"),
+  overslept = Strings.source("%s!\nI overslept!"),
+  yikes = Strings.source("%s!\nYikes! I over-\nslept!"),
+  whatDay = Strings.source("What day is it?"),
+  confirmDay = Strings.source("%s, is that right?"),
+}
+InitClock.TEXT = TEXT
+
+-- constants/misc_constants.asm:37-39.  DAY_HOUR is 10, not 9: it read 9 here,
+-- which moved Oak's line an hour early -- 10 o'clock answered "Yikes! I
+-- overslept!" where OakText_ResponseToSetTime's `cp DAY_HOUR + 1` still puts
+-- it in the plain "I overslept!" arm.  src/world/gen2/Palettes.lua carries the
+-- same three and has always had them right.
+local MORN_HOUR, DAY_HOUR, NITE_HOUR = 4, 10, 18
+
+-- data/text/day_of_week.asm order, which is wCurDay's own: SUNDAY is 0.
+local DAYS = {
+  "SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY",
+}
+InitClock.DAYS = DAYS
+
+function InitClock:wantsFillScale() return true end
+function InitClock:drawsWidescreen() return true end
+
+-- PrintHour (engine/rtc/timeset.asm:672) is GetTimeOfDayString + PlaceString,
+-- then AdjustHourForAMorPM as a left-aligned two-digit number.  So the cart
+-- prints the time-of-day WORD and a 1-12 hour -- "MORN 5" -- and never an
+-- AM/PM suffix.  Writing it as "5 AM" was what put the meridiem in the middle
+-- of the clock-set line, because InitClock.timeString appends ":mm" to this
+-- and Oak came out saying "5 AM:30".
+--
+-- AdjustHourForAMorPM still governs the number: 0 shows as 12, 13-23 lose 12,
+-- so midnight is "NITE 12" and not "NITE 0".
+--
+-- The word comes from src/world/gen2/Palettes.lua:clockDaytime, which already
+-- transcribes GetTimeOfDayString's own ladder (NITE below MORN_HOUR, MORN
+-- below DAY_HOUR, DAY below NITE_HOUR, NITE after) off the real constants.
+-- One source for it means the clock Oak reads out cannot disagree with the
+-- palette the world is lit by.
+function InitClock.hourString(hour)
+  local h = math.floor(hour or 0) % 24
+  local display = h % 12
+  if display == 0 then display = 12 end
+  local word = require("src.world.gen2.Palettes").clockDaytime(h)
+  return ("%s %d"):format(word, display)
+end
+
+function InitClock.oclockString(hour)
+  return InitClock.hourString(hour) .. " o'clock"
+end
+
+function InitClock.timeString(hour, minute)
+  return ("%s:%02d"):format(InitClock.hourString(hour),
+    math.floor(minute or 0) % 60)
+end
+
+-- .OakTimeSoDarkText / .OakTimeOversleptText / .OakTimeYikesText, in the ladder
+-- OakText_ResponseToSetTime walks them in.
+function InitClock.responseKey(hour)
+  local h = math.floor(hour or 0) % 24
+  if h < MORN_HOUR then return "soDark" end
+  if h <= DAY_HOUR then return "overslept" end
+  if h < NITE_HOUR then return "yikes" end
+  return "soDark"
+end
+
+-- opts: mode ("clock" | "day"), save, onDone(hour, minute) / onDone(day),
+-- autoConfirm (a driver's deterministic path: every step takes its default and
+-- answers YES).
+function InitClock.new(game, opts)
+  opts = opts or {}
+  local self = setmetatable({}, InitClock)
+  self.game = game
+  self.mode = opts.mode == "day" and "day" or "clock"
+  self.save = opts.save or (game and game.save)
+  self.onDone = opts.onDone
+  self.autoConfirm = opts.autoConfirm or false
+  self.hour = opts.hour or Clock.DEFAULT_HOUR
+  self.minute = opts.minute or Clock.DEFAULT_MINUTE
+  -- `xor a / ld [wTempDayOfWeek], a`: the wheel opens on SUNDAY.
+  self.day = opts.day or 0
+  -- YesNoBox's cursor, which opens on YES.
+  self.yesNo = 1
+  -- The cart opens on the "you woke me up" page and only then starts asking;
+  -- the day wheel has no preamble.
+  self.phase = self.mode == "day" and "day" or "intro"
+  -- Which page of the current question is showing.  PrintText pages a `para`
+  -- (a \f here) on a button press like any other text box, and Oak's opening
+  -- is three lines long over two of them.
+  self.page = 1
+  return self
+end
+
+-- The current question, split into its pages.
+function InitClock:pages()
+  local out = {}
+  for page in (self:question() .. "\f"):gmatch("(.-)\f") do
+    if page ~= "" then out[#out + 1] = page end
+  end
+  if #out == 0 then out[1] = "" end
+  return out
+end
+
+function InitClock:pageText()
+  local pages = self:pages()
+  return pages[math.min(self.page, #pages)] or ""
+end
+
+-- True while there is another page of the same question to show.
+function InitClock:morePages()
+  return self.page < #self:pages()
+end
+
+-- The value the picker is walking right now, and its wrap limit.
+function InitClock:value()
+  if self.phase == "hour" then return self.hour, 23 end
+  if self.phase == "minute" then return self.minute, 59 end
+  return self.day, 6
+end
+
+function InitClock:step(delta)
+  local value, last = self:value()
+  -- .AdvanceThroughMidnight / .DecreaseThroughMidnight: both ends wrap.
+  value = (value + delta) % (last + 1)
+  if self.phase == "hour" then self.hour = value
+  elseif self.phase == "minute" then self.minute = value
+  else self.day = value end
+end
+
+-- The line printed above the picker.
+function InitClock:question()
+  if self.phase == "intro" then return Strings(TEXT.wokeUp) end
+  if self.phase == "hour" then return Strings(TEXT.whatTime) end
+  if self.phase == "minute" then return Strings(TEXT.howManyMinutes) end
+  if self.phase == "day" then return Strings(TEXT.whatDay) end
+  if self.phase == "confirm-hour" then
+    return Strings(TEXT.whatHours, InitClock.oclockString(self.hour))
+  end
+  if self.phase == "confirm-minute" then
+    return Strings(TEXT.whoaMinutes, self.minute)
+  end
+  if self.phase == "confirm-day" then
+    return Strings(TEXT.confirmDay, DAYS[self.day + 1] or "?")
+  end
+  if self.phase == "response" then
+    return Strings(TEXT[InitClock.responseKey(self.hour)],
+      InitClock.timeString(self.hour, self.minute))
+  end
+  return ""
+end
+
+-- The value the picker box shows, or nil while a page is up with no picker.
+function InitClock:display()
+  if self.phase == "hour" then return InitClock.oclockString(self.hour) end
+  if self.phase == "minute" then return ("%d min."):format(self.minute) end
+  if self.phase == "day" then return DAYS[self.day + 1] or "?" end
+  return nil
+end
+
+function InitClock:confirming()
+  return self.phase == "confirm-hour" or self.phase == "confirm-minute"
+    or self.phase == "confirm-day"
+end
+
+function InitClock:finish()
+  if self.mode == "day" then
+    Clock.setWeekday(self.save, self.day)
+    if self.onDone then self.onDone(self.day) end
+    return
+  end
+  Clock.setTime(self.save, self.hour, self.minute)
+  if self.onDone then self.onDone(self.hour, self.minute) end
+end
+
+-- A on a picker confirms it, YES on a confirmation takes it, NO drops back to
+-- the picker it came from (`jr c, .loop` / `jr nc, .HourIsSet`).
+function InitClock:accept()
+  -- A on a page that has more behind it turns the page, the way `para` does.
+  if self:morePages() then
+    self.page = self.page + 1
+    return
+  end
+  self.page = 1
+  if self.phase == "intro" then
+    self.phase = "hour"
+  elseif self.phase == "hour" then
+    self.phase = "confirm-hour"
+  elseif self.phase == "confirm-hour" then
+    self.phase = "minute"
+  elseif self.phase == "minute" then
+    self.phase = "confirm-minute"
+  elseif self.phase == "confirm-minute" then
+    self.phase = "response"
+  elseif self.phase == "response" then
+    self:finish()
+  elseif self.phase == "day" then
+    self.phase = "confirm-day"
+  elseif self.phase == "confirm-day" then
+    self:finish()
+  end
+end
+
+function InitClock:decline()
+  if self.phase == "confirm-hour" then
+    self.phase = "hour"
+  elseif self.phase == "confirm-minute" then
+    self.phase = "minute"
+  elseif self.phase == "confirm-day" then
+    self.phase = "day"
+  end
+end
+
+function InitClock:update(_dt)
+  -- The driver path: no screen this new may be allowed to stall a scripted
+  -- run, so it walks itself to the end taking every default.
+  if self.autoConfirm then
+    self:accept()
+    return
+  end
+  local input = self.game and self.game.input
+  if not input then return end
+  if self:confirming() and not self:morePages() then
+    -- YesNoBox: the cursor walks two rows and B is NO.
+    if input:wasPressed("up") or input:wasPressed("down") then
+      self.yesNo = self.yesNo == 1 and 2 or 1
+    elseif input:wasPressed("a") then
+      if self.yesNo == 1 then self:accept() else self:decline() end
+      self.yesNo = 1
+    elseif input:wasPressed("b") then
+      self:decline()
+      self.yesNo = 1
+    end
+    return
+  end
+  if input:wasPressed("up") then
+    self:step(1)
+  elseif input:wasPressed("down") then
+    self:step(-1)
+  elseif input:wasPressed("a") then
+    self:accept()
+  end
+end
+
+-- ------------------------------------------------------------------- drawing
+
+-- The picker box: a Textbox with the value inside it, TIMESET_UP_ARROW on its
+-- top border and TIMESET_DOWN_ARROW three rows below.
+function InitClock:pickerBox()
+  if self.phase == "hour" then return 3, 7, 15, 2, 11, 4, 9 end
+  if self.phase == "minute" then return 11, 7, 7, 2, 15, 12, 9 end
+  if self.phase == "day" then return 9, 3, 9, 2, 14, 10, 5 end
+  return nil
+end
+
+-- TimeSetUpArrowGFX / TimeSetDownArrowGFX are two 1bpp tiles the cart loads
+-- OVER the ♂ and ♀ font cells for this screen only; the extractor carries the
+-- font page, not the replacements, so the pair are drawn rather than printed.
+-- Four pixel rows, widest at the base, which is what the two 1bpp tiles are.
+local ARROW_ROWS = { 1, 3, 5, 7 }
+
+local function arrow(tx, ty, up)
+  local G = love.graphics
+  local x, y = tx * 8, ty * 8
+  -- The arrow tile REPLACES the border tile it lands on (hlcoord 11, 7 is the
+  -- box's own top row), so the cell is cleared before it is drawn.
+  G.setColor(1, 1, 1, 1)
+  G.rectangle("fill", x, y, 8, 8)
+  G.setColor(0, 0, 0, 1)
+  for i, width in ipairs(ARROW_ROWS) do
+    local row = up and (i - 1) or (#ARROW_ROWS - i)
+    G.rectangle("fill", x + math.floor((8 - width) / 2), y + 2 + row, width, 1)
+  end
+  G.setColor(1, 1, 1, 1)
+end
+
+function InitClock:drawPanel()
+  Chrome.clear()
+  local value = self:display()
+  if value then
+    local bx, by, bw, bh, arrowX, tx, ty = self:pickerBox()
+    Chrome.textbox(bx, by, bw, bh)
+    -- The two arrows sit ON the border rows, which is why they are placed
+    -- after the box rather than inside it.
+    arrow(arrowX, by, true)
+    arrow(arrowX, by + bh + 1, false)
+    Chrome.print(value, tx, ty)
+  end
+  -- The question (and the confirmations) share the bottom textbox every other
+  -- Gold prompt uses.
+  Chrome.textbox(0, 12, 18, 4)
+  Chrome.printWrapped(self:pageText(), 1, 14, 18, 3)
+  if self:confirming() then
+    Chrome.box(14, 6, 6, 5)
+    Chrome.print("YES", 16, 7)
+    Chrome.print("NO", 16, 9)
+    Chrome.cursor(15, self.yesNo == 1 and 7 or 9)
+  end
+end
+
+function InitClock:draw()
+  self:drawPanel()
+end
+
+function InitClock:drawWidescreen(winW, winH)
+  local G = love.graphics
+  G.setColor(1, 1, 1, 1)
+  G.rectangle("fill", 0, 0, winW, winH)
+  local scale = Chrome.fitScale(winW, winH)
+  local ox, oy = Chrome.fitOrigin(winW, winH, scale)
+  G.push()
+  G.translate(ox, oy)
+  G.scale(scale, scale)
+  self:drawPanel()
+  G.pop()
+end
+
+return InitClock

@@ -59,10 +59,11 @@ local PAL = {
   red         = { 255, 80, 90 },   -- destructive
   blue        = { 90, 190, 255 },  -- links, in-panel navigation
   steel       = { 120, 120, 120 }, -- disabled
-  -- the tri-colour version rail is the one piece of brand colour that stays
+  -- the version rail is the one piece of brand colour that stays
   railRed     = { 255, 60, 72 },
   railBlue    = { 70, 150, 255 },
-  railGold    = { 255, 203, 5 },
+  railGold    = { 255, 203, 5 },   -- Yellow cartridge (bright)
+  railAmber   = { 218, 145, 32 },  -- Gold cartridge (deeper metal)
 }
 -- Semantic aliases kept so ported call sites read the same as before.
 PAL.cardBorder = PAL.line
@@ -244,12 +245,12 @@ function Theme.meter(x, y, w, h, pct, c)
   end
 end
 
--- The 4px tri-colour rail across the top of both windows: the only brand
--- colour on screen, and the one thing that says "this is the Gen 1 launcher".
+-- The 4px version rail across the top of both windows: the only brand
+-- colour on screen (Red / Blue / Yellow / Gold cartridge colours).
 function Theme.versionRail(x, y, w, h)
   if not G then return end
-  local bars = { PAL.railRed, PAL.railBlue, PAL.railGold }
-  local seg = w / 3
+  local bars = { PAL.railRed, PAL.railBlue, PAL.railGold, PAL.railAmber }
+  local seg = w / #bars
   for i, c in ipairs(bars) do
     Theme.fill(x + (i - 1) * seg, y, seg, h, c, 1)
   end

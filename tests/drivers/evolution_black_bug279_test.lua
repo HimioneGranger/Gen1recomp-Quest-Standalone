@@ -248,7 +248,7 @@ return function(game)
 
   -- ---- case 2: B-cancel settles on the OLD form's colours -----------------
   local karp = startEvo("MAGIKARP", "GYARADOS")
-  U.wait(24)
+  U.wait(100) -- past the 80-frame pre-animLoop delay before the poll starts
   U.hold(game, "b", 20) -- evolution.asm Evolution_CheckForCancel
   if not waitFor(function() return findText("stopped evolving") ~= nil end, 240) then
     check(false, "holding B prints \"stopped evolving\"")

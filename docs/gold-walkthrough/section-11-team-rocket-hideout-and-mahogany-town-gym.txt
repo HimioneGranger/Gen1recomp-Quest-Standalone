@@ -1,0 +1,334 @@
+---- 17 > Team Rocket Hideout and Mahogany Town Gym ----
+--------------------------------------------------------
+
+Video Playthrough Link (Mahogany Town & Lake of Rage):
+https://www.youtube.com/watch?v=z5_tkLJ0fvw
+
+Video Playthrough Link (Mahogany Town Gym):
+https://www.youtube.com/watch?v=CoPpbons5bY
+
+|-------------|
+|Mahogany Town|
+|-------------|
+
+Heal at the Pokémon Center and withdraw your Gyarados so that it's in your
+lineup. If you head to the middle of the town where a guy is selling things,
+you'll find Lance inside basically forcing his way through that house. He'll
+show you the secret stairway to Team Rocket's Hideout.
+
+If you're just leveling up your Starter, your lineup should look something like
+this:
+
+Level 44 Starter Evolution
+Level 30 Gyarados
+Level 21 Sudowoodo
+Level 20 Eevee
+Level 21 Tentacool
+Level 10 Kenya the Spearow
+
+If a more balanced lineup, it should now look something like this:
+
+Level 27 Starter Evolution
+Level 28 Sudowoodo
+Level 30 Eevee
+Level 30 Gyarados
+Level 31 Raticate
+Level 5 Pidgey
+
+|-------------------|
+|Team Rocket Hideout|
+|-------------------|
+
+Items in the Team Rocket Hideout:
+
+Ice Heal
+Hyper Potion
+Nugget
+Protein
+X Accuracy
+TM46
+
+You and Lance must now stop Team Rocket's operations, but you're still left on
+your own. Head downstairs and left after you do so. But you have been spotted.
+You intruder!
+
+Rocket Grunt (M)
+Level 17 Drowzee (368 EXP)
+Level 19 Zubat (219 EXP)
+You get: 760G
+
+A second Rocket Grunt runs out to greet you. Hooray. You see, every time you
+pass one of those statues, two Team Rocket grunts will fight you.
+
+Rocket Grunt (M)
+Level 16 Zubat (184 EXP)
+Level 17 Grimer (327 EXP)
+Level 18 Rattata (219 EXP)
+You get: 720G
+
+See? You really should read the dialogue. I'm not saying this as a hypocrite who
+doesn't read some of the dialogue himself. Anyway, you'll spot another statute
+while heading left. If you pass by that statue, you'll fight the same two Grunts
+again, with the Drowzee and Zubat, and the Zubat, Grimer, and Rattata. If you go
+down further, you'll fight a Rocket Grunt with many Rattatas. You could say that
+he's a Rattata connoisseur.
+
+Rocket Grunt (M)
+Level 16 Rattata (195 EXP)
+Level 16 Rattata (195 EXP)
+Level 16 Rattata (195 EXP)
+Level 16 Rattata (195 EXP)
+You get: 640G
+
+Does Team Rocket have an undercover Zubat, Grimer, and Rattata breeding
+operation? I mean, probably. No one wants to admit that publicly, because that's
+embarrassing. Anyway, if you head back past that statute and go down, you'll see
+a pattern of zig-zags that avoids the statutes and leads to a scientist with
+glasses. We know he's smart because he's wearing glasses. Let's fight him and
+get him to give us some answer.
+
+Scientist Jed
+Level 20 Magnemite (381 EXP)
+Level 20 Magnemite (381 EXP)
+Level 20 Magnemite (381 EXP)
+You get: 2000G
+
+Talk to the scientist again. He'll tell you about Warp Panels that can take you
+back to the entrance. I told you he was smart. Then go to the computer next to
+him and press A to turn off the switch for the statues. Good thing the scientist
+isn't a security expert. Now, no more Team Rocket Grunts will  swarm you every
+time you reach a statue.
+
+You can now roam around the floor like you own the place. Pick up the X
+Accuracy, Hyper Potion, and Nugget. Then make your way around to the
+southwest part of the room and take the staircase down to the next floor
+(Negative Floor 2). Lance, who is not only a Pokémon champion but also a healer,
+will meet with you and heal all your Pokémon. What a nice, kind-hearted guy.
+Then head to the right and beat both Rocket Grunts.
+
+Rocket Grunt (M)
+Level 18 Venonat (288 EXP)
+Level 18 Venonat (288 EXP)
+You get: 720G
+
+Now head to the right.
+
+Rocket Grunt (M)
+Level 18 Golbat (658 EXP)
+You get: 720G
+
+Head downstairs to Negative Floor 3. Lance says we need two passwords to unlock
+the doors on this level. Unfortunately, one of the passwords is not 123456. But
+if you beat the right Rocket Grunts, they'll spill the beans. Fortunately for
+you, the hero, they are both on this level. Go up and left and you can pick up a
+Protein and an Ice Heal. Then loop all the way back down and to the right, go
+past the trainer that Lance beat up for more intel, and go up to fight the
+scientist.
+
+Scientist Ross
+Level 22 Koffing (537 EXP)
+Level 22 Koffing (537 EXP)
+You get: 2200G
+
+Head up to fight the Team Rocket Grunt above that. She says she MIGHT have the
+password. She does! You've got to give that to the Team Rocket Grunts. They
+aren't liars. They are, in fact, people of integrity.
+
+Rocket Grunt (F)
+Level 18 Ekans (238 EXP)
+Level 18 Gloom (508 EXP)
+You get: 720G
+
+Now that you've beat her, you have the password after you talk to her. It's
+SLOWPOKETAIL. I know, it's shocking. Then head left for your next battle.
+
+Scientist Mitch
+Level 24 Ditto (313 EXP)
+You get: 2400G
+
+Head left to the final trainer to the left of the table. Fight him.
+
+Rocket Grunt (M)
+Level 19 Raticate (471 EXP)
+You get: 760G
+
+Talk to him again now that you've beat him, and he'll give you his password
+(RATICATE TAIL). Get the items (Dire Hit and Full Heal), go up the stairs at the
+upperright part of the floor, then head left on Negative Floor 2. Fight the Team
+Rocket member that spots you...or that you reach.
+
+Rocket Grunt (M)
+Level 17 Rattata (207 EXP)
+Level 17 Rattata (207 EXP)
+Level 17 Zubat (196 EXP)
+You get: 680G
+
+Head up the stairs to Negative Floor 1. Head right and then before you reach the
+locked door, your rival will come and talk to you. He can't battle you though,
+cause Lance just destroyed him. "He said I don't love and trust my Pokémon
+enough." Press A at the door to open it and go into Giovanni's office. No idea
+where Giovanni is, but there's a Rocket Executive that you can square off with.
+
+Rocket Executive (M)
+Level 22 Zubat (253 EXP)
+Level 24 Raticate (595 EXP)
+Level 22 Koffing (537 EXP)
+You get: 1584G
+
+He quickly runs off after he loses. Talk to the Murkrow next to the Rocket
+Executive and it'll give you the final password, HAIL GIOVANNI. Now head to the
+second stairs that you did NOT come out of, and grab TM46 from there, then go
+back down to the same floor as where you just beat the executive.
+
+Head back the way you came, past the spinning Team Rocket member, and go back
+upstairs. Go back down to the floor with the gate blocking you from entering the
+area with machines inside. We're going ALL the way back to where you met Lance
+for the second time within the Team Rocket hideout. It's the second floor where
+Lance healed your Pokémon.
+
+You'll find a passworded door right there. Open it, and you'll quickly get
+surrounded by two Team Rocket executives. Now you'd have to take both
+executives, but Lance comes just in time. This time, you're fighting the female
+Team Rocket boss while Giovanni's apprentice takes on Lance. Spreading the fun?
+The battle isn't too difficult though, so just defeat her with any combo.
+
+Rocket Executive (F)
+Level 23 Arbok (724 EXP)
+Level 23 Gloom (649 EXP)
+Level 25 Murkrow (573 EXP)
+You get: 1800G
+
+She later says that you would be powerful enough to be a Rocket Executive. Well,
+not quite. You're strong enough to run all of Team Rocket. But you are a kind
+soul. You're here to do good for the world. After the Team Rocket Executives
+lose, they run away like the losers that they are. Lance will then talk to you
+and he'll want you to help him destroy the Electrodes supplying the base with
+electricity. 
+
+Lance runs to the right to take the Electrodes on the right, so you'll take the
+left. The Electrodes will typically try to Self Destruct, so move your Sudowoodo
+into the first spot temporarily as Sudowoodo can absorb a lot of damage. If
+you're lucky enough to have any Electrode not use Self Destruct, you can try to
+catch it with a Great Ball.
+
+Level 23 Electrode (492 EXP)
+
+Level 23 Electrode (492 EXP)
+
+Level 23 Electrode (492 EXP)
+
+The Lake is saved, and Lance thinks you're the hero. Why thank you, Lance. You
+are the hero that the world deserves! Lance gives you HM06 Waterpool, an item he
+just found lying around in the hideout. Excellent. You'll need the 7th badge
+from the Mahogany City Gym to use it, though. Follow Lance's way out to the
+stairs, then use the warp next to it to head out of the hideout. You know your
+way out now.
+
+|-------------|
+|Mahogany Town|
+|-------------|
+
+Heal at the Pokémon Center, then enter the Mahogany Town Gym. I hope all those
+trips to the ice rink as a kid pay off, because you'll be sliding all over the
+place. This gym will actually have lower-level Pokémon than Jasmine. Fire and
+grass moves will be effective. It's an ice gym!
+
+Skate to the left to fight the very first trainer.
+
+Boarder Ronald
+Level 24 Seel (513 EXP)
+Level 24 Seel (513 EXP)
+Level 25 Dewgong (942 EXP)
+You get: 1728G
+
+Slide up twice, then right one, then down one, then left one to fight another
+trainer.
+
+Boarder Douglas
+Level 24 Shellder (498 EXP)
+Level 25 Cloyster (1087 EXP)
+Level 24 Shellder (498 EXP)
+You get: 1728G
+
+Talk to the trainer again to get Gym Leader Pyrce's secret. He meditates under a
+waterfall every day. When you're listening to music as you meditate, it's
+actually a recording from Pryce's special waterfall. Now slide down, then to the
+right.
+
+Boarder Brad
+Level 26 Swinub (433 EXP)
+Level 26 Swinub (433 EXP)
+You get: 1872G
+
+Slide once to the right, then down to face another trainer.
+
+Skier Clarissa
+Level 28 Dewgong (1056 EXP)
+You get: 2016G
+
+Head up twice, then slide left to the final trainer.
+
+Skier Roxanne
+Level 28 Jynx (822 EXP)
+You get: 2016G
+
+Slide down and out of the gym to heal at the Pokémon Center before you return to
+fight the gym leader. Go to just left of the left pillar then go up, up, right,
+down, left, up and finally right. You will be standing in front of the gym
+leader in your ice skates. Your time falling down at the ice rink as a kid did
+pay off after all!
+
+Good luck against Pryce. This will be a piece of cake after fighting Jasmine. He
+thinks he's amazing because he has been fighting since before you were born. But
+you're an underage kid who's been biking around the world on a rental bike. How
+could you be stopped?
+
+If you are focusing on leveling up your starter, your lineup should be around:
+
+Level 47 Starter Evolution
+Level 30 Gyarados
+Level 22 Sudowoodo
+Level 21 Tentacool
+Level 20 Eevee
+Level 10 Kenya the Spearow
+
+If you have a balanced lineup, your lineup should be around:
+
+Level 31 Raticate
+Level 31 Gyarados
+Level 31 Bayleef or Quilava, or Croconaw
+Level 31 Eevee
+Level 31 Sudowoodo
+Level 5 Pidgey
+
+---
+GYM LEADER PRYCE
+Level 27 Seel (577 EXP)
+Level 29 Dewgong (1093 EXP)
+Level 31 Piloswine (1062 EXP)
+You get: Glacier Badge, 3,100G, & TM16 (Icy Wind)
+---
+
+Strategy VERSUS Seel: Use the highest-powered attack from your highest level
+Pokémon that is not a fire or water type. Grass moves are ideal. Finally, a gym
+that somewhat favors anyone who started with Chikorita!
+
+Strategy VERSUS Dewgong: Use the highest-powered attack from your highest level
+Pokémon that is not a fire or water type. Grass moves are still ideal.
+
+Strategy VERSUS Piloswine: Pilowsine is a bit tougher. It is higher level and
+more defensive. But it is also slow. Use the highest-powered attack from your
+highest level Pokémon that is not a fire or water type. Grass moves are still
+ideal.
+
+You're worthy of the badge, and you get the SEVENTH badge. W00t! This raises
+your Pokémon's special stats, you get more mooooney, and you have TM16 Icy Wind.
+You can now use Whirlpool, once you find that in a dark cavern. Skate your way
+to the bottom of the gym, then exit. One more badge to go!
+
+==============================================================================
+==============================================================================
+==============================================================================
+
+(c18)
+--------------------------------------

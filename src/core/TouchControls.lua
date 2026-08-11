@@ -12,6 +12,17 @@
 -- (main.lua then drives it with the mouse); POKEPORT_TOUCH=0 forces it
 -- off everywhere.
 --
+-- BOTH GENERATIONS, one module.  Red/Blue/Yellow reach it from
+-- src/core/Game.lua and Gold from src/core/Game2.lua, through the same six
+-- seams in the same order: init + applyOptions at boot, touchpressed /
+-- touchmoved / touchreleased ahead of the mod pointer hook (the pad keeps
+-- first refusal, #807), noteGamepad on any controller input, joystickremoved
+-- when the last pad goes away, reset on focus/visibility loss, and draw as the
+-- last thing in the frame -- after the post passes, so the controls are never
+-- inside the CRT/GBC grid the picture is being shown through.  One
+-- options.touchControls block serves both games, so a layout edited in the
+-- launcher's editor is the layout Gold draws.
+--
 -- Player preferences (options.touchControls) can permanently disable the
 -- overlay and/or override per-control positions as normalized window
 -- fractions.  Positions and a size multiplier are stored per orientation
@@ -589,9 +600,10 @@ local function drawIcon(img, zone, pressed, alphaMul)
                      zone.cy - img:getHeight() * scale / 2, 0, scale, scale)
 end
 
--- Screen-space, called by Game:draw after Renderer:endFrame so the
--- overlay rides on top of everything (world, UI, CRT/GBC FX included).
--- Also used by the launcher layout editor under preview mode.
+-- Screen-space, called by Game:draw after Renderer:endFrame -- and by
+-- Game2:drawHud after Gold's own present pass -- so the overlay rides on top
+-- of everything (world, UI, CRT/GBC FX included).  Also used by the launcher
+-- layout editor under preview mode.
 function TouchControls:draw()
   if not self:visible() then return end
   local L = self:layout()

@@ -102,34 +102,29 @@ end
 -- (M14 adds the gate; it does not retro-fit other milestones' unit tests).
 -- Removing a name from this list is the only way to close its entry, and
 -- the staleness check below forces that the moment a test lands.
+--
+-- The Gen 2 tier drained most of this ledger: tests/engine/gate_gen2_mod_api.lua
+-- names each seam Gold raises and holds it to having a call site in BOTH
+-- generations under the one shared name, which is a test that fails if the
+-- seam is deleted or renamed.  It is not a payload case, so a per-seam case
+-- through the public mod API is still worth writing for those names -- it is
+-- simply no longer owed as debt, because the ledger's rule is that an entry
+-- closes the moment any test names the seam.
 local DEBT = {
-  -- M6 audio: the registry is exercised through cries/music/sfx, never by
-  -- the aggregate `audio` name
-  ["registry:audio"] = "M6",
-  -- M12 link: declared for the extra-bag negotiation, no case names it yet
-  ["registry:link_fields"] = "M12",
-
-  ["hook:encounter.fishing"] = "M5",
-  ["hook:render.zones"] = "M9",
-  ["hook:trainer.party"] = "M7",
-  ["hook:ui.pc.items"] = "M8",
+  -- registry:link_fields closed the same way: the Gen 2 gate names it in the
+  -- gated list, because link play is Gen 1 only and Gold has nowhere to put a
+  -- link field.  Still not a payload case, still worth one.
+  --
+  -- hook:render.zones was the last M9 entry and closed when Gold grew its own
+  -- zone pass: src/core/Game2.lua:blitZones raises the hook with the same rect
+  -- list shape src/render/Renderer.lua does, so gate_gen2_mod_api names it in
+  -- the shared-hook list and the ledger's rule ("an entry closes the moment
+  -- any test names the seam") retired it.
 
   ["event:link.connected"] = "M12",
   ["event:link.ended"] = "M12",
-  ["event:player.warped"] = "M5",
   ["event:pokemon.before_give"] = "M7",
-  ["event:pokemon.evolved"] = "M7",
-  ["event:pokemon.level_up"] = "M7",
-  ["event:pokemon.move_learned"] = "M7",
-  ["event:save.loaded"] = "M11",
-  ["event:save.loading"] = "M11",
-  ["event:save.writing"] = "M11",
   ["event:trade.completed"] = "M12",
-  ["event:world.blacked_out"] = "M5",
-  ["event:world.boulder_moved"] = "M5",
-  ["event:world.interacted"] = "M5",
-  ["event:world.npc_spawned"] = "M5",
-  ["event:world.trainer_engaged"] = "M5",
 }
 
 local seen = {}

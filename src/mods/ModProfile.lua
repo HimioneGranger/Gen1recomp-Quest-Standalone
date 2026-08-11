@@ -26,17 +26,34 @@ ModProfile.FORMAT = "g1rmodlist"
 ModProfile.FORMAT_VERSION = 1
 
 -- deterministic order; GameVersion.VERSIONS is a map, and a profile file has
--- to encode the same way twice for a diff to mean anything
-local VERSION_ORDER = { "red", "blue", "yellow" }
+-- to encode the same way twice for a diff to mean anything.  GameVersion.ORDER
+-- rather than a literal so the next version added is captured with the rest:
+-- decode already validates against GameVersion.VERSIONS, so a gold slot in an
+-- imported profile survived the read and was then dropped by capture.
+local VERSION_ORDER = GameVersion.ORDER
 
 local function fsOr(fs)
   return fs or (love and love.filesystem) or nil
 end
 
+-- one version's per-game enable overlay, copied flat (SaveData.modsByVersion)
+local function copyFlags(bucket)
+  if type(bucket) ~= "table" then return nil end
+  local copy, any = {}, false
+  for id, on in pairs(bucket) do
+    if type(id) == "string" then
+      copy[id] = on and true or false
+      any = true
+    end
+  end
+  return any and copy or nil
+end
+
 -- Capture the live setup.  `available` is ManagerState.status.available (the
 -- loader's status manifests, m.enabled = the desired set including staged
--- flips); `modOptions` is options.modOptions.
-function ModProfile.capture(available, modOptions)
+-- flips); `modOptions` is options.modOptions; `byVersion` is
+-- options.modsByVersion, the per-game answers that differ from it.
+function ModProfile.capture(available, modOptions, byVersion)
   local enabled, options = {}, {}
   for _, m in ipairs(available or {}) do
     enabled[m.id] = m.enabled and true or false
@@ -50,12 +67,47 @@ function ModProfile.capture(available, modOptions)
       options[m.id] = copy
     end
   end
-  local slots = {}
+  local slots, perVersion = {}, {}
   for _, id in ipairs(VERSION_ORDER) do
     local ok, slot = pcall(SaveData.activeSlot, id)
     if ok and slot then slots[id] = slot end
+    local flags = copyFlags(type(byVersion) == "table" and byVersion[id])
+    if flags then perVersion[id] = flags end
   end
-  return { enabled = enabled, options = options, slots = slots }
+  return { enabled = enabled, options = options, slots = slots,
+           enabledByVersion = perVersion }
+end
+
+-- Write a profile's per-game answers back into an options table, replacing
+-- only the games it carries: a profile shared by someone who never played
+-- Gold must not blank the Gold set here.
+function ModProfile.restoreVersions(p, options)
+  if type(options) ~= "table" then return end
+  local wanted = type(p) == "table" and p.enabledByVersion or nil
+  if type(wanted) ~= "table" then return end
+  options.modsByVersion = options.modsByVersion or {}
+  for _, id in ipairs(VERSION_ORDER) do
+    local flags = copyFlags(wanted[id])
+    if flags then options.modsByVersion[id] = flags end
+  end
+end
+
+-- Does the live per-game overlay still read the way this profile captured it?
+-- Only the games the profile names are compared, matching restoreVersions.
+function ModProfile.matchesVersions(p, options)
+  local wanted = type(p) == "table" and p.enabledByVersion or nil
+  if type(wanted) ~= "table" then return true end
+  local live = (type(options) == "table" and options.modsByVersion) or {}
+  for _, id in ipairs(VERSION_ORDER) do
+    local want, got = wanted[id], live[id]
+    if type(want) == "table" then
+      for modId, on in pairs(want) do
+        local cur = type(got) == "table" and got[modId] or nil
+        if (cur and true or false) ~= (on and true or false) then return false end
+      end
+    end
+  end
+  return true
 end
 
 -- The slot moves a profile may actually make: a slot id has to be registered
@@ -94,7 +146,8 @@ function ModProfile.encode(p)
     format = ModProfile.FORMAT,
     formatVersion = ModProfile.FORMAT_VERSION,
     profile = { name = p.name, enabled = p.enabled,
-                options = p.options, slots = p.slots },
+                options = p.options, slots = p.slots,
+                enabledByVersion = p.enabledByVersion },
   })
 end
 
@@ -109,7 +162,8 @@ function ModProfile.decode(body)
   if type(raw) ~= "table" or type(raw.name) ~= "string" or raw.name == "" then
     return nil, "BAD FILE"
   end
-  local p = { name = raw.name:sub(1, 10), enabled = {}, options = {}, slots = {} }
+  local p = { name = raw.name:sub(1, 10), enabled = {}, options = {}, slots = {},
+              enabledByVersion = {} }
   for id, on in pairs(type(raw.enabled) == "table" and raw.enabled or {}) do
     if type(id) == "string" then p.enabled[id] = on and true or false end
   end
@@ -128,6 +182,13 @@ function ModProfile.decode(body)
   for version, slot in pairs(type(raw.slots) == "table" and raw.slots or {}) do
     if GameVersion.VERSIONS[version] and type(slot) == "string" then
       p.slots[version] = slot
+    end
+  end
+  local shared = type(raw.enabledByVersion) == "table" and raw.enabledByVersion or {}
+  for version, bucket in pairs(shared) do
+    if GameVersion.VERSIONS[version] then
+      local flags = copyFlags(bucket)
+      if flags then p.enabledByVersion[version] = flags end
     end
   end
   return p
@@ -196,7 +257,7 @@ function ModProfile.ensureFirst(opts, available, modOptions)
   opts.modProfilesSeeded = true
   opts.modProfiles = opts.modProfiles or {}
   if #opts.modProfiles > 0 then return nil end
-  local p = ModProfile.capture(available, modOptions)
+  local p = ModProfile.capture(available, modOptions, opts.modsByVersion)
   p.name = "PROFILE 1"
   opts.modProfiles[1] = p
   opts.activeProfile = p.name

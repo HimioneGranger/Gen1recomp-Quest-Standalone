@@ -11,6 +11,8 @@ local Stats = require("src.pokemon.Stats")
 local Zoom = require("src.render.Zoom")
 local ListMenu = require("src.ui.ListMenu")
 local NamingScreen = require("src.ui.NamingScreen")
+local TextBox = require("src.render.TextBox")
+local PartyMenu = require("src.ui.PartyMenu")
 local Player = require("src.world.Player")
 local Music = require("src.core.Music")
 
@@ -159,6 +161,71 @@ do
   Runtime.call("battle.overlay", function() end, { kind = "wild" })
   check(drew, "battle.overlay runs after the vanilla no-op")
   unsub()
+end
+
+-- ------- battle UI visibility (companion / alternate renderers)
+
+do
+  local BattleState = require("src.battle.BattleState")
+  check(BattleState.bottomUIVisible({ phase = "menu" }),
+    "battle bottom UI is visible without a mod")
+  local seen
+  local unsub = wrap("battle.bottom_ui_visible", function(_, state)
+    seen = state
+    return false
+  end)
+  check(not BattleState.bottomUIVisible({ phase = "messages" }),
+    "a mod can hide the battle text and menu layer")
+  local text = setmetatable({}, TextBox)
+  text:draw()
+  check(seen == text, "pushed text boxes use the same visibility hook")
+  unsub()
+  check(BattleState.bottomUIVisible({ phase = "moveSelect" }),
+    "battle bottom UI returns when the hook is removed")
+
+  check(BattleState.statusHUDVisible({}),
+    "battle status HUD is visible without a mod")
+  unsub = wrap("battle.status_hud_visible", function() return false end)
+  check(not BattleState.statusHUDVisible({}),
+    "a mod can hide the battle status HUD")
+  unsub()
+  check(BattleState.statusHUDVisible({}),
+    "battle status HUD returns when the hook is removed")
+end
+
+-- ------- grid navigation ownership (alternate menu renderers)
+
+do
+  local BattleState = require("src.battle.BattleState")
+  local battle = { wideLayout = function() return false end }
+  check(not BattleState.moveGridNavigation(battle),
+    "classic move navigation stays a list without a mod")
+  local unsub = wrap("battle.move_grid_navigation", function() return true end)
+  check(BattleState.moveGridNavigation(battle),
+    "a mod can opt the classic move menu into grid navigation")
+  unsub()
+  battle.wideLayout = function() return true end
+  check(BattleState.moveGridNavigation(battle),
+    "the native wide move grid remains enabled without a mod")
+
+  local game = {
+    save = { party = { {}, {}, {}, {}, {}, {} } },
+    input = { wasPressed = function(_, key) return key == "down" end },
+  }
+  local field = PartyMenu.new(game)
+  unsub = wrap("ui.party.grid_navigation", function() return true end)
+  field:update(0)
+  check(field.index == 2,
+    "field party navigation remains a native list when the hook is active")
+  game.partyMenuSavedIndex = nil
+  local menu = PartyMenu.new(game, { battle = {} })
+  menu:update(0)
+  check(menu.index == 3 and game.partyMenuSavedIndex == 3,
+    "a battle party can follow and remember a companion grid")
+  unsub()
+  menu:update(0)
+  check(menu.index == 4,
+    "removing the hook restores native list navigation immediately")
 end
 
 -- ------- music.volume (distance / indoor muffling)

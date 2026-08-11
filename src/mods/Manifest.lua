@@ -2,6 +2,7 @@
 -- valid.  Pure (no filesystem): the loader's validate phase owns the checks
 -- that need to stat a file, this owns shape, vocabulary and range grammar.
 local Logger = require("src.core.Logger")
+local ModTargets = require("src.mods.ModTargets")
 local Semver = require("src.mods.Semver")
 local Version = require("src.core.Version")
 
@@ -189,6 +190,39 @@ function Manifest.validate(raw, path)
     "language must be a boolean")
   local language = raw.language == true
 
+  -- Gen 2 is opt-in and never inferred.  The hook/event names and the
+  -- registry names are shared across generations on purpose, so a Gen 1 mod
+  -- LOOKS like it would work under Gold; what it actually gets is a subset
+  -- (Gold has its own battle, world, script VM and save), and half-running is
+  -- worse than not running.  A mod author claims Gen 2 only after testing
+  -- there, and until then the loader leaves the mod out of a Gold boot
+  -- entirely (Loader:_gateGeneration) rather than letting it half-apply.
+  -- Absent means false: every mod written before this field existed is Gen 1
+  -- only, which is exactly what it was tested as.
+  assert(raw.gen2compat == nil or type(raw.gen2compat) == "boolean",
+    "gen2compat must be a boolean")
+
+  -- `games` is the same statement made per game: version ids ("red"),
+  -- generations ("gen1"), or "all" (src/mods/ModTargets.lua).  gen2compat is
+  -- kept as its Gen 2 spelling and only ever ADDS Gen 2, so no shipped
+  -- manifest loses a game it already ran on, and gen2compat below is derived
+  -- from the resolved list -- the loader's gate reads that one field.
+  assert(raw.games == nil or type(raw.games) == "table",
+    "games must be an array")
+  local games, unknownGames = ModTargets.normalize(raw.games)
+  for _, token in ipairs(unknownGames) do
+    violation(strict, raw.id, ("unknown game %q"):format(token))
+  end
+  if raw.games ~= nil and #games == 0 then
+    violation(strict, raw.id, "games names no game this engine knows")
+  end
+  if #games == 0 then
+    games = ModTargets.legacy(raw.gen2compat == true)
+  elseif raw.gen2compat == true then
+    games = ModTargets.union(games, ModTargets.generationVersions(2))
+  end
+  local gen2compat = ModTargets.covers(games, 2)
+
   -- overhauls and total conversions are assumed to move the link
   -- fingerprint unless the manifest says otherwise; content packs and
   -- declared translations are not
@@ -224,11 +258,14 @@ function Manifest.validate(raw, path)
     experimental = experimental,
     profile = profile,
     language = language,
+    games = games,
+    gen2compat = gen2compat,
     affects_link = affectsLink,
     permissions = permissions,
     permissionSet = permissionSet,
     options_schema = optionalFile(raw.options_schema, "options_schema"),
     assets_transforms = optionalFile(raw.assets_transforms, "assets_transforms"),
+    force_enable_env = optionalFile(raw.force_enable_env, "force_enable_env"),
     path = path,
     raw = raw,
   }

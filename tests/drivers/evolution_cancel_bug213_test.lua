@@ -1,13 +1,14 @@
 -- Driver: cancel an evolution with the B button (#213).
 --
--- pokered engine/pokemon/evos_moves.asm polls hJoyHeld during the pic
--- flash: holding B aborts the evolution (the mon keeps its species and
+-- pokered engine/movie/evolution.asm polls hJoy5 during the pic flash: a
+-- fresh B press aborts the evolution (the mon keeps its species and
 -- _StoppedEvolvingText prints).  Trade evolutions (wLinkState ==
 -- LINK_STATE_TRADING) skip that poll and cannot be cancelled.
 --
--- Case 1 (level path, cancelable): open EvolutionState directly, wait a
--- few frames into the flash (t well under FLASH_FRAMES=220), hold B, and
--- assert the mon stays CATERPIE with "stopped evolving" text on screen.
+-- Case 1 (level path, cancelable): open EvolutionState directly, wait past
+-- the 80-frame pre-animLoop delay (still well under FLASH_FRAMES=220),
+-- press B, and assert the mon stays CATERPIE with the "stopped evolving"
+-- text on screen.
 -- Case 1b: after cancel, checkParty with no level-ups must not re-offer;
 -- a subsequent level-up set must offer again (EvolveAfterBattle parity).
 -- Case 2 (control): let the flash run to completion with no input and
@@ -80,11 +81,11 @@ return function(game)
   Evolution.evolve(game, mon, "METAPOD", function() done1 = true end)
 
   if not waitFor(evoTop, 300) then error("EvolutionState never opened (case1)") end
-  U.wait(20) -- into the flash, well under FLASH_FRAMES=220
+  U.wait(100) -- past the 80-frame pre-animLoop delay, still under 220
   U.log("case1 flash", "t=", top().t, "species=", mon.species)
   U.shot(game, DIR .. "/evo213_1_evolving.png")
 
-  U.hold(game, "b", 20) -- Gen1 hJoyHeld B-cancel
+  U.hold(game, "b", 20) -- Gen1 hJoy5 B-cancel
 
   -- the flash aborts: EvolutionState is no longer the top (the stopped
   -- text overlays it and then pops it)
@@ -118,7 +119,7 @@ return function(game)
   if not waitFor(evoTop, 300) then
     error("EvolutionState never opened after level-up re-offer")
   end
-  U.wait(20)
+  U.wait(100) -- past the same 80-frame pre-animLoop delay
   U.hold(game, "b", 20) -- cancel so case 2 stays independent
   if not waitFor(function() return not evoTop() end, 240) then
     error("level-up re-offer did not abort on B")

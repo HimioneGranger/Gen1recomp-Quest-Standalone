@@ -1,5 +1,6 @@
 local GameVersion = require("src.core.GameVersion")
 local GamepadMap = require("src.core.GamepadMap")
+local Logger = require("src.core.Logger")
 local Strings = require("src.core.Strings")
 local HostShell = require("src.core.HostShell")
 local Platform = require("src.core.Platform")
@@ -34,6 +35,12 @@ end
 -- their Tilesets row (#889), which a .sav export replays so a Continue on
 -- real hardware has a map to load; a v9 cache has none of them and exports
 -- the same unbootable save as before.
+-- Deliberately NOT bumped for the Gold trainer-pic gap: this tag invalidates
+-- every version at once, and that gap is Gold-only.  A per-version marker in
+-- VERSION_REQUIRED_FILES_OVERRIDE.gold re-imports exactly the caches that lack
+-- the stage, which is what the Yellow markers below already do for #439/#557.
+-- Reach for a bump when the change spans versions or has no single file to
+-- point at.
 local CACHE_FORMAT = "rom-cache-v10:"
 -- The completion marker is written under each version's cache prefix
 -- (red/rom-cache.complete, blue/rom-cache.complete, ...).
@@ -82,6 +89,54 @@ local VERSION_REQUIRED_FILES = {
     -- cache reads as incomplete and re-importing cannot clear it.
     "assets/generated/battle/profoakb.png",
     "assets/generated/pikachu/pikapic_1.png",
+  },
+}
+
+-- Gold Phase 1 writes a thinner cache than Gen 1 (no battle anim sheets,
+-- trade art, or field.lua payload yet -- see docs/gold-phase1.md).  This
+-- list replaces REQUIRED_FILES entirely for that version so a successful
+-- Gen 2 extract is not stuck as "incomplete" waiting on Gen 1 markers.
+local VERSION_REQUIRED_FILES_OVERRIDE = {
+  gold = {
+    "data/generated/constants.lua",
+    "data/generated/maps.lua",
+    "data/generated/roofs.lua", -- Phase 2: forces re-import of Phase 1 caches
+    "data/generated/sprites.lua", -- OW sheets (Chris + NPCs)
+    "data/generated/scripts.lua", -- disassembled map scripts
+    "data/generated/text.lua", -- decoded Gen 2 dialogue strings
+    "data/generated/pokemon.lua",
+    "data/generated/tilesets.lua",
+    "data/generated/audio.lua",
+    -- Mart shelves + the heal machine art ride the same import, so listing
+    -- marts.lua alone re-imports the caches from before either existed
+    -- (empty shop shelves, no Pokecenter light show).
+    "data/generated/marts.lua",
+    "assets/generated/fonts/font.png",
+    "assets/generated/fonts/frames.png", -- the seven other OPTION textbox frames
+    "assets/generated/title/pokemon_logo.png",
+    "assets/generated/title/title_screen.png", -- TitleScreenTilemap composition
+    "assets/generated/title/hooh.png",
+    "assets/generated/title/hooh_5.png", -- wing-flap frames force re-import
+    "assets/generated/title/clouds.png",
+    "assets/generated/title/copyright_splash.png",
+    "data/generated/oak_speech.lua", -- Oak texts + trainer pics
+    "assets/generated/intro/oak.png",
+    "assets/generated/intro/cal.png",
+    "assets/generated/tilesets/johto.png",
+    "assets/generated/tilesets/roofs/new_bark.png",
+    "assets/generated/sprites/chris.png",
+    "assets/generated/battle/front/chikorita.png",
+    "assets/generated/battle/front/pikachu.png",
+    "assets/generated/battle/front/marill.png", -- Oak speech demo mon
+    -- The trainer class pics (TrainerPicPointers).  FALKNER is row 0 of that
+    -- table, so a cache that produced any class pic at all produced this one.
+    -- Listed for the reason the Yellow markers above are: a cache built before
+    -- the stage existed reads as INCOMPLETE and re-imports itself, so this
+    -- particular gap cannot survive a tag bump being forgotten again.  It
+    -- costs nothing on a current cache and is the difference between every
+    -- trainer battle opening with a picture and opening with none.
+    "assets/generated/battle/trainers/falkner.png",
+    "assets/generated/audio/programs.bin",
   },
 }
 
@@ -146,11 +201,14 @@ local function allRequiredFilesExist(version)
   local saved = CacheFs.prefix
   CacheFs.prefix = GameVersion.cachePrefix(version)
   local ok = true
-  for _, path in ipairs(REQUIRED_FILES) do
+  local required = VERSION_REQUIRED_FILES_OVERRIDE[version] or REQUIRED_FILES
+  for _, path in ipairs(required) do
     if not CacheFs.exists(path) then ok = false; break end
   end
-  for _, path in ipairs(ok and VERSION_REQUIRED_FILES[version] or {}) do
-    if not CacheFs.exists(path) then ok = false; break end
+  if ok and not VERSION_REQUIRED_FILES_OVERRIDE[version] then
+    for _, path in ipairs(VERSION_REQUIRED_FILES[version] or {}) do
+      if not CacheFs.exists(path) then ok = false; break end
+    end
   end
   CacheFs.prefix = saved
   return ok
@@ -350,7 +408,14 @@ local IMPORTS_DIR = "imports"
 local BASE_ROMS_DIR = "baseroms"
 local MODS_INBOX_DIR = "imports/mods"
 local SAVES_INBOX_DIR = "imports/saves"
-local ROM_BYTES = 1024 * 1024
+local ROM_BYTES_GEN1 = 1024 * 1024
+local ROM_BYTES_GEN2 = 2 * 1024 * 1024
+-- Historical alias: Gen 1 helpers and tests still refer to ROM_BYTES.
+local ROM_BYTES = ROM_BYTES_GEN1
+
+local function isAcceptedRomSize(n)
+  return n == ROM_BYTES_GEN1 or n == ROM_BYTES_GEN2
+end
 
 local function savesInboxDir(version)
   return SAVES_INBOX_DIR .. "/" .. tostring(version)
@@ -522,9 +587,9 @@ function RomImporter:_stepBaseRomScan()
   scan.index = scan.index + 1
 
   local info = love.filesystem.getInfo(path, "file")
-  if info and info.size == ROM_BYTES then
+  if info and isAcceptedRomSize(info.size) then
     local data = love.filesystem.read(path)
-    if type(data) == "string" and #data == ROM_BYTES then
+    if type(data) == "string" and isAcceptedRomSize(#data) then
       local version = GameVersion.forSha1(sha1(data))
       if version and not self.ready[version] and not self.baseRoms[version] then
         self.baseRoms[version] = {
@@ -766,7 +831,7 @@ function RomImporter:rescanAction(version)
       self:setError("The file could not be read: " .. displayName, version)
       return
     end
-    if #data ~= ROM_BYTES then
+    if not isAcceptedRomSize(#data) then
       if not junkData then junkData, junkName = data, displayName end
     else
       local romVersion = GameVersion.forSha1(sha1(data))
@@ -837,12 +902,13 @@ end
 -- Only a .gb/.gbc whose SHA maps to a version that is not yet ready counts as
 -- pending.  GameActivity always writes the SAF pick to picked_rom.gb, so a
 -- naive "first ROM wins" scan would re-import Red when the player tries to
--- add Blue (issue #167).  Yellow carts are typically .gbc.
+-- add Blue (issue #167).  Yellow and Gold carts are typically .gbc (Gold is
+-- 2 MiB).
 local function findPendingRom(ready)
   for _, name in ipairs(love.filesystem.getDirectoryItems("")) do
     if name:lower():match("%.gbc?$") and love.filesystem.getInfo(name, "file") then
       local data = love.filesystem.read(name)
-      if type(data) == "string" and #data == 1024 * 1024 then
+      if type(data) == "string" and isAcceptedRomSize(#data) then
         local version = GameVersion.forSha1(sha1(data))
         if version and not ready[version] then
           return name, data
@@ -866,7 +932,7 @@ local function consumePickedRomError(self)
   local preferred = "picked_rom.gb"
   if not love.filesystem.getInfo(preferred, "file") then return false end
   local data = love.filesystem.read(preferred)
-  if type(data) == "string" and #data == 1024 * 1024 then
+  if type(data) == "string" and isAcceptedRomSize(#data) then
     local version = GameVersion.forSha1(sha1(data))
     if version and self.ready[version] then return false end
   end
@@ -1165,6 +1231,10 @@ function RomImporter.new(onComplete, opts)
     -- modScroll is the list scroll offset (px, clamped in draw); modNotice is
     -- the last install/delete result { ok, text } shown as a line above the list.
     mods = nil, modScroll = 0, modNotice = nil,
+    -- Which game the MODS panel is answering for (a GameVersion id, nil =
+    -- every game).  Rows resolve their enable-state and their "runs here"
+    -- verdict against it (src/mods/ModTargets.lua).
+    modScope = nil,
     -- FIND MODS panel state (src/mods/ModIndex.lua).  findLoaded gates the
     -- first fetch the way `mods = nil` gates the mods list, but it is a flag
     -- rather than a nil listing because "no index added" is a legitimate
@@ -1215,7 +1285,7 @@ function RomImporter.new(onComplete, opts)
     self.returning[version] =
       (not ready) and marker ~= nil and marker ~= markerFor(version)
     self.romName[version] = "pokemon_" .. info.id
-      .. (info.id == "yellow" and ".gbc" or ".gb")
+      .. ((info.id == "yellow" or info.id == "gold") and ".gbc" or ".gb")
   end
   self:_applyLastVersionTab()
   self:_queueBaseRomScan()
@@ -1397,6 +1467,16 @@ function RomImporter:setError(message, version)
   self.progress = 0
   self.worker = nil
   self.romData = nil
+  -- A headless import has no launcher to read this off: POKEPORT_IMPORT_ONLY
+  -- only ever quits from onComplete, so an import that fails here would sit in
+  -- the error state forever and look to a build script (or a person) exactly
+  -- like a hang.  Log what broke and exit non-zero instead.  Logger, not a
+  -- literal write: this is a diagnostic for whoever ran the import, never text
+  -- a player sees, so it is deliberately not a translated string.
+  if os.getenv("POKEPORT_IMPORT_ONLY") == "1" then
+    Logger.error("import failed: %s", tostring(message))
+    love.event.quit(1)
+  end
 end
 
 -- draw() may leave the system hand cursor set while hovering a Play /
@@ -1424,8 +1504,9 @@ function RomImporter:startData(data, displayName)
     self:setError("The selected file could not be read.")
     return
   end
-  if #data ~= 1024 * 1024 then
-    self:setError(("Expected a 1 MiB Game Boy ROM; this file is %.2f MiB.")
+  if not isAcceptedRomSize(#data) then
+    self:setError(("Expected a 1 MiB Game Boy ROM (Red/Blue/Yellow) or a "
+      .. "2 MiB Game Boy Color ROM (Gold); this file is %.2f MiB.")
       :format(#data / 1024 / 1024))
     return
   end
@@ -1433,7 +1514,7 @@ function RomImporter:startData(data, displayName)
   local version = GameVersion.forSha1(actualHash)
   if not version then
     self:setError(("Unsupported ROM (SHA-1 %s). This needs a clean US Pokemon "
-      .. "Red, Blue, or Yellow dump; patched, trimmed or \"fixed\" dumps "
+      .. "Red, Blue, Yellow, or Gold dump; patched, trimmed or \"fixed\" dumps "
       .. "(tagged [b] or [BF]) never verify."):format(actualHash))
     return
   end
@@ -1468,7 +1549,9 @@ function RomImporter:startData(data, displayName)
     CacheFs.remove(MARKER_PATH)
 
     local manifest = decodeManifest(version)
-    local RomExtractor = require("src.import.RomExtractor")
+    local RomExtractor = version == "gold"
+      and require("src.import.RomExtractorGen2")
+      or require("src.import.RomExtractor")
     local extractor = RomExtractor.new(self.romData, manifest,
       function(progress, total, stage, current, stageTotal)
         self.status = stage
@@ -2198,7 +2281,7 @@ function RomImporter:resumeAfterOverlay()
 end
 
 function RomImporter:_cycleTab(delta)
-  local order = { "red", "blue", "yellow", "mods", "find" }
+  local order = { "red", "blue", "yellow", "gold", "mods", "find" }
   local idx = 1
   for i, id in ipairs(order) do
     if id == self.tab then idx = i; break end
@@ -2569,8 +2652,12 @@ function RomImporter:_openSettings()
       self.onEditTouchControls()
     end
   end
+  -- The tab the gear was opened on decides the row set: Gold reads a
+  -- different option block entirely, and offering it Gen 1's rows meant a
+  -- dozen controls that changed nothing (see LauncherSettings.gen2Rows).
+  local version = self.tab
   local ok, model = pcall(function()
-    return require("src.import.LauncherSettings").open(hooks)
+    return require("src.import.LauncherSettings").open(hooks, version)
   end)
   if ok and model then self._settings = model end
 end
@@ -2858,8 +2945,15 @@ function RomImporter:_refreshMods()
                .. table.concat(failed, ", ") }
     end
   end
-  self.mods = LauncherMods.list() or {}
+  self.mods = LauncherMods.list(self.modScope) or {}
   self:_syncModUpdateInfo(false)
+end
+
+-- Point the MODS panel at one game (or nil for all of them) and relist, so
+-- every row's status is answered for that game.
+function RomImporter:_setModScope(version)
+  self.modScope = GameVersion.VERSIONS[version] and version or nil
+  self:_refreshMods()
 end
 
 function RomImporter:_ensureMods()
@@ -2983,7 +3077,7 @@ function RomImporter:_toggleMod(id, confirmed)
     return
   end
   self._modConfirm = nil
-  LauncherMods.setEnabled(id, want)
+  LauncherMods.setEnabled(id, want, self.modScope)
   self:_refreshMods()
 end
 
@@ -3023,7 +3117,7 @@ function RomImporter:_setAllMods(want, confirmed)
     return
   end
   self._modConfirm = nil
-  LauncherMods.setAllEnabled(ids, want)
+  LauncherMods.setAllEnabled(ids, want, self.modScope)
   self:_refreshMods()
   self.modNotice = { ok = true, text = want
     and Strings("Enabled %d mods.", #ids)

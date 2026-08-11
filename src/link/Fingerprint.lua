@@ -13,6 +13,15 @@
 -- generated paths that differ between two otherwise identical machines),
 -- names, dex entries, learnsets and TM/HM lists (they change no battle math
 -- and no trade rebuild).
+--
+-- Two generations, two surfaces.  Gold's link surface is the same IDEA over
+-- different tables -- statuses live at data.gen2Statuses, the special stat is
+-- two stats, the exp curves are data rather than code, and held items exist at
+-- all -- so the Gen 2 arm below is a second surface writer, not a widened Gen 1
+-- one.  Widening would have moved the Gen 1 digest, which is pinned by
+-- tests/engine/gate_fingerprint.lua and by every installed build in the wild.
+-- docs/gen2-link-design.md section 5 is the field-by-field reasoning for what
+-- the Gen 2 surface covers and what it deliberately leaves out.
 
 local Runtime = require("src.mods.Runtime")
 
@@ -152,18 +161,122 @@ local RECORD_FIELDS = { pokemon = SPECIES_FIELDS, moves = MOVE_FIELDS,
 
 Fingerprint.FIELDS = RECORD_FIELDS
 
-local function writeSection(out, data, kind)
-  local map = data[kind]
+-- ------- the Gen 2 link surface
+--
+-- Same doctrine, applied to Gold's records.  Every difference from the Gen 1
+-- lists above is a real Gen 2 change rather than an extractor spelling:
+--
+--   baseStats     carries specialAttack/specialDefense instead of special
+--                 (pokegold data/pokemon/base_stats/), which writeValue hashes
+--                 by sorted key without needing to know either name
+--   genderRatio   Gen 2 has ATTRACT, so two peers that disagree on a species'
+--                 gender split disagree on whether a move lands.  Nothing else
+--                 out of the breeding block is here: the Day-Care is local,
+--                 there is no link breeding, and an egg's contents are decided
+--                 before it can be traded.
+--   evolutions    points at `into` rather than `species` and carries the
+--                 happiness window / stat comparison; it decides what a traded
+--                 mon becomes, exactly as on Gen 1
+--
+-- catchRate stays out for the reason #511 gives, and so does the whole
+-- eggGroups/eggMoves/eggSteps block, `items` (the wild held-item slots, rolled
+-- before a link session can see them) and tmhm.
+local GEN2_SPECIES_FIELDS = { "baseStats", "types", "baseExp",
+                              "growthRate", "evolutions", "genderRatio" }
+-- effectChance is the one addition: Gen 1 encodes a secondary effect's odds in
+-- the effect itself, Gen 2 stores them per move (pokegold data/moves/moves.asm
+-- `move` macro, the effect chance byte), so two peers that disagree about
+-- BODY SLAM's 30 percent disagree about the battle.  The rest of the Gen 1
+-- list rides along unchanged: those keys are absent from an extracted Gold
+-- record, and writeFields skips an absent field, so they cost nothing and
+-- cover a mod that sets one.
+local GEN2_MOVE_FIELDS = { "power", "type", "accuracy", "pp", "effect",
+                           "effectChance", "category", "priority", "highCrit",
+                           "fixedDamage", "multiHit", "counterable",
+                           "semiInvulnerable" }
+-- the same six the Gen 1 statuses carry: src/mods/Schemas.lua R.statuses is one
+-- spec for both games, and Gold's own records (src/battle/gen2/Battle.lua
+-- STATUS_RECORDS) fill exactly these
+local GEN2_STATUS_FIELDS = STATUS_FIELDS
+-- `status` beside kind: a Gen 2 move_effects record is
+-- { kind = "primary"/"secondary", status = "burn" } for every status-inflicting
+-- effect (src/battle/gen2/Battle.lua MOVE_EFFECT_RECORDS), so the status a
+-- given effect inflicts is part of the surface rather than part of the handler
+local GEN2_EFFECT_FIELDS = { "rev", "kind", "accuracyChecked", "status" }
+-- ItemAttributes' last two columns.  Pure battle math (Leftovers' heal, King's
+-- Rock's odds, a type booster's percentage) and the item rides along with a
+-- traded mon, which makes it trade surface too.
+local GEN2_HELD_FIELDS = { "rev", "heldEffect", "heldParameter" }
+-- The exp curve coefficients, straight off pokegold data/growth_rates.asm.  On
+-- Gen 1 this is code (src/pokemon/Growth.lua) and cannot be hashed at all; on
+-- Gold it is data the extractor writes, and it decides what level a traded
+-- mon's experience buys, so it is surface.
+local GEN2_GROWTH_FIELDS = { "numerator", "denominator", "squared", "linear",
+                             "constant" }
+
+local GEN2_RECORD_FIELDS = { pokemon = GEN2_SPECIES_FIELDS,
+                             moves = GEN2_MOVE_FIELDS,
+                             statuses = GEN2_STATUS_FIELDS,
+                             move_effects = GEN2_EFFECT_FIELDS,
+                             held_items = GEN2_HELD_FIELDS,
+                             growth_rates = GEN2_GROWTH_FIELDS }
+
+Fingerprint.GEN2_FIELDS = GEN2_RECORD_FIELDS
+
+-- the allowlist table for a generation; unknown generations read as Gen 1, the
+-- same default GameVersion.generation() carries
+local function fieldsFor(generation)
+  if generation == 2 then return GEN2_RECORD_FIELDS end
+  return RECORD_FIELDS
+end
+
+-- ------- which generation a merged dataset belongs to
+--
+-- Read off the data rather than off GameVersion, for two reasons: this file is
+-- loaded by tools and headless tests that never boot a game (see the FNV
+-- comment above), and a caller that hands over a fixture dataset should get a
+-- digest for THAT dataset rather than for whatever the process last booted.
+--
+-- data.type_chart.generation is written by the Gen 2 extractor and is the
+-- cheapest honest answer.  The namespace check behind it covers a dataset
+-- assembled without a type chart: gen2Statuses/gen2MoveEffects/gen2Constants
+-- are Data keys only a Gen 2 boot ever creates (src/core/Game2.lua:load and
+-- src/mods/Builtins.lua's Gen 2 registrants), and Schemas.GEN1 gates every one
+-- of the Gen 2-only registries to false, so a Red boot cannot grow one.
+function Fingerprint.generationOf(data)
+  if type(data) ~= "table" then return 1 end
+  local chart = data.type_chart
+  if type(chart) == "table" and tonumber(chart.generation) then
+    return tonumber(chart.generation)
+  end
+  if data.gen2Statuses or data.gen2MoveEffects or data.gen2Constants then
+    return 2
+  end
+  return 1
+end
+
+-- data.pokemon on Gold carries one sibling that is not a species: the
+-- extractor's `growthRates` coefficient rows, which src/battle/gen2/Mon.lua
+-- reads through growthFor.  It gets its own section in the surface, and it is
+-- skipped here so the species id space -- which Fingerprint.records hands to
+-- Protocol.eligibleParty as "the mons the peer can rebuild" -- never carries an
+-- id no party slot could hold.
+local NON_SPECIES = { growthRates = true }
+
+local function writeRecords(out, map, label, fields, skip)
   if map == nil then return end
-  local fields = RECORD_FIELDS[kind]
-  out[#out + 1] = "[" .. kind .. "]"
+  out[#out + 1] = "[" .. label .. "]"
   for _, id in ipairs(sortedIds(map)) do
     local record = map[id]
-    if type(record) == "table" then
+    if type(record) == "table" and not (skip and skip[id]) then
       out[#out + 1] = "@" .. id
       writeFields(out, record, fields)
     end
   end
+end
+
+local function writeSection(out, data, kind)
+  writeRecords(out, data[kind], kind, RECORD_FIELDS[kind])
 end
 
 -- the chart rows are an ordered array whose order the merge rebuilds from
@@ -183,6 +296,22 @@ local function writeTypeChart(out, data)
       out[#out + 1] = "@" .. id
       writeFields(out, record, { "category", "index" })
     end
+  end
+end
+
+-- Gold's chart carries one extra ordered array: the matchups FORESIGHT
+-- rewrites, which is how a Normal or Fighting move reaches a Ghost at all
+-- (pokegold data/types/foresight_matchups.asm, read through
+-- BattleCheckTypeMatchup's `.foresight` arm in engine/battle/effect_commands.asm).
+-- Two peers that disagree about it disagree about a turn, so it is surface.
+local function writeGen2TypeChart(out, data)
+  writeTypeChart(out, data)
+  local chart = data.type_chart
+  if not chart or not chart.foresightMatchups then return end
+  out[#out + 1] = "[foresight]"
+  for _, row in ipairs(chart.foresightMatchups) do
+    out[#out + 1] = ("@%s>%s"):format(tostring(row.attacker), tostring(row.defender))
+    writeValue(out, row.multiplier)
   end
 end
 
@@ -229,7 +358,7 @@ Fingerprint.modKey = modKey
 -- entry to link play, and vanilla single-player must not pay for it at all
 local cache = setmetatable({}, { __mode = "k" })
 
-local function surface(data, mods)
+local function surfaceGen1(data, mods)
   local out = {}
   writeSection(out, data, "pokemon")
   writeSection(out, data, "moves")
@@ -242,16 +371,67 @@ local function surface(data, mods)
   return table.concat(out)
 end
 
+-- The Gen 2 surface.  Opens with a "[gen2]" tag so a Gen 2 digest can never
+-- collide with a Gen 1 one even over degenerate data -- checkCompat refuses a
+-- cross-generation pairing by the hello's `generation` field long before the
+-- digests are compared, and this makes the digest agree with that refusal
+-- instead of leaving it to luck.
+--
+-- data.gen2Constants is deliberately absent, and it is the one omission worth
+-- spelling out: it is the ROM's ordered NAME lists (speciesOrder, itemOrder,
+-- heldEffectOrder, mapOrder...), an index space the extractor uses, and every
+-- dispatch in the Gen 2 simulation goes by name -- Battle.heldEffect compares
+-- record.heldEffect strings, moveEffectRecordFor keys by EFFECT_*.  Reordering
+-- one moves no battle math, so hashing it would split two peers over a table
+-- neither of them dispatches on, which is the #511 mistake in a new place.
+-- Balls and item_effects stay out for the reason the Gen 1 surface leaves them
+-- out: no link mode lets a bag item be thrown.
+local function surfaceGen2(data, mods)
+  local out = { "[gen2]" }
+  writeRecords(out, data.pokemon, "pokemon", GEN2_SPECIES_FIELDS, NON_SPECIES)
+  -- the growth curves live on the species map as a sibling of the species
+  -- records (data.pokemon.growthRates, written by the extractor and read by
+  -- src/battle/gen2/Mon.lua:growthFor), so they hash as their own section
+  -- rather than as a species with no fields
+  writeRecords(out, data.pokemon and data.pokemon.growthRates,
+               "growth_rates", GEN2_GROWTH_FIELDS)
+  writeRecords(out, data.moves, "moves", GEN2_MOVE_FIELDS)
+  writeGen2TypeChart(out, data)
+  writeRecords(out, data.gen2Statuses, "statuses", GEN2_STATUS_FIELDS)
+  writeRecords(out, data.gen2MoveEffects, "move_effects", GEN2_EFFECT_FIELDS)
+  writeRecords(out, data.gen2HeldItems, "held_items", GEN2_HELD_FIELDS)
+  out[#out + 1] = "[mods]" .. modKey(mods)
+  return table.concat(out)
+end
+
+-- `generation` is optional everywhere: absent means "ask the data"
+-- (Fingerprint.generationOf), which is what every caller but a test does.
+local function surface(data, mods, generation)
+  if (generation or Fingerprint.generationOf(data)) == 2 then
+    return surfaceGen2(data, mods)
+  end
+  return surfaceGen1(data, mods)
+end
+
 Fingerprint.surface = surface
 
 -- mods: { { id, version, affectsLink } } -- the hello's mod array
-function Fingerprint.compute(data, mods)
+function Fingerprint.compute(data, mods, generation)
   if not data then return digest("") end
-  local key = modKey(mods)
+  generation = generation or Fingerprint.generationOf(data)
+  -- the generation rides in the memo key: one dataset asked for both digests
+  -- (a test, a tool) must not be handed the other one back
+  local key = modKey(mods) .. "|" .. tostring(generation)
   local hit = cache[data]
   if hit and hit.key == key then return hit.value end
+  -- The hook keeps its Gen 1 name AND its Gen 1 arity.  `generation` is
+  -- captured by the closure rather than passed as a third argument, so a mod
+  -- that wraps link.fingerprint and forwards nxt(data, mods) -- the shape
+  -- docs/modding.md documents and tests/mod_link_tests.lua exercises -- keeps
+  -- working verbatim on Gold instead of silently dropping the argument and
+  -- computing a Gen 1 digest over Gen 2 data.
   local value = Runtime.call("link.fingerprint", function(d, m)
-    return digest(surface(d, m))
+    return digest(surface(d, m, generation))
   end, data, mods)
   cache[data] = { key = key, value = value }
   return value
@@ -261,25 +441,42 @@ end
 -- exactly which species and moves they rebuild identically
 local recordCache = setmetatable({}, { __mode = "k" })
 
-function Fingerprint.records(data, kind)
-  local fields = RECORD_FIELDS[kind]
-  assert(fields, "no record allowlist for " .. tostring(kind))
+-- The Data path a record kind reads from for a generation.  Only the Gen 2
+-- side ever differs, and only for the registries Schemas.GEN2 namespaces.
+local GEN2_PATHS = { statuses = "gen2Statuses", move_effects = "gen2MoveEffects",
+                     held_items = "gen2HeldItems" }
+
+local function recordMap(data, kind, generation)
+  if generation == 2 then
+    local path = GEN2_PATHS[kind]
+    if path then return data[path] end
+  end
+  return data[kind]
+end
+
+function Fingerprint.records(data, kind, generation)
+  generation = generation or Fingerprint.generationOf(data)
+  local fields = fieldsFor(generation)[kind]
+  assert(fields, ("no record allowlist for %s (generation %s)")
+    :format(tostring(kind), tostring(generation)))
   local perData = recordCache[data]
   if not perData then
     perData = {}
     recordCache[data] = perData
   end
-  if perData[kind] then return perData[kind] end
-  local map = data[kind] or {}
+  local slot = kind .. "|" .. tostring(generation)
+  if perData[slot] then return perData[slot] end
+  local map = recordMap(data, kind, generation) or {}
+  local skip = (generation == 2 and kind == "pokemon") and NON_SPECIES or nil
   local out = {}
   for id, record in pairs(map) do
-    if type(record) == "table" then
+    if type(record) == "table" and not (skip and skip[id]) then
       local buf = { "@" .. id }
       writeFields(buf, record, fields)
       out[id] = digest(table.concat(buf))
     end
   end
-  perData[kind] = out
+  perData[slot] = out
   return out
 end
 

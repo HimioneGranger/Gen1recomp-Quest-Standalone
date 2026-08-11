@@ -1,0 +1,153 @@
+---- 37 > Mount Silver and Red ----
+-----------------------------------
+
+|------------|
+|Mount Silver|
+|------------|
+
+Pokémon in Mount Silver:
+
+#042 Golbat
+#055 Golduck
+#075 Graveler
+#232 Donphan
+#246 Larvitar
+
+Items in Mount Silver:
+
+Escape Rope
+Full Restore
+Protein 
+
+Head west and up from there and you'll be on Mt. Silver. Bring your best team
+with all the HMs (particularly Surf, Waterfall, and Flash). Bring 30 Ultra Balls
+so you can catch the strongest wild Pokémon in any dungeon. Consider having a
+few Max Repels ready in case you get frustrated with the numerous wild Pokémon
+encounters here. I'd suggest trying to catch many of the Pokémon in here,
+though, as they are high-level Pokémon and a few are great to catch. 
+
+Larvitar would be a good Pokémon to catch because its most-evolved form,
+Tyranitar, is an excellent Pokémon. Golduck may also be good if you want a
+higher-level water Pokémon that can also learn HMs Surf, Strength, Waterfall,
+and Whirlpool. 
+
+When you get in, use HM Flash. Head up, then go left and drop down the ledge to
+get the Escape Rope. Jump back down and go right instead of up. Go up the steps
+to the cliff and grab the X Accuracy. 
+
+Head back down the cliff, and go up the middle. This time, go right at the
+intersection. Head a bit to the right, go up the steps, and then up the cliff.
+
+Go along the path, head on right, then up another cliff to the north. Continue
+along the cliff route, and then when there's an intersection to the left and
+right, take the left, drop down and get the Max Elixir. Drop down the ledges all
+the way back to ground level, then again, and then go back up the cliff.
+
+Next, go, left, up, and right. If you go down, use Surf on the lake, and then
+use Waterfall, you can go through an entrance to grab a Full Restore. If you
+then return across the lake, you can go through the cave door, keep going up,
+and you'll find a trainer. 
+
+Your final lineup, if you've been leveling up your starter only, might look like
+this:
+
+Level 82 Starter Evolution
+Level 70 Ho-Oh/Lugia
+Level 50 Snorlax
+Level 48 Golduck
+Level 40 Ho-Oh/Lugia
+Level 39 Tangela
+
+Your final lineup, if balanced, might look like this:
+
+Level 60 Lugia 
+Level 54 Espeon
+Level 53 Dragonair
+Level 53 Sudowoodo
+Level 53 Starter Evolution
+Level 50 Gyarados
+
+You're about to face by far the strongest trainer in the game. Red is the final
+boss. Make sure you have HMs Surf and Strength equipped on any high-level
+Pokémon that can make use of them. Both HMs can be used an unlimited number of
+times and even now, they likely do more damage than almost any move that a
+Pokémon can learn during your game playthrough. You can go back to the Move
+Deleter in Blackthorn City later in the game if you want to replace the moves
+later.
+
+|-----------------------------|
+|Red                          |
+|Level 81 Pikachu (1422 EXP)  |
+|Level 73 Espeon (3081 EXP)   |
+|Level 77 Blastoise (3465 EXP)|
+|Level 75 Snorlax (2475 EXP)  |
+|Level 77 Charizard (3448 EXP)|
+|Level 77 Venusaur (3432 EXP) |
+|You get: 7700G               |
+|-----------------------------|
+
+Red will have three Full Restores that he can use. You will likely need to use
+several Hyper Potions and Revives to keep your Level 70+ Pokémon in the fight.
+
+Strategy VERSUS Pikachu: Pikachu is an electric type Pokémon that cannot damage
+rock or ground type Pokémon. Pikachu is super effective against water type
+Pokémon like Feraligatr. However, despite being the highest level Pokémon that
+Red has, it is pretty frail. You can use your highest powered attack from your
+starter evolution (even if it is a water move) or the highest powered attack
+from Lugia or Ho-Oh, whichever Pokémon has the higher level.
+
+Strategy VERSUS Espeon: Espeon is a dark type that cannot be hit with ghost
+moves. You can use your highest powered attack from your starter evolution or
+the highest powered attack from Lugia or Ho-Oh, whichever Pokémon has the higher
+level.
+
+Strategy VERSUS Blastoise: Blastoise is a water type Pokémon, and the most
+evolved form of Squirtle. Blastoise is strong against fire type Pokémon like
+Typhlosion and Ho-Oh. Blastoise is technically weak against grass type Pokémon,
+but it also has Blizzard, a very strong ice type move, that is super effective
+both against Meganium as well as flying types like Ho-Oh and Lugia. The best
+moves to use against Blastoise are your highest-level grass moves (e.g. from
+Meganium) or your highest-level electric moves that can be taught to a Pokémon
+(like Ho-Oh). If you don't have those as Level 70+ Pokémon, use the highest
+powered attack from your highest-level Pokémon that isn't Typhlosion or Ho-Oh.
+
+Strategy VERSUS Charizard: Charizard is a fire and flying type Pokémon, and the
+most evolved form of Charmander. Charizard is strong against grass type Pokémon
+like Meganium, so don't use Meganium. Charizard can still take damage from fire
+type attacks from Typhlosion and Ho-Oh. Avoid using grass and fire type attacks
+against Charizard. The best moves to use against Charizard are your
+highest-level water type move (Hydro Pump or Surf) from your best Pokémon that
+can use it (Feraligatr or Lugia), or your highest-level electric move that can
+be taught to a Pokémon (like Ho-Oh). If you don't have those as Level 70+
+Pokémon, use the highest powered attack from your highest-level Pokémon that
+isn't Meganium (e.g. Typhlosion or Ho-Oh).
+
+Strategy VERSUS Snorlax: Snorlax is Ash's strongest Pokémon, and takes the
+longest to defeat. Snorlax is bulky and will keep using Rest to restore its
+health. A rock, ground, or steel type Pokémon might take a bit more damage. Use
+the highest powered attack from your starter evolution or the highest powered
+attack from Lugia or Ho-Oh, whichever Pokémon has the higher level.
+
+Strategy VERSUS Venusaur: Venusaur is a grass and poison type Pokémon, and the
+most evolved form of Bulbasaur. Venusaur is a slow and bulky Pokémon that can
+use Synthesis to heal half its HP. Venusaur will be strong against water types
+like Feraligatr, and will take damage well from grass attacks from Meganium.
+Avoid using grass and water attacks against Venusaur. The best moves to use
+against Venusaur will be your fire, flying, or psychic moves that you can have
+Typhlosion, Ho-Oh, or Lugia utilize.
+
+Red is down. You're the best trainer in the Johto and Kanto worlds combined, at
+this time. After defeating Red, he'll give you the money and then the silent
+treatment. He flies away, and then the credits start rolling. After the credits
+roll, save.
+
+The game is over, for the most part. You can still catch the Legendary Dogs at
+this time if you haven't already. If you want to fight Red again, beat the Elite
+Four again and then he'll be back at Mt. Silver, for experience or whatever.
+
+==============================================================================
+==============================================================================
+==============================================================================
+
+(c38)
+-----------------------------------------

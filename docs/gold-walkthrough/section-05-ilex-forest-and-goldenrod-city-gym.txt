@@ -1,0 +1,395 @@
+---- 11 > Ilex Forest and Goldenrod City Gym ----
+-------------------------------------------------
+
+Video Playthrough Link (Slowpoke Well, Azalea Town Gym, Ilex Forest, Goldenrod
+City Gym): https://www.youtube.com/watch?v=LSEriFoAxC0
+
+|-----------|
+|Azalea Town|
+|-----------|
+
+Now leave the gym and heal your Pokémon at the Pokémon Center. Go west and try
+to exit the town and you'll run into your rival. Yay for you! He doesn't believe
+you beat Team Rocket, but let the battle begin.
+
+|--------------------------|
+|Rival                     |
+|Level 12 Gastly (240 EXP) |
+|Level 16 Starter (489 EXP)|
+|Level 14 Zubat (162 EXP)  |
+|You get: 960G             |
+|--------------------------|
+
+Pokémon VERSUS Gastly: Use the highest-powered attack on your highest level
+Pokémon that is NOT a normal type move, as ghost types do not get damaged by
+normal moves. You can't use normal moves with Gastly, but you can use grass,
+fire, or water.
+
+Pokémon VERSUS Starter: Use the highest-powered attack that aren't the type of
+your starter.
+
+Pokémon VERSUS Zubat: Use the highest-powered attack on your highest level
+Pokémon.
+
+Well, at least he admits, "I only lost because my Pokémon were weak." He talks
+tougher than his Pokémon really are. Uncle Ralph calls again about taking care
+of Pokémon and taking out a Zubat. Anyway, heal again, then continue going west
+into Ilex Forest!
+
+Defeat your rival and head the way you were going, west. You'll enter Ilex
+Forest.
+
+|-----------|
+|Ilex Forest|
+|-----------|
+
+Pokémon found in Ilex Forest:
+
+#010 Caterpie
+#011 Metapod
+#013 Weedle
+#041 Zubat
+#043 Oddish
+#046 Paras
+
+Items found in Ilex Forest:
+
+HM01 (Cut)
+Revive
+TM02 (Headbutt)
+TM12 (Sweet Scent)
+
+Keep heading north up the path, then follow the path eastward. Talk to the first
+guy you see. He is standing next to a bush that you can cut. He tells you that
+his boss's Farfetch'd got away. He's sooo irresponsible. Keep following the path
+and you'll find that scary Farfetch'd. XD 
+
+Anyway, if you talk to the Farfetch'd, it'll run away. Far, far away. Keep on
+following it and talking to it. Eventually, it'll turn back the opposite
+direction so make sure you're "pushing" it back the way you came. Grab the
+Revive you see while you're at it. It will then lead you to the man and his
+boss.
+
+Anyway, talk to the boss and he will give you HM01 Cut! You'll want to equip Cut
+on Bellsprout right away, and that is in the fourth section of your backpack.
+Now use HM01 Cut on that bush to keep moving up the path. A new feature is that
+you can just go up to the bush, press A, and it will get cut down if you have a
+Pokémon with Cut in your lineup. You can do the same later with other HMs like
+Strength (with boulders), Surf (with water), and Whirlpool (with, well,
+whirlpools).
+
+Now you enter the Ilex Forest Shrine, and the Ilex Forest Maze. Keep heading
+along the path and grab the X Attack you see, and then the Antidote you spot
+later on the path going east. To the northeast is an Ether, but go right first.
+Talk to the trainer and you'll get TM02 Headbutt, which allows you to headbutt
+other people. Just kidding. It's for your Pokémon and I am a serious person.
+Headbutt lets you shake the little trees that are everywhere in the game,
+sometimes revealing sleeping Pokémon. Then, head back left from there and talk
+to that other trainer for a battle!
+
+Bug Catcher Wayne
+Level 8 Ledyba (122 EXP)
+Level 10 Paras (150 EXP)
+You get: 160G
+
+Keep going along the path and into the building to the north. Talk to the lady
+behind the counter and you'll get TM12 Sweet Scent. Walk through and you'll get
+on Route 34!
+
+|--------|
+|Route 34|
+|--------|
+
+Pokémon found in Route 34:
+
+#019 Rattata
+#063 Abra
+#096 Drowzee
+#132 Ditto
+
+Items found in Route 34:
+
+Soft Sand
+
+Welcome to Route 34. Here, you'll fight even more trainers. Head right up and
+you'll enter a match right away.
+
+Youngster Samuel
+Level 7 Rattata (85 EXP)
+Level 10 Sandshrew (198 EXP)
+Level 8 Spearow (99 EXP)
+Level 8 Spearow (99 EXP)
+You get: 128G
+
+Keep heading up the path to face the guy who sent his Pokémon to the Daycare
+Center!
+
+PoKeFan Brandon
+Level 13 Snubbull (175 EXP)
+You get: 1040G
+
+Continue along the path to face that Youngster, who says he's the best in his
+class at Pokémon.
+
+Youngster Ian
+Level 10 Mankey (157 EXP)
+Level 12 Diglett (207 EXP)
+You get: 192G
+
+Youngster Ian will want to trade phone numbers with you. Now head down through
+some of the wild grass to battle Picnicker Gina.
+
+Picnicker Gina
+Level 9 Hoppip (142 EXP)
+Level 9 Hoppip (142 EXP)
+Level 12 Bulbasaur (163 EXP)
+You get: 240G
+
+Head up from Youngster Ian and you'll find this building to the right. Enter it
+and talk. Thard_Verad notes correctly that only in the Pokémon Crystal Version
+does the Daycare have a free egg and that "there's a PC in the corner of the
+Daycare" if you need it.
+
+Inside the Daycare/Breeding Center with the old man and woman, you can talk to
+the man and he will take one of your Pokémon to level up. Talking to the woman
+will do the same thing. It will cost 100G to take them out, and 100G per level
+up, but their stats won't be as good as if you trained them yourself, obviously.
+To breed Pokémon you must give the old man a Male Pokémon and give the old woman
+a Female Pokémon (or vice-versa) that have the same little icon or sprite. Or
+they must be compatible at breeding.
+
+Then exit the building and go walk around for a little while. Come back when you
+see the man standing outside with your two Pokémon. Talk to him and answer yes,
+he will give you an Egg. If you put in Pokémon of different #'s, for example
+Pidgey and Hoothoot, the resulting egg will be the same species as the female
+Pokémon and with an Attack that the Male had. Just think of the strange
+combinations.
+
+Head back out as you can't really do much here yet. If it's night time, you can
+fight the officers. Thanks to Thard_Verad for pointing out that the Police
+Officers will only battle you at night.
+
+Officer Keith
+Level 17 Growlithe (331 EXP)
+You get: 680G
+
+Move up to take on the final trainer on the route.
+
+Camper Todd
+Level 14 Psyduck (240 EXP)
+You get: 280G
+
+Great! Now, talk to the same guy again and you'll exchange phone numbers. He's
+great. He'll call you later about his awesome looking Psyduck and that he beat
+some tough Rattata.
+
+Then, let's go into Goldenrod City, the LARGEST city in the game, or something
+like that.
+
+If you focused on just leveling up your starter, your lineup might look like
+this:
+
+Level 25 Starter Evolution
+Level 6 Bellsprout
+Level 6 Wooper
+Level 5 Rattata
+Level 5 Unown Egg
+
+If you balanced leveling up your Starter and Raticate:
+
+Level 22 Starter Evolution
+Level 20 Raticate
+Level 8 Bellsprout
+Level 5 Mystery Egg
+Level 5 Pidgey
+Level 4 Wooper
+
+|--------------|
+|Goldenrod City|
+|--------------|
+
+Pokémon found in Goldenrod City:
+
+#66 Machop (Through Trading)
+#133 Eevee (Get from Bill)
+
+Pokémon/Items in Goldenrod's Game Corner: (Coins)
+
+Abra 200              TM 25  5500
+Ekans/Sandshrew 700   TM 14  5500
+Dratini 2100          TM 38  5500
+
+Items found in Goldenrod City:
+
+Bicycle
+Coin Case
+HP Up
+Radio Card
+TM 21
+TM 27
+TM 45
+Squirtwater
+
+Goldenrod City has got to be the biggest city in the game. There's lots to do in
+the city. Heal at the Pokémon Center, then cross the road to the right to the
+Goldenrod City Department Store. There's a beautiful assortment of items on
+every floor:
+
+Level 2: Potions, Heals, Great Balls, Escape Ropes, Repels
+Level 3: X Items (temporary stat boosts)
+Level 4: Stat increase items
+Level 5: TM02, TM33, TM41, TM48 (includes Drownzee-Machop trade and Sunday
+giveaway of TMs)
+Level 6: Vending Machine heal items
+
+Thard_Verad adds, "Super Potions are a scam. As soon as you reach Goldenrod, you
+can go to the top of the Dept. Store and replace all your Potions with Fresh
+Water (same price, 2.5x stronger) and Super Potions with Lemonade (half price,
+60% stronger) If only you could buy in bulk...."
+
+Additionally, Thard_Verad comments, "After you get TM08 Rock Smash, it will be
+added to the Dept. Store's lineup."
+
+Next, you'll want to head to Bill's house. Go through the path just above the
+Pokémon Center and it should be the first house you see. Talk to the girl that's
+closer to the door and you'll get Bill's phone number. Calling it will tell you
+how many Pokémon you have.
+
+After that, we'll go down under the city for some street fighting. Go to the
+house below Bill's, and it turns out to be the entrance to the underground. Go
+downstairs. Go up and you'll face a Game Corner cheater.
+
+Super Nerd Eric
+Level 11 Grimer (211 EXP)
+Level 11 Grimer (211 EXP)
+You get: 352G
+
+Head up to face PoKeManiac Isaac.
+
+PoKeManiac Isaac
+Level 12 Lickitung (325 EXP)
+You get: 720
+
+Grab the Coin Case above him. You'll need it for the Game Corner because
+apparently, nothing else can carry their special coins. Pass by the three
+strange shops, including a Pokémon Salon, and stop in front of the guy that's
+there.
+
+Super Nerd Teru
+Level 7 Magnemite (133 EXP)
+Level 11 Voltorb (241 EXP)
+Level 7 Magnemite (133 EXP)
+Level 9 Magnemite (171 EXP)
+You get: 288G
+
+Head up to face another trainer.
+
+PoKeManiac Donald
+Level 10 Slowpoke (211 EXP)
+Level 10 Slowpoke (211 EXP)
+You get: 600G
+
+Head to the right and you'll see the door is locked, so come back and go up the
+stairs above Donald. Come back out and go to the Pokémon Center to heal.
+
+Now head out of the gym and we'll hit the east side of town (below the train
+tracks) for a Bike. Keep heading down that path till you hit a dead end and
+there's a house. It's the Bike Shop. Talk to the manager inside and he tells you
+that you can borrow a bike if you advertise for him. You can access the bike
+from your backpack. This makes no sense - is it a foldable bike? Eh, whatever.
+It's in the 3rd section of your backpack, so start using it to cruise through
+areas. Once you get out, go to your bicycle and press Sel, which means the item
+will be equipped for use on the Select Button. Now you can simply just press
+Select and you'll be on your bike.
+
+To the west is a train station. The train conductor stands there and says no
+train is coming, but they're still paying him to be there. Now, you'll want to
+visit the Radio Tower in the western side of town. It is a black building just
+south of the train tracks. Talk to the middle man for possible ID matches, then
+talk to the woman on the right for the Radio Quiz.
+
+Question 1: Can the Town Map be displayed on a Pokegear? (YES)
+
+Question 2: Can Nidorina be female only? (YES)
+
+Question 3: Does Kurt, the Pokeball crafts-man, use Aprikorn? (NO)
+
+Question 4: Maikarp won't learn any TM move? (YES)
+
+Question 5: Prof. Oak's Pokémon Talk is a very popular program? Is Marie the
+co-host of the show? (NO, it's Mary)
+
+Now you'll get the Radio Card for your Pokegear, and can listen to the radio
+anytime. There are three radio channels, including Pokémon Music 7.5 with DJ Ben
+and the 8.5 Lucky Channel. Thard_Verad notes correctly that the Buena meeting
+and Blue Card are only available in the Pokémon Crystal Version. Head back out
+now.
+
+Now, let's head for the gym for that 3rd badge, shall we? We'll go back to the
+PoKeMart for supplies later. The gym is in the northeast part of town. This
+gym's trainer all use Normal Pokémon.
+
+Enter the gym and head up to face Beauty Victoria.
+
+Beauty Victoria
+Level 9 Sentret (109 EXP)
+Level 13 Sentret (157 EXP)
+Level 17 Sentret (207 EXP)
+You get: 1496G
+
+Easy battle. Go around her and to the right side of the gym to face the other
+Beauty now.
+
+Beauty Samantha
+Level 16 Meowth (235 EXP)
+Level 16 Meowth (235 EXP)
+You get: 1408G
+
+Start heading left along the path towards the center, for another battle.
+
+Lass Carrie
+Level 18 Snubbull (243 EXP)
+You get: 432G
+
+Go up to fight the last trainer before the gym leader, Lass Bridget. She loves
+to use Jigglypuff and has 3 of them, so expect to get hit by sleep spells.
+
+Lass Bridget
+Level 15 Jigglypuff (243 EXP)
+Level 15 Jigglypuff (243 EXP)
+Level 15 Jigglypuff (243 EXP)
+You get: 360G
+
+Now, me being me, I'd just go straight into the battle against the gym leader
+without items or healing, but I'd recommend going back to the Pokémon Center to
+heal before the battle.
+
+---
+GYM LEADER WHITNEY
+Level 18 Clefairy (261 EXP)
+Level 20 Miltank (856 EXP)
+You get: Plain Badge, 2,000G, & TM45 (Attract)
+---
+
+Strategy VERSUS Clefairy: Use your highest powered attack from your starter.
+
+Strategy VERSUS Miltank: The most troublesome thing about facing a Miltank is
+that it heals with milk and it has an attack that makes your Pokémon get woozy.
+Your Pokémon are then unable to attack the Miltank for a few turns and Miltank
+just slams you with Stomps and Rollouts. Use your highest powered attacks from
+your highest level Pokémon. Flying type moves are also super effective against
+Miltank, and rock Pokémon tend to absorb moves from Miltank better than the
+rest.
+
+Whitney won't give you the Plain Badge at first because she will be upset that
+you've been "so serious". Anyway, she refuses to give you your badge. The
+trainer below you will talk to you. Then talk to Whitney again. She will now
+give you the Plain Badge. It will let your Pokémon use Strength outside of
+battle and it boosts your Pokémon's Speed. She'll also give you TM45 Attract.
+
+==============================================================================
+==============================================================================
+==============================================================================
+
+(c12)
+-------------------------------------------------

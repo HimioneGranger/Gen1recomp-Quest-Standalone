@@ -1,0 +1,133 @@
+---- 33 > Cinnabar Island and Seafoam Islands Gym ----
+------------------------------------------------------
+
+|--------|
+|Route 21|
+|--------|
+
+Pokémon on Route 21:
+
+#072 Tentacool
+#114 Tangela
+
+Surf south on Route 21. There are a few trainers. Nikki, an avid Seel
+enthusiast, wants you to put sunblock on her.
+
+Swimmer Nikki
+Level 28 Seel (600 EXP)
+Level 28 Seel (600 EXP)
+Level 28 Seel (600 EXP)
+Level 28 Dewgong (1056 EXP)
+You get: 560G
+
+There's a fisherman here. He used his Super Rod to catch you, and you didn't
+even notice. Please be more aware of your surroundings.
+
+Fisher Arnold
+Level 34 Tentacruel (1492 EXP)
+You get: 1360G
+
+Head way left then down to...
+
+Swimmer Seth
+Level 29 Quagsire (850 EXP)
+Level 29 Octillery (1018 EXP)
+Level 32 Quagsire (939 EXP)
+You get: 256G
+
+Head down from him and you'll get to Cinnabar Island.
+
+|---------------|
+|Cinnabar Island|
+|---------------|
+
+Cinnabar Island is in a sad state of affairs for its former residents, who fled
+the premises. The volcano has done very well for itself. So you were on Team
+Volcano, you're a monster, but also, you probably won a lot of money in Team
+Rocket's black market gambling scene. You can now enter the Pokémon Center and
+heal your Pokémon. Talk to the two people there and they'll tell you that the
+volcano erupted a year ago (two years after Red, Blue, and Yellow).
+
+You'll notice someone looking at what's left of it. It's Blue! He was the
+Champion of the Pokémon League until Red beat him. He knows you want a challenge
+but he's not in the mood for one yet. He laments, "The volcano erupts, and just
+like that, a whole town disappears." I never thought of Blue as a sentimental
+guy, but here we are. Blue then levitates and flies off into space, presumably
+with Alakazam. Then, surf east to Route 20.
+
+|--------|
+|Route 20|
+|--------|
+
+Pokémon on Route 20:
+
+#072 Tentacool
+
+Head east and you'll come across one trainer.
+
+Swimmer Cameron
+Level 34 Marill (421 EXP)
+You get: 272G
+
+Now head on east to the Seafoam Islands.
+
+|-------------------|
+|Seafoam Islands Gym|
+|-------------------|
+
+Since Cinnabar Island's volcano erupted and destroyed Blaine's gym, it's moved
+to the Seafoam Islands. It's now in the middle of nowhere. You should see a
+small cave at the Seafoam Islands. Go inside and it's Blaine's remote, makeshift
+gym. This gym doesn't even fit the entire screen. The poor guy's become a hermit
+and a caveman. I just heard him grunting and working on his cave painting.
+
+---
+GYM LEADER BLAINE
+Level 45 Magcargo (1485 EXP)
+Level 45 Magmar (1609 EXP)
+Level 50 Rapidash (2056 EXP)
+You get: Volcano Badge, 5,000G
+---
+
+Blaine will have two Full Restores available to use on his Pokémon.
+
+Strategy VERSUS Magcargo: Magcargo has Yawn to put your Pokémon asleep, Recover
+to get back half its HP in one turn, and Overheat, a pretty strong fire move
+that can do significant damage to a starter Pokémon like Meganium and also cause
+burn damage. Don't use Meganium, because it takes damage faster than it can deal
+to Magcargo. You can use a strong normal move from your strongest Pokémon that
+isn't Meganium, like HM Strength, against Magcargo. Additionally, Ho-Oh's
+AncientPower is a super-effective rock move against fire types which also raises
+Ho-Oh's special stats. Or you can use Lugia's Hydro Pump/Surf, as water moves
+are super effective against Magcargo. Feraligatr's water type moves will be
+super effective against all Pokémon in this gym.
+
+Strategy VERSUS Magmar: Magmar has a Confuse Ray move that can prevent your
+Pokémon from attacking. Don't use Meganium, because it takes damage faster than
+it can deal to Magmar. You can use a strong normal move from your strongest
+Pokémon that isn't Meganium, like HM Strength, against Magcargo. Additionally,
+Ho-Oh's AncientPower is a super-effective rock move against fire types which
+also raises Ho-Oh's special stats. Or you can use Lugia's Hydro Pump/Surf, as
+water moves are super effective against Magmar.
+
+Strategy VERSUS Rapidash: Rapidash has the moves Flare Blitz (which also speeds
+Rapidash up) and Bounce (which is a two-turn Fly type move). Don't use Meganium,
+because it takes damage faster than it can deal to Magmar. Additionally, avoid
+using two-turn moves, because Bounce can result in your low-PP moves missing
+entirely. You can use a strong normal move from your strongest Pokémon that
+isn't Meganium, like HM Strength, against Magcargo. Additionally, Ho-Oh's
+AncientPower is a super-effective rock move against fire types which also raises
+Ho-Oh's special stats. Or you can use Lugia's Hydro Pump/Surf, as water moves
+are super effective against Magmar.
+
+Blaine will give you the Volcano Badge and 5,000G. You now have 15 badges! You
+can talk to the guy that comes in, but he's late. Word doesn't travel quickly
+across the sea. Now exit the cave.
+
+
+==============================================================================
+==============================================================================
+==============================================================================
+
+(c34)
+-------------------------------------------------

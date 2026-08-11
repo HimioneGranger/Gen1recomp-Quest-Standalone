@@ -1,9 +1,11 @@
--- Overworld character sprites.  A 12-tile sheet (16x96 PNG) holds 6 16x16
--- frames: stand down/up/left, walk down/up/left (data/sprites/facings.asm).
+-- Overworld character sprites.  The vanilla 12-tile sheet (16x96 PNG) holds
+-- 6 16x16 frames: stand down/up/left, walk down/up/left
+-- (data/sprites/facings.asm).  Mod records may opt into another frame size
+-- and anchor; the defaults below preserve the original grounded placement.
 -- Right-facing frames are horizontal flips of the left frames.
--- Sprites draw 4px above their cell, like the GB engine.
 
 local Assets = require("src.render.Assets")
+local GbcPalette = require("src.render.GbcPalette")
 local PaletteFX = require("src.render.PaletteFX")
 
 local SpriteRenderer = {}
@@ -76,6 +78,58 @@ local WALK = { down = 3, up = 4, left = 5, right = 5 }
 SpriteRenderer.STAND = STAND
 SpriteRenderer.WALK = WALK
 
+-- Sprite records are anchored at the point where the actor stands in the
+-- world.  In the vanilla renderer that point is the bottom-center of a
+-- 16x16 frame: the frame starts at (px, py - 4), so the ground point is
+-- (px + 8, py + 12).  Custom anchors are measured from the frame's top-left
+-- in sheet pixels and may be fractional for a sub-pixel art style.
+local DEFAULT_FRAME_WIDTH = 16
+local DEFAULT_FRAME_HEIGHT = 16
+local DEFAULT_ANCHOR_X = 8
+local DEFAULT_ANCHOR_Y = 16
+local WORLD_ANCHOR_X = 8
+local WORLD_ANCHOR_Y = 12
+SpriteRenderer.DEFAULT_FRAME_WIDTH = DEFAULT_FRAME_WIDTH
+SpriteRenderer.DEFAULT_FRAME_HEIGHT = DEFAULT_FRAME_HEIGHT
+SpriteRenderer.DEFAULT_ANCHOR_X = DEFAULT_ANCHOR_X
+SpriteRenderer.DEFAULT_ANCHOR_Y = DEFAULT_ANCHOR_Y
+
+local function finiteNumber(value)
+  if type(value) ~= "number" or value ~= value
+     or value == math.huge or value == -math.huge then
+    return nil
+  end
+  return value
+end
+
+local function positiveInteger(value, fallback)
+  value = finiteNumber(value)
+  if value and value >= 1 then return math.floor(value) end
+  return fallback
+end
+
+local function numberOr(value, fallback)
+  return finiteNumber(value) or fallback
+end
+
+local function pose(self, facing, walkPhase, stepFlip)
+  if self.frameCount <= 1 then return 0, false end
+  local frame = (self.def.walker and walkPhase == 1)
+                and WALK[facing] or STAND[facing]
+  frame = frame or 0
+  -- Preserve the old fallback for a short custom sheet whose pose table
+  -- names a frame it does not provide.
+  if not self.frames[frame] then frame = 0 end
+  local flip = false
+  if facing == "right" then
+    flip = true
+  elseif (facing == "down" or facing == "up")
+         and walkPhase == 1 and stepFlip then
+    flip = true
+  end
+  return frame, flip
+end
+
 -- seed: any stable per-instance value (e.g. an NPC's `id`) used to resolve
 -- RED++'s per-instance "random" OBP sentinel (PaletteFX.spriteObp)
 function SpriteRenderer.new(spriteDef, seed)
@@ -83,12 +137,60 @@ function SpriteRenderer.new(spriteDef, seed)
   self.def = spriteDef
   self.seed = seed
   self.image = getImage(spriteDef.image)
+  self.frameCount = positiveInteger(spriteDef.frames, 1)
+  self.frameWidth = positiveInteger(spriteDef.frameWidth, DEFAULT_FRAME_WIDTH)
+  self.frameHeight = positiveInteger(spriteDef.frameHeight, DEFAULT_FRAME_HEIGHT)
+  self.anchorX = numberOr(spriteDef.anchorX, self.frameWidth / 2)
+  self.anchorY = numberOr(spriteDef.anchorY, self.frameHeight)
   local iw, ih = self.image:getDimensions()
   self.frames = {}
-  for f = 0, spriteDef.frames - 1 do
-    self.frames[f] = love.graphics.newQuad(0, f * 16, 16, 16, iw, ih)
+  for f = 0, self.frameCount - 1 do
+    self.frames[f] = love.graphics.newQuad(0, f * self.frameHeight,
+                                           self.frameWidth, self.frameHeight,
+                                           iw, ih)
   end
   return self
+end
+
+-- Return the sheet rectangle and top-left-relative anchor for a frame.  The
+-- result is a fresh table so a custom render pipeline may annotate it without
+-- changing the renderer's shared definition.
+function SpriteRenderer:getFrameGeometry(frame)
+  frame = math.floor(finiteNumber(frame) or 0)
+  if frame < 0 then frame = 0 end
+  if frame >= self.frameCount then frame = self.frameCount - 1 end
+  return {
+    frame = frame,
+    x = 0,
+    y = frame * self.frameHeight,
+    width = self.frameWidth,
+    height = self.frameHeight,
+    anchorX = self.anchorX,
+    anchorY = self.anchorY,
+    quad = self.frames[frame],
+  }
+end
+
+-- Return the frame geometry selected by the ordinary 2D pose rules, plus the
+-- horizontal mirror state that :draw applies.  This is the supported hook for
+-- custom render pipelines that need to draw actors with the same pose/flip.
+function SpriteRenderer:getPoseGeometry(facing, walkPhase, stepFlip)
+  local frame, flip = pose(self, facing, walkPhase, stepFlip)
+  local geometry = self:getFrameGeometry(frame)
+  geometry.facing = facing
+  geometry.walkPhase = walkPhase
+  geometry.stepFlip = stepFlip
+  geometry.mirror = flip
+  return geometry
+end
+
+-- Screen-space top-left for the actor's current world anchor.  World-facing
+-- effects such as fishing can use this instead of assuming a 16x16 frame.
+function SpriteRenderer:getScreenOrigin(px, py, camX, camY)
+  local baseX = math.floor(px - camX) + WORLD_ANCHOR_X
+  local baseY = math.floor(py - camY) + WORLD_ANCHOR_Y
+  return math.floor(baseX - self.anchorX),
+         math.floor(baseY - self.anchorY)
 end
 
 -- The image this sprite would draw from right now: the plain sheet, or the
@@ -103,8 +205,38 @@ end
 -- pipeline that renders into its own canvas never runs through it.  For the
 -- same reason the OG-RED bake is returned unconditionally here rather than
 -- only during a redraw pass -- there is no later pass to restore it.
+-- Gen 2 hands its OBJ palette over explicitly.  Gold is a CGB-native game:
+-- every OW sprite already has a real 4-color OBJ palette (PAL_OW_* crossed
+-- with the time of day, engine/gfx/color.asm MapObjectPals), so there is
+-- nothing for the PaletteFX mode ladder below to infer -- src/world/gen2 just
+-- says what the colors are.  It rides the same getObpImage bake as RED++,
+-- which is also what keys OBJ color 0 to alpha; the sheets carry no real
+-- alpha of their own, so a raw blit would put a white box behind every
+-- character.
+--
+-- `group` must be distinct per palette or the bake cache collides -- callers
+-- pass something like "gen2:NITE:1".
+function SpriteRenderer:setObjPalette(colors, group)
+  self.objColors = colors
+  self.objGroup = group or "gen2"
+end
+
+-- The Gen 2 OBJ palette with the COLOR option applied.  Resolved on the way
+-- to the bake rather than where the world hands the colours over: the option
+-- can change between two frames of a standing map, and applyPalettes only
+-- runs on map entry and once a second.  The mode joins the cache group
+-- because the bake is per-palette -- without it, DMG would keep serving the
+-- colour bake it made first.
+function SpriteRenderer:gen2Obp()
+  return GbcPalette.resolve(self.objColors),
+    self.objGroup .. "|" .. tostring(GbcPalette.mode)
+end
+
 function SpriteRenderer:resolveImage()
   if self.def.trueColor then return self.image end
+  if self.objColors then
+    return getObpImage(self.def.image, self:gen2Obp())
+  end
   if PaletteFX.usesGbcPack() then
     local colors, group = PaletteFX.spriteObp(self.def, self.seed)
     if colors then return getObpImage(self.def.image, colors, group) end
@@ -125,27 +257,43 @@ end
 
 -- facing: down/up/left/right; walkPhase: 0 stand, 1 walk; flip: alternate
 -- steps mirror the walk frame for up/down (GB uses OAM flip for this).
-local function blitFrame(image, quad, x, y, flip, redraw)
+local function blitFrame(image, quad, x, y, flip, redraw, frameWidth)
+  frameWidth = frameWidth or DEFAULT_FRAME_WIDTH
   if flip then
-    love.graphics.draw(image, quad, x + 16, y, 0, -1, 1)
-    if redraw then PaletteFX.markSpriteRedraw(image, quad, x + 16, y, -1) end
+    love.graphics.draw(image, quad, x + frameWidth, y, 0, -1, 1)
+    if redraw then
+      PaletteFX.markSpriteRedraw(image, quad, x + frameWidth, y, -1)
+    end
   else
     love.graphics.draw(image, quad, x, y)
     if redraw then PaletteFX.markSpriteRedraw(image, quad, x, y, 1) end
   end
 end
 
--- topHalf blits only the upper 8 rows of the frame: FishingAnim overwrites the
--- bottom tile row of the standing frames with the fishing pose art, which the
--- caller then draws itself through :drawTile (Player:draw, #384)
-function SpriteRenderer:draw(px, py, camX, camY, facing, walkPhase, stepFlip, topHalf)
-  local x = math.floor(px - camX)
-  local y = math.floor(py - camY) - 4
+-- topHalf blits everything above the bottom 8-pixel tile row: FishingAnim
+-- overwrites that row of the standing frames with fishing pose art, which the
+-- caller then draws itself through :drawTile (Player:draw, #384).  Vanilla
+-- frames therefore still draw 8 rows, while taller frames keep their larger
+-- body and reserve only the overlay row.
+-- `forceFlip` is the caller asking for the X-flipped copy of the frame it
+-- already picked, for the facings whose OAM rows are the mirror of another
+-- row's: FacingWeirdTree3 is FacingWeirdTree1's four tiles with the columns
+-- swapped and OAM_XFLIP on each (data/sprites/facings.asm:192-197).  Optional
+-- and trailing, so every existing call site is unchanged.
+function SpriteRenderer:draw(px, py, camX, camY, facing, walkPhase, stepFlip,
+    topHalf, forceFlip)
+  local x, y = self:getScreenOrigin(px, py, camX, camY)
   local image = self.image
   local redraw = false
-  -- full-color art claims its 16x16 cell out of the shade-remap pass
+  -- True-color sheets bypass every palette bake; the screen-space exemption
+  -- is recorded below once the final frame/height is known.
   if self.def.trueColor then
-    PaletteFX.markTrueColor(x, y, 16, 16)
+    image = self.image
+  elseif self.objColors then
+    -- Gen 2: the palette came from the caller (setObjPalette).  Like RED++
+    -- this bakes to a true-color, real-alpha image and there is no BG zone
+    -- shader over the Gen 2 world to exempt it from.
+    image = getObpImage(self.def.image, self:gen2Obp())
   elseif PaletteFX.usesGbcPack() then
     -- RED++: the world canvas is already true-color (TileRenderer bakes
     -- terrain, this bakes the sprite) and the world pass runs unshaded
@@ -177,31 +325,29 @@ function SpriteRenderer:draw(px, py, camX, camY, facing, walkPhase, stepFlip, to
     -- being colorized by the zone IS the point (#301).
     image = getObpImage(self.def.image, PaletteFX.dmgObj())
   end
-  -- single-frame sprites (item balls, fossils...) have one fixed pose;
+  -- Single-frame sprites (item balls, fossils...) have one fixed pose;
   -- still 3-frame sprites turn to face (the nurse at her machine,
-  -- facePlayer on STAY NPCs) but never show walk frames
-  if self.def.frames <= 1 then
-    blitFrame(image, self.frames[0], x, y, false, redraw)
-    return
-  end
-  local frame = (self.def.walker and walkPhase == 1)
-                and WALK[facing] or STAND[facing]
-  local flip = false
-  if facing == "right" then
-    flip = true
-  elseif (facing == "down" or facing == "up") and walkPhase == 1 and stepFlip then
-    flip = true
-  end
-  local quad = self.frames[frame] or self.frames[0]
-  if topHalf then
+  -- facePlayer on STAY NPCs) but never show walk frames.
+  local frame, flip = pose(self, facing, walkPhase, stepFlip)
+  if forceFlip then flip = true end
+  local quad = self.frames[frame]
+  local drawHeight = self.frameHeight
+  if topHalf and self.frameCount > 1 then
     self.halfFrames = self.halfFrames or {}
     if not self.halfFrames[frame] then
       local iw, ih = self.image:getDimensions()
-      self.halfFrames[frame] = love.graphics.newQuad(0, frame * 16, 16, 8, iw, ih)
+      local topHeight = math.max(1, self.frameHeight - math.min(8, self.frameHeight))
+      self.halfFrames[frame] = love.graphics.newQuad(
+        0, frame * self.frameHeight, self.frameWidth, topHeight, iw, ih)
     end
     quad = self.halfFrames[frame]
+    drawHeight = math.max(1, self.frameHeight - math.min(8, self.frameHeight))
   end
-  blitFrame(image, quad, x, y, flip, redraw)
+  -- Full-color art claims exactly the portion of the frame that was drawn.
+  if self.def.trueColor then
+    PaletteFX.markTrueColor(x, y, self.frameWidth, drawHeight)
+  end
+  blitFrame(image, quad, x, y, flip, redraw, self.frameWidth)
 end
 
 -- Blit a loose 16-wide fx tile at screen (x, y) wearing THIS sprite's OBJ
@@ -225,7 +371,7 @@ function SpriteRenderer:drawTile(path, x, y, flip)
   self.tileQuads = self.tileQuads or {}
   self.tileQuads[path] = self.tileQuads[path]
                          or love.graphics.newQuad(0, 0, iw, ih, iw, ih)
-  blitFrame(image, self.tileQuads[path], x, y, flip, redraw)
+  blitFrame(image, self.tileQuads[path], x, y, flip, redraw, iw)
 end
 
 return SpriteRenderer

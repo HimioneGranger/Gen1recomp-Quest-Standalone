@@ -1,0 +1,232 @@
+---- 32 > Mount Moon and Routes 1-4 ----
+----------------------------------------
+
+|-------|
+|Route 3|
+|-------|
+
+Pokémon on Route 3: 
+
+#019 Rattata
+#023 Ekans
+#024 Arbok
+
+As you follow the path east on Route 3, you'll face four trainers.
+
+Youngster Warren
+Level 35 Fearow (1215 EXP)
+You get: 560G
+
+Head up, then right to...
+
+Youngster Jimmy
+Level 33 Raticate (819 EXP)
+Level 33 Arbok (1039 EXP)
+You get: 528G
+
+Head on right to...
+
+Firebreather Otis
+Level 29 Magmar (1036 EXP)
+Level 32 Weezing (1185 EXP)
+Level 29 Magmar (1036 EXP)
+You get: 1392G
+
+Head right and along the path, then up to...
+
+Firebreather Burt
+Level 32 Koffing (781 EXP)
+Level 32 Slugma (534 EXP)
+You get: 1536G
+
+Before you head into Mount Moon, heal back at the Pewter City Pokémon Center,
+come back, and then save, because you're about to have another major battle.
+
+|----------|
+|Mount Moon|
+|----------|
+
+Pokémon at Mt. Moon:
+
+#041 Zubat
+#046 Parus
+#074 Geodude
+
+When you get to Mt. Moon, you will encounter your rival for the first time in a
+long time. This may or may not be the final time you battle him, but he has
+levelled up his Pokémon and finally has six Pokémon. At this point, you can use
+any high-powered moves from your highest-level Pokémon that the Rival's Pokémon
+doesn't resist, and you'll be fine.
+
+|------------------------------------------|
+|Rival                                     |
+|Level 41 Sneasel (1159 EXP)               |
+|Level 42 Golbat (1539 EXP)                |
+|Level 45 Starter Evolution (2005-2025 EXP)|
+|Level 41 Magneton (1414 EXP)              |
+|Level 43 Gengar (1750 EXP)                |
+|Level 43 Alakazam (1713 EXP)              |
+|You get: 4500G                            |
+|------------------------------------------|
+
+Strategy VERSUS Sneasel: Sneasel is a dark type, so use the highest-powered
+attack on your highest-level Pokémon that isn't a psychic move.
+
+Strategy VERSUS Golbat: Golbat is a poison and flying type. Use the
+highest-powered attack on your highest-level Pokémon that isn't a ground move.
+Golbat is a flying type that resists ground moves. Electric moves will be super
+effective. Beware of Confuse Ray, as that will confuse your Pokémon and take
+away attack opportunities.
+
+Strategy VERSUS Starter Evolution: The starter evolution will have the type
+advantage on your starter, so don't use same-type attacks from your own starter.
+Use the most high-powered attack on your highest-level Pokémon (likely Strength
+or Body Slam). Or you can utilize Lugia/Ho-Oh to do the requisite water damage
+against Typhlosion or fire damage against Meganium.
+
+Strategy VERSUS Magneton: Use the most high-powered attack on your highest-level
+Pokémon. Magneton does resist most types of moves due to its steel typing, but
+fire and fighting moves would be strong against it.
+
+Strategy VERSUS Gengar: Gengar is a ghost and poison type. Use the most
+high-powered attack on your highest-level Pokémon that isn't a normal or
+fighting move, as Gengar will completely resist those attacks as a ghost type.
+
+Strategy VERSUS Alakazam: Alakazam is a pure psychic type. Use the most
+high-powered attack on your highest-level Pokémon that isn't a fighting or
+psychic move.
+
+Your rival's not nearly as confident as he was at the beginning of the game,
+after losing to you over and over. Save after you beat the Rival, and heal back
+at a Pokémon Center if that's useful. There are two ways past Mount Moon. If you
+go right from your Rival battle, up the ladder, and then out, you can go to a
+shop outside that sells Fresh Water, Soda Pop, and Lemonade. If you then go down
+into another cave entrance and down the ladder, you'll make your way through.
+
+Alternatively, if you go down from the Rival battle, then to the right, and go
+out that door, you'll end up in the same spot as going the path above. Either
+way, you can face up to three trainers on your east on Route 4.
+
+Thard_Verad adds, "Monday nights at Mt. Moon, you might catch Clefairy dancing
+at the lake. Bring Rock Smash." Also, "After you defeat Silver at Mt. Moon, you
+can challenge him at Indigo Plateau once a day on Monday and Wednesday. You can
+also visit Dragon Den on Tuesday or Thursday and see him training."
+
+|-------|
+|Route 4|
+|-------|
+
+Pokémon on Route 4:
+
+#019 Rattata
+#021 Spearow
+#024 Arbok
+
+Item on Route 4:
+
+HP Up
+
+Route 4 has three trainer battles as you head east.
+
+Picnicker Hope
+Level 34 Flaaffy (852 EXP)
+You get: 680G
+
+Bird Keeper Hank
+Level 12 Pidgey (141 EXP)
+Level 34 Pidgeot (1252 EXP)
+You get: 816G
+
+Picnicker Sharon
+Level 31 Furret (769 EXP)
+Level 33 Rapidash (1357 EXP)
+You get: 660G
+
+Head east, then up to grab the HP Up. Now, you can fly back to Pewter City to
+heal at the Pokémon Center, head south onto Route 2 and south through Viridian
+Forest, and you'll be in Viridian City.
+
+|-------------|
+|Viridian City|
+|-------------|
+
+North from the Pokémon Center is the One-on-One Trainer House. This is probably
+your easiest way of getting experience every day. You can go in here every day
+to fight Trainer Cal, or a placeholder for Cal. Simply go downstairs in that
+house to do so. Head left after you go downstairs and the lady will talk to you.
+Say Yes and you can battle Cal after you go down. He will have the final
+evolutions of the three starters.
+
+Thard_Verad adds, "Pokemon Trainer Cal is a placeholder. If you Mystery Gift
+with anyone, they can show up at the Trainer House instead."
+
+Pokémon Trainer Cal
+Level 50 Meganium (2227 EXP)
+Level 50 Typhlosion (2238 EXP)
+Level 50 Feraligatr (2250 EXP)
+You get: 5000G
+
+Strategy VERSUS Meganium: Meganium is a grass type. Avoid using grass or water
+moves. Use fire or flying moves from Typhlosion, Ho-Oh, or Lugia against
+Meganium. Keep in mind that Meganium has Toxic, and Toxic can inflict poison
+damage on your Pokémon every turn.
+
+Strategy VERSUS Typhlosion: Typhlosion is a fire type and its best move is
+Flamethrower, although its fighting-move Focus Blast also packs a punch. Avoid
+using fire or grass moves. Use water moves, like Surf, Waterfall, Hydro Pump
+from Feraligatr, Lugia, or Gyarados. Rock moves like Ho-Oh's AncientPower can
+also be effective.
+
+Strategy VERSUS Feraligatr: Feraligatr is a strong water type. Avoid using fire
+or water moves. Use grass or electric moves against Feraligatr. Keep in mind
+that Feraligatr can use Ice Punch against Meganium and all the flying
+legendaries (Ho-Oh, Lugia, and others that you catch later). Additionally,
+Feraligatrs water moves can still be effective against electric type Pokémon
+despite being weak to electric attacks.
+
+Then head south onto Route 1 towards Pallet Town.
+
+|-------|
+|Route 1|
+|-------|
+
+Pokémon on Route 1:
+
+#016 Pidgey
+#162 Furret
+
+Item on Route 1:
+
+Bitter Berry
+
+Unlike in Red, Blue, and Yellow, there are two Pokémon trainers. You can grab
+the Bitter Berry on the way down to fight the two trainers.
+
+Schoolboy Danny
+Level 31 Jynx (909 EXP)
+Level 31 Electrabuzz (1035 EXP)
+Level 31 Magmar (1108 EXP)
+You get: 992G
+
+Cooltrainer Quinn
+Level 38 Ivysaur (1147 EXP)
+Level 38 Starmie (1684 EXP)
+You get: 1824G
+
+Now head south into Pallet Town!
+
+|-----------|
+|Pallet Town|
+|-----------|
+
+Talk with Professor Oak in his lab (the biggest building). He notices your Kanto
+badges. He tells you that he'll give you a prize if you get all the badges, so
+remember that. The houses for Red and Blue are here. You can now fly to Pallet
+Town. Now, surf south onto Route 21.
+
+==============================================================================
+==============================================================================
+==============================================================================
+
+(c33)
+------------------------------------------------------

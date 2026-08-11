@@ -69,6 +69,21 @@ do
   local n2, m2 = SaveData.slotSummary(nil)
   T.eq(n2, nil, "slotSummary of an empty slot has no name")
   T.eq(m2, nil, "slotSummary of an empty slot has no meta")
+
+  -- A Gen 2 (Gold) save stores playTime as a { hours, minutes, seconds,
+  -- frames } table, not a seconds count.  The launcher lists EVERY version's
+  -- slots, so a math.floor on that table crashed the whole launcher the moment
+  -- a Gold save existed -- and dropped its CONTINUE row.  slotSummary reads
+  -- both shapes now.
+  local gName, gMeta = SaveData.slotSummary({
+    player = { name = "GOLD" },
+    playTime = { hours = 3, minutes = 35, seconds = 40, frames = 45 },
+    pokedex = { owned = { CYNDAQUIL = true, PIDGEY = true } },
+  })
+  T.eq(gName, "GOLD", "slotSummary reads a Gen 2 save's name")
+  T.eq(gMeta.dexCount, 2, "and its dex count")
+  T.eq(gMeta.timeText, "3:35",
+    "and formats the Gen 2 { hours, minutes, seconds } playTime without crashing")
 end
 
 -- ---------------------------------------------- legacy migration happy path

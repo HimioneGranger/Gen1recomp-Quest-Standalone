@@ -661,9 +661,8 @@ end
 -- AskName runs for party (AddPartyMon) and box (SendNewMonToBox) when a
 -- script runner is present; mods that pre-set gift.nickname skip it.
 -- Box deposits also print SentToBoxText (give_pokemon.asm:36-37).
--- skipNickname suppresses the AskName prompt: Yellow's lab Pikachu is
--- added straight through AddPartyMon (pokeyellow scripts/OaksLab.asm
--- OaksLabPlayerReceivedMonText) -- the starter Pikachu keeps its name.
+-- skipNickname suppresses AskName for callers that name the gift themselves;
+-- no vanilla script uses it (pokeyellow scripts/OaksLab.asm, #1013)
 function Commands.give_pokemon(ctx, species, level, skipNickname)
   -- Native mods can transform a gift before the Pokémon object is created.
   -- This is intentionally an event rather than a special-case starter hook:
@@ -1097,6 +1096,17 @@ function Commands.march_in_place(ctx, objIndex, on)
   ow.marchers[npc] = on and true or nil
 end
 
+-- pikachu_make_way: callfar OaksLabPikachuMovementScript (pokeyellow
+-- scripts/OaksLab_2.asm); a no-op without a Yellow follower (#1021)
+function Commands.pikachu_make_way(ctx)
+  local ow = ctx.overworld
+  if not ow then return end
+  local runner = ctx.runner
+  local started = require("src.world.PikachuFollower")
+    .oaksLabMakeWay(ctx.game, ow, function() runner:resume() end)
+  if started then runner:yield() end
+end
+
 -- play_music <songId> [opts]: switch map music now; opts.keep marks it
 -- to survive the next warp (the story files' keepMusic idiom).
 -- opts.tempo is the Music_*AlternateTempo override (audio/alternate_tempo.asm
@@ -1359,7 +1369,7 @@ for _, verb in ipairs({ "show_text", "ask", "choice", "start_battle", "warp",
     "old_man_demo", "static_battle", "rival_battle", "give_item",
     "give_pokemon", "wait",
     "wait_flag", "move_player", "move_npc", "move_npc_to", "walk_npc",
-    "emote", "fade", "pan_camera", "play_once" }) do
+    "emote", "fade", "pan_camera", "play_once", "pikachu_make_way" }) do
   local meta = Commands.meta[verb] or {}
   Commands.meta[verb] = meta
   meta.blocking = true

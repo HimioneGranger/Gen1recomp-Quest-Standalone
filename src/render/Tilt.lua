@@ -129,6 +129,21 @@ function Tilt.groundPoint(cx, cy, vw, vh)
   return sx, sy, scale
 end
 
+-- Is a flat foot point on the ground quad at all?
+--
+-- The ground is the flat world canvas warped onto the perspective plane, so it
+-- STOPS at that canvas.  groundPoint has no such edge: it happily projects a
+-- point far above the viewport, and perspective pulls it back down toward the
+-- horizon, which is how an NPC two screens away ended up standing over the
+-- border fill past where the map is drawn at all.  Billboards ask this first
+-- and skip anything the ground does not reach.  `margin` is the sprite's own
+-- size, so someone half off the edge still draws.
+function Tilt.onGround(fx, fy, vw, vh, margin)
+  margin = margin or 0
+  return fx >= -margin and fx <= (vw or 0) + margin
+     and fy >= -margin and fy <= (vh or 0) + margin
+end
+
 function Tilt.viewGrowth()
   local a = Tilt.angle
   if a <= 0 then return 1 end

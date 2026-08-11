@@ -32,6 +32,7 @@
 
 local Manifest = require("src.mods.Manifest")
 local ManagerState = require("src.mods.ManagerState")
+local ModTargets = require("src.mods.ModTargets")
 local Semver = require("src.mods.Semver")
 local Version = require("src.core.Version")
 local SaveData = require("src.core.SaveData")
@@ -45,8 +46,20 @@ local LauncherMods = {}
 -- the id -> validated-manifest map resolveToggle reads (its dependencySpecs,
 -- conflictSpecs, version and game_version are exactly the fields the loader's
 -- Manifest.validate produced); enabledSet is the current desired enable-set.
-local function statusFor(mods, id, enabledSet, enabled)
+local function statusFor(mods, id, enabledSet, enabled, version, forcedFor)
   local m = mods[id]
+  local forced = forcedFor(id)
+  -- The game this mod is for outranks everything below it: a mod that is not
+  -- going to run here has no useful conflict or dependency verdict.  Same
+  -- source as the in-game manager (src/mods/ModTargets.lua), so the two
+  -- surfaces cannot disagree about the same mod.
+  if version and not ModTargets.supports(m, version) then
+    if forced then
+      return "warn", "Forced onto " .. ModTargets.gameLabel(version)
+        .. " by you (untested)"
+    end
+    return "other_game", ModTargets.detail(m, version)
+  end
   -- conflict only bites an enabled mod: resolveToggle's conflict list is
   -- bidirectional (this mod's conflicts spec vs an enabled other, and an
   -- enabled other's spec vs this mod), which is exactly the launcher chip.
@@ -59,8 +72,10 @@ local function statusFor(mods, id, enabledSet, enabled)
         "Conflicts with " .. ((other and other.name) or otherId)
     end
   end
-  -- warn: the engine is outside the mod's game_version range
-  if m.game_version
+  -- warn: the engine is outside the mod's game_version range.  The dev
+  -- placeholder is skipped here exactly as Loader.devEngine skips it, so the
+  -- launcher and the loader cannot disagree about the same mod.
+  if m.game_version and Version.engine:match("^0%.0%.0%-") == nil
       and not Semver.satisfies(Version.engine, m.game_version) then
     return "warn", "Needs engine " .. m.game_version
       .. " (have " .. Version.engine .. ")"
@@ -74,6 +89,13 @@ local function statusFor(mods, id, enabledSet, enabled)
       return "warn", "Needs " .. spec.id .. " (not installed)"
     elseif not enabledSet[spec.id] then
       return "warn", "Needs " .. spec.id .. " (disabled)"
+    -- installed and on, but not for THIS game: the loader skips the
+    -- dependency and the skip is contagious (Loader:_enforceDependencies),
+    -- so a mod that runs everywhere still does not run here
+    elseif version
+        and not ModTargets.runsHere(dep, version, nil, forcedFor(spec.id)) then
+      return "warn", "Needs " .. spec.id .. " (not for "
+        .. ModTargets.gameLabel(version) .. ")"
     elseif spec.range
         and not Semver.satisfies(dep.version, spec.range) then
       return "warn", "Needs " .. spec.id .. " " .. spec.range
@@ -82,34 +104,44 @@ local function statusFor(mods, id, enabledSet, enabled)
   return "ok", "Ready"
 end
 
--- deriveList(manifests, options) -> the panel row list, pure.
+-- deriveList(manifests, options [, version]) -> the panel row list, pure.
 -- manifests is an array of validated manifests (Manifest.validate output);
--- options is the options table (only options.mods is read).  Rows come back
--- sorted by id so the panel order is stable.
-function LauncherMods.deriveList(manifests, options)
-  local mods = options and options.mods or {}
+-- options is the options table (options.mods, options.modsByVersion and
+-- options.modsGen2 are read).  `version` is the game the panel is showing:
+-- nil keeps the pre-per-game view, where the shared flag is the whole answer.
+-- Rows come back sorted by id so the panel order is stable.
+function LauncherMods.deriveList(manifests, options, version)
   local ordered = {}
   for _, m in ipairs(manifests) do ordered[#ordered + 1] = m end
   table.sort(ordered, function(a, b) return a.id < b.id end)
 
+  -- the override is one answer per game (SaveData.modForced), the same scope
+  -- the loader resolves it under
+  local forcedFor = function(id)
+    return version and SaveData.modForced(options, id, version) or false
+  end
   local byId, enabledSet = {}, {}
   for _, m in ipairs(ordered) do
     byId[m.id] = m
-    -- missing entry means enabled, matching the loader -- except experimental
-    -- mods, which stay off until the player opts in
-    if mods[m.id] == false then
-      -- stay off
-    elseif mods[m.id] == true then
-      enabledSet[m.id] = true
-    elseif not m.experimental then
-      enabledSet[m.id] = true
-    end
+    -- this game's choice, then the shared flag, then the default: enabled,
+    -- matching the loader -- except experimental mods, which stay off until
+    -- the player opts in.  Scoped through modScope, so this reads exactly what
+    -- setEnabled writes and the loader loads: while per-game flags are a
+    -- preview the shared flag is the whole answer on every surface.
+    local decided = SaveData.modEnabled(options, m.id, SaveData.modScope(version))
+    if decided == nil then decided = not m.experimental end
+    if decided then enabledSet[m.id] = true end
   end
 
   local out = {}
   for _, m in ipairs(ordered) do
     local enabled = enabledSet[m.id] == true
-    local status, detail = statusFor(byId, m.id, enabledSet, enabled)
+    local forced = forcedFor(m.id)
+    local status, detail =
+      statusFor(byId, m.id, enabledSet, enabled, version, forcedFor)
+    -- nil, not false, when the panel is showing every game at once
+    local here = nil
+    if version then here = ModTargets.runsHere(m, version, nil, forced) end
     local raw = m.raw or {}
     local badge = tostring(raw.category or m.profile or "MOD"):upper()
     if m.experimental then badge = "EXPERIMENTAL" end
@@ -124,6 +156,10 @@ function LauncherMods.deriveList(manifests, options)
       statusDetail = detail,
       github = m.github,
       experimental = m.experimental == true,
+      -- what game this mod is for, and whether it will run on the one the
+      -- panel is showing (src/mods/ModTargets.lua)
+      targets = ModTargets.chip(m),
+      targetsHere = here,
     }
   end
   return out
@@ -239,13 +275,13 @@ local function discover()
   return out
 end
 
--- list() -> the mods-panel rows for the current install.  Reads the same
--- options.mods enable-state the loader persists, so a toggle here is what the
--- game sees on its next boot.
-function LauncherMods.list()
+-- list([version]) -> the mods-panel rows for the current install.  Reads the
+-- same enable-state the loader persists, so a toggle here is what the game
+-- sees on its next boot; `version` narrows that to one game's answers.
+function LauncherMods.list(version)
   local ok, result = pcall(function()
     local options = SaveData.loadOptions()
-    return LauncherMods.deriveList(discover(), options)
+    return LauncherMods.deriveList(discover(), options, version)
   end)
   if not ok then
     -- a single bad options/mod file must not blank the launcher
@@ -328,27 +364,27 @@ function LauncherMods.translationStrings()
   return merged
 end
 
--- setEnabled(id, enabled): persist options.mods[id] in the exact shape
--- Loader:_saveState writes (a plain boolean), so the running game and the
--- in-game ManagerState pick it up unchanged.
-function LauncherMods.setEnabled(id, enabled)
+-- setEnabled(id, enabled [, version]): persist options.mods[id] in the exact
+-- shape Loader:_saveState writes (a plain boolean), so the running game and
+-- the in-game ManagerState pick it up unchanged.  With `version` the choice
+-- lands in that game's overlay instead and no other game moves.
+function LauncherMods.setEnabled(id, enabled, version)
   local options = SaveData.loadOptions()
-  options.mods = options.mods or {}
-  options.mods[id] = enabled and true or false
+  SaveData.setModEnabled(options, id, enabled, SaveData.modScope(version))
   SaveData.saveOptions(options)
   return true
 end
 
--- setAllEnabled(ids, enabled): the launcher's Enable all / Disable all buttons
--- (#647).  Writes exactly the options.mods shape setEnabled does, but loads and
+-- setAllEnabled(ids, enabled [, version]): the launcher's Enable all / Disable
+-- all buttons (#647).  Writes what setEnabled writes, but loads and
 -- saves once for the whole list: saveOptions rewrites the whole options file per
 -- call, so looping setEnabled over a big mods folder is one disk write per mod
 -- and leaves a half-applied state behind if one of them fails.
-function LauncherMods.setAllEnabled(ids, enabled)
+function LauncherMods.setAllEnabled(ids, enabled, version)
   local options = SaveData.loadOptions()
-  options.mods = options.mods or {}
+  local scope = SaveData.modScope(version)
   for _, id in ipairs(ids or {}) do
-    options.mods[id] = enabled and true or false
+    SaveData.setModEnabled(options, id, enabled, scope)
   end
   SaveData.saveOptions(options)
   return true

@@ -13,9 +13,22 @@ end
 -- screen.pushed/popped fire after enter/exit so listeners observe the
 -- settled state; the wants guard keeps the no-listener path allocation-free
 
+-- enter/exit are OPTIONAL callbacks, so the test is "is it callable", not "is
+-- it there".  A state is an ordinary table and `exit` is an ordinary word: the
+-- Gen 2 GameFreak screen counts its 16-frame exit tail in a field, and under a
+-- truthiness test the stack called into a number and took the process down at
+-- a screen hand-off.  Reserving the names is still the contract (see
+-- src/ui/gen2/GameFreakPresents.lua's exitTail), but the stack does not need
+-- to be the thing that enforces it by crashing.
+local function callback(state, name)
+  local fn = state and state[name]
+  return type(fn) == "function" and fn or nil
+end
+
 function StateStack:push(state, ...)
   table.insert(self.states, state)
-  if state.enter then state:enter(...) end
+  local enter = callback(state, "enter")
+  if enter then enter(state, ...) end
   if Runtime.wants("screen.pushed") then
     Runtime.emit("screen.pushed", { state = state })
   end
@@ -23,7 +36,8 @@ end
 
 function StateStack:pop()
   local state = table.remove(self.states)
-  if state and state.exit then state:exit() end
+  local exit = callback(state, "exit")
+  if exit then exit(state) end
   if state and Runtime.wants("screen.popped") then
     Runtime.emit("screen.popped", { state = state })
   end
@@ -32,6 +46,15 @@ end
 
 function StateStack:top()
   return self.states[#self.states]
+end
+
+-- Tear the whole stack down top-first, so every state still gets its exit and
+-- every listener still sees screen.popped in the order it would have on a
+-- hand-written unwind.  Gold's boot cinema hands off between screens this way
+-- (title -> intro menu -> Oak) and the Gen 1 paths that did
+-- `while self.stack:top() do self.stack:pop() end` mean exactly this.
+function StateStack:clear()
+  while self:top() do self:pop() end
 end
 
 function StateStack:update(dt)

@@ -27,13 +27,14 @@ body:
     id: game
     attributes:
       label: Which game is this for
-      description: Pick every version the mod should cover.
+      description: Pick every version the mod should cover. Use N/A if it isn't game-specific.
       multiple: true
       options:
         - Red
         - Blue
         - Yellow
-        - Not version-specific
+        - Gold
+        - N/A
     validations:
       required: true
 

@@ -1,39 +1,67 @@
--- The bag defaults to 20 slots (BAG_ITEM_CAPACITY,
--- constants/menu_constants.asm), but mods may replace that limit through
--- Data.constants.bagSize.  A distinct item id occupies one slot regardless
--- of quantity; badges live in the inventory table but are not bag items.
--- save.bagOrder keeps acquisition order like wBagItems (SELECT can reorder
--- it).
+-- Gen 2 keeps FOUR pockets, not Gen 1's single bag (item_data_constants.asm):
+-- Items 20, Balls 12, Key Items 25, TM/HM 57.  A distinct item id occupies one
+-- slot of ITS OWN pocket regardless of quantity, and a pocket fills
+-- independently -- which is exactly why the cart can hold every TM, every key
+-- item AND still pick up an HM.  Modelling all four as one 20-slot list filled
+-- the bag with TMs and key items by the Ice Path and refused HM07 WATERFALL.
+-- Badges live in the inventory table but are not bag items.  save.bagOrder
+-- keeps acquisition order like wBagItems (SELECT can reorder it).
 
 local Bag = {}
 
+-- MAX_ITEMS / MAX_BALLS / MAX_KEY_ITEMS, and the TM/HM pocket holds one of
+-- every TM plus the seven HMs (NUM_TMS + NUM_HMS).  A `mods` bagSize override
+-- replaces the ITEM pocket only, the way the Gen 1 single-bag config did.
+local POCKET_CAPACITY = {
+  ITEM = 20,
+  BALL = 12,
+  KEY_ITEM = 25,
+  TM_HM = 64,
+}
 local DEFAULT_CAPACITY = 20
+
+local function isBadge(id)
+  return id:find("BADGE", 1, true) ~= nil
+end
+
+-- Which pocket an id belongs to.  Unknown ids (a stale cache, a mod that did
+-- not declare a pocket) fall to ITEM, the Gen 1 behaviour.
+local function pocketOf(id, data)
+  data = data or require("src.core.Data")
+  local def = data and data.items and data.items[id]
+  return (def and def.pocket) or "ITEM"
+end
+Bag.pocketOf = pocketOf
 
 -- `data` is injectable for the save editor and headless mod tests.  Normal
 -- gameplay may omit it because the loader merges mods into the Data
--- singleton before any item can be added.  The fallback keeps old/stale
--- generated caches and isolated callers at the vanilla limit.
-function Bag.capacity(data)
+-- singleton before any item can be added.  A pocket argument gives that
+-- pocket's cap; omitting it keeps the old single-number ITEM answer so
+-- existing callers (and the mod bagSize override) are unchanged.
+function Bag.capacity(data, pocket)
   data = data or require("src.core.Data")
+  if pocket and pocket ~= "ITEM" then
+    return POCKET_CAPACITY[pocket] or DEFAULT_CAPACITY
+  end
   local configured = data and data.constants and data.constants.bagSize
   if type(configured) == "number" and configured >= 1 then
     return math.floor(configured)
   end
-  return DEFAULT_CAPACITY
-end
-
-local function isBadge(id)
-  return id:find("BADGE", 1, true) ~= nil
+  return POCKET_CAPACITY.ITEM
 end
 
 -- exported so item lists that share save.inventory (e.g. the PC deposit
 -- menu) can exclude badges the same way the bag does
 Bag.isBadge = isBadge
 
-function Bag.slots(save)
+-- Occupied slots, of one pocket when named or of the whole inventory when not.
+function Bag.slots(save, data, pocket)
   local n = 0
   for id in pairs(save.inventory) do
-    if not isBadge(id) then n = n + 1 end
+    if not isBadge(id)
+        and (not pocket or pocketOf(id, data) == pocket) then
+      n = n + 1
+    end
   end
   return n
 end
@@ -72,18 +100,25 @@ end
 -- (AddItemToInventory's per-slot quantity cap).
 function Bag.add(save, id, qty, data)
   local inv = save.inventory
+  -- Only the item's OWN pocket has to have room -- a full ITEM pocket does not
+  -- keep a KEY_ITEM or an HM out, which is the whole point of pockets.
+  local pocket = pocketOf(id, data)
   if not inv[id] and not isBadge(id)
-      and Bag.slots(save) >= Bag.capacity(data) then
+      and Bag.slots(save, data, pocket) >= Bag.capacity(data, pocket) then
     return false
   end
   if not isBadge(id) and (inv[id] or 0) + (qty or 1) > 99 then
     return false
   end
+  -- Insert into the order BEFORE the inventory write: Bag.order's defensive
+  -- append reads save.inventory, so writing first made it add the id and the
+  -- table.insert below add it again -- one pickup, two bag rows, until the
+  -- next order() pass deduped it (and a save taken in between kept both).
   local isNew = not inv[id]
-  inv[id] = (inv[id] or 0) + (qty or 1)
   if isNew and not isBadge(id) then
     table.insert(Bag.order(save), id)
   end
+  inv[id] = (inv[id] or 0) + (qty or 1)
   return true
 end
 

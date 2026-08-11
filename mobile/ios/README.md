@@ -1,130 +1,113 @@
-# iOS build (LÖVE 12.0)
+# iOS build
 
-> **Native ROM/mod/save import.** The iOS build ships a Swift
-> document-picker bridge (`native/GRPickerBridge.swift` + `GRBootstrap.m`)
-> that `patch_love_src.py` wires into the LÖVE tree on every build:
->
-> - `love.system.pickFile("rom"|"mod"|"sav")` and `love.system.createFile`
->   are exposed to Lua on iOS (same contract as love-android's SAF picker:
->   picks land in the save dir as `picked_rom.gb` / `picked_mod.zip` /
->   `picked_save.sav`; exports signal via `export_done.flag`).
-> - The Info.plist overlay enables `UIFileSharingEnabled` +
->   `LSSupportsOpeningDocumentsInPlace`, and `GRBootstrap.m` sweeps
->   `.gb/.gbc/.zip/.sav` files dropped in Documents (Files app / Finder)
->   into the LÖVE save dir on every activation — drop a ROM, open the app,
->   and it imports with no taps.
-> - `src/import/RomImporter.lua` treats iOS as a mobile platform and polls
->   for picker results (iOS pickers are in-process modals, so Android's
->   refocus rescan never fires).
->
-> The note below about a missing "UIDocumentPicker handoff" is
-> resolved by this bridge.
+This directory contains the macOS/Xcode build used to package Gen1 Recomp as
+an iOS app with LÖVE 12.0.
 
-macOS + Xcode only. Fetches the **LÖVE 12.0** source tree and matching Apple
-dependencies from the official [LÖVE source](https://github.com/love2d/love)
-and [Apple dependencies](https://github.com/love2d/love-apple-dependencies)
-repositories. `conf.lua` declares LÖVE 12.0 on iOS and 11.5 elsewhere.
+## User data location
 
-Pin file: [`LOVE_VERSION`](./LOVE_VERSION) → `12.0`.
+The app uses the public iOS Documents directory as its LÖVE save directory.
+There is no `pokemon-love2d` subdirectory and the app does not create a
+README file there. When browsing `On My iPhone > gen1recomp` in Files, the
+directory contains the app's runtime data directly, including:
 
-## Quick start (simulator)
+- installed mods and downloaded ROMs
+- save files and save-state data
+- options, caches, logs, and other files created by the game
+
+The build enables `UIFileSharingEnabled` and
+`LSSupportsOpeningDocumentsInPlace`, so the same directory is available in
+Files and Finder. Files copied into the app's Documents directory are used by
+the game on its next activation.
+
+Existing installations are migrated automatically. Files from the old
+private `Application Support/pokemon-love2d` directory are merged into
+Documents on launch; conflicts are retained with a `.legacy` suffix.
+
+## Build
+
+Run these commands from the repository root:
 
 ```bash
-# Fetch LÖVE 12.0 iOS sources and dependencies (once) + build for Simulator
 scripts/build_ios.sh --fetch
+scripts/build_ios.sh
 ```
 
-The embedded `game.love` contains no ROM or generated game data. The current
-first-boot importer has desktop file pickers only, so a production iOS release
-still needs a UIDocumentPicker handoff that passes the selected ROM to LÖVE.
+`--fetch` downloads the pinned LÖVE source and matching Apple dependencies
+into the gitignored `love-src/` directory. It is only needed when that tree is
+missing. The default build targets the iOS Simulator in Debug configuration.
 
-Default output: an unsigned Simulator `.app` under `mobile/ios/build/`
-(no Apple Developer account required). A convenience copy also lands under
-`dist/ios/<Config>-<sdk>/`.
-
-Install on a booted simulator (example):
+For a physical device or a release build:
 
 ```bash
-xcrun simctl install booted mobile/ios/build/Build/Products/Debug-iphonesimulator/PokemonRed.app
-xcrun simctl launch booted com.theboisclub.pokemonred
+scripts/build_ios.sh --device --install
+scripts/build_ios.sh --device --release --install
 ```
 
-Or open `mobile/ios/love-src/platform/xcode/love.xcodeproj` in Xcode,
-select the `love-ios` target, and Run on a Simulator after
-`scripts/build_ios.sh --package-only` (or a full build) has placed `game.love`.
+Device builds require a paired, unlocked device and a valid Apple signing
+identity. Set `DEVELOPMENT_TEAM` or `CODE_SIGN_IDENTITY` when automatic
+signing cannot select the intended account. Add `--ipa` to create
+`dist/ios/gen1recomp.ipa`.
 
-## Device / Release
+The script verifies the final app before packaging it:
 
-```bash
-scripts/build_ios.sh --device            # Debug, physical device SDK
-scripts/build_ios.sh --device --release  # Release configuration
+- the public Documents plist settings are present
+- the native picker bridge is present
+- `game.love` exists and is non-empty
+
+If the payload is missing, the build fails instead of producing a blank app.
+
+## Useful options
+
+| Option | Purpose |
+| --- | --- |
+| `--fetch` | Fetch LÖVE 12.0 and Apple dependencies when `love-src/` is missing |
+| `--device` | Build for `iphoneos` instead of the Simulator |
+| `--release` | Use the Release configuration |
+| `--install` | Install a device build on the first connected device |
+| `--ipa` | Create an IPA after a device build |
+| `--version X.Y.Z` | Stamp the engine and app version |
+| `--package-only` | Package `game.love` and apply the iOS plist overlay without Xcode |
+
+`scripts/build.sh ios` delegates to this script and forwards the iOS release
+option.
+
+## Output
+
+Simulator and device app bundles are copied to:
+
+```text
+dist/ios/Debug-iphonesimulator/gen1recomp.app
+dist/ios/Release-iphonesimulator/gen1recomp.app
+dist/ios/Debug-iphoneos/gen1recomp.app
+dist/ios/Release-iphoneos/gen1recomp.app
 ```
 
-Device builds need a signing identity and provisioning profile configured in
-Xcode (or via `DEVELOPMENT_TEAM` / `CODE_SIGN_IDENTITY` env vars). This repo
-does **not** store certificates, profiles, or App Store Connect secrets.
+The intermediate Xcode products are under `mobile/ios/build/`. Both locations
+are gitignored.
 
-Manual out-of-band steps:
-
-1. Apple Developer account + App ID for `com.theboisclub.pokemonred`
-2. Development or Distribution certificate + provisioning profile
-3. In Xcode: open `love.xcodeproj` → target `love-ios` → Signing & Capabilities
-   → select your Team (or set `DEVELOPMENT_TEAM=XXXXXXXXXX` when invoking
-   `scripts/build_ios.sh --device`)
-4. Archive / export an `.ipa` from Xcode Organizer for TestFlight / Ad Hoc
-
-## Layout
-
-| Path | Role |
-|------|------|
-| `LOVE_VERSION` | Engine pin (`12.0`) |
-| `overlays/love-ios.plist` | Portrait-only Info.plist + display name **Pokemon Red** (copied over the upstream plist every build) |
-| `love-src/` | Downloaded LÖVE 12.0 source tree (**gitignored**, do not commit) |
-| `cache/` | Temporary source and dependency checkout data (**gitignored**) |
-| `build/` | `xcodebuild` derived data (**gitignored**) |
-
-Game payload lands at:
-
-`love-src/platform/xcode/ios/resources/game.love`
-
-and is fused into the built `.app` (LÖVE auto-runs any bundled `*.love`).
-
-## Apple libraries dependency
-
-`scripts/build_ios.sh --fetch` retrieves the matching iOS libraries and the
-SDL3 framework from
-[love-apple-dependencies](https://github.com/love2d/love-apple-dependencies).
-Re-run it if either dependency directory is absent.
+The bundled game payload is staged at
+`love-src/platform/xcode/ios/resources/game.love` and copied into the final
+app bundle. The payload contains the game, not user-generated ROMs, mods, or
+saves; those are created at runtime in Documents.
 
 ## App identity
 
-| Field | Value |
-|-------|--------|
-| Display name | Pokemon Red |
-| `PRODUCT_NAME` | PokemonRed |
-| Bundle ID | `com.theboisclub.pokemonred` |
-| Orientations | Portrait only (`UIInterfaceOrientationPortrait`) |
+| Field | Default |
+| --- | --- |
+| Display name | `gen1recomp` |
+| Product name | `gen1recomp` |
+| Bundle identifier | `com.theboisclub.gen1recomp` |
+| Save directory | Public `Documents` root |
+| Orientation | Portrait |
 
-Overrides are applied by the build script (`xcodebuild` settings + plist overlay)
-so refreshing `love-src/` does not lose branding.
+Set `GEN1_BUNDLE_ID` to use a different bundle identifier for local device
+builds.
 
-## Flags (`scripts/build_ios.sh`)
+## Prerequisites
 
-| Flag | Meaning |
-|------|---------|
-| *(default)* | Simulator, Debug, no signing |
-| `--fetch` | Fetch the LÖVE 12.0 source tree and Apple dependencies if `love-src/` is missing |
-| `--device` | Build against `iphoneos` instead of `iphonesimulator` |
-| `--release` | `Release` configuration instead of `Debug` |
-| `--package-only` | Zip `game.love` + apply plist overlay; skip `xcodebuild` |
+- macOS with Xcode and `xcodebuild`
+- the iOS and iOS Simulator platforms installed in Xcode
+- a fetched `love-src/` tree, or the `--fetch` option
+- the matching iOS libraries and SDL3 framework under `love-src/`
 
-Also: `scripts/build.sh ios` delegates here (`--release` is forwarded).
-
-## Preconditions
-
-- macOS (Darwin) with Xcode + `xcodebuild` on `PATH`
-- iOS platform installed in Xcode (Settings → Platforms). `xcodebuild -showsdks`
-  should list `iphonesimulator` / `iphoneos`. A partial install can fail IB/xib
-  compiles with `iOS … Platform Not Installed` even when the SDK name appears.
-- `love-src/` present (`--fetch`)
-- iOS libraries under `love-src/platform/xcode/ios/libraries/` and SDL3 under `love-src/platform/xcode/shared/Frameworks/`
+Use `xcodebuild -showsdks` to confirm that the required SDKs are installed.

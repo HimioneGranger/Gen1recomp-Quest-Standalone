@@ -823,6 +823,29 @@ do
       and caught.enemy.mon.species == "TANGELA",
       "and it is the species the authored encounter table names")
 
+    -- Trainer battles do not arm the wild-encounter cooldown.
+    walker.wildEncounterGraceSteps = 0
+    walker:afterBattle("win", { kind = "trainer" })
+    check(walker.wildEncounterGraceSteps == 0,
+      "trainer battles do not start the wild encounter grace period")
+
+    -- pokered grants three completed steps after a wild battle before the
+    -- next random battle can start (end_of_battle.asm + home/overworld.asm).
+    local finishedWild = caught
+    walker:afterBattle("run", finishedWild)
+    caught = nil
+    withBuses(function(_, hooks)
+      hooks:wrap("encounter.roll", function()
+        return { species = "TANGELA", level = 5 }
+      end, 0, "grace-period")
+      for step = 1, 3 do
+        pcall(walker.onStepComplete, walker)
+        check(caught == nil, "wild encounter grace period blocks step " .. step)
+      end
+      pcall(walker.onStepComplete, walker)
+      check(caught ~= nil, "wild encounter is eligible on step 4")
+    end)
+
     -- the same walk with an encounter.roll wrapper never starts a battle
     withBuses(function(_, hooks)
       hooks:wrap("encounter.roll", function() return nil end, 0, "nuzlocke")
@@ -893,6 +916,76 @@ do
   check(value == nil and err == "no overworld", "npc() off the world")
   value, err = api:queueScript({})
   check(value == nil and err == "no overworld", "queueScript() off the world")
+  value, err = api:startWildBattle("PIDGEY", 5)
+  check(value == nil and err == "no overworld", "startWildBattle() off the world")
+end
+
+-- startWildBattle: what regresses is the handoff, not the battle.  A mod that
+-- builds a BattleState and pushes it itself still fights and still levels; it
+-- silently loses onFinish -> afterBattle (evolutions, blackout-on-loss) and
+-- pushBattle (entry wipe, battle theme).  Shipped mods have hit exactly this.
+do
+  -- the real dataset, not fixture(): a battle reaches for type_chart, items,
+  -- battle_anims and more, and this block only reads
+  local data = Data
+  local state, game = liveWorld(data)
+  -- the handoff runs through these three, so each needs the live game
+  for _, fn in ipairs({ "pushBattle", "isDungeonTransitionMap", "afterBattle" }) do
+    check(bindGame(OW[fn], game), fn .. " binds Game")
+  end
+  state:setMap("PALLET_TOWN", 5, 6, "down", { via = "boot" })
+
+  local Pokemon = require("src.pokemon.Pokemon")
+  local api = WorldAPI.new(game, "tester")
+
+  local value, err = api:startWildBattle("NOT_A_MON", 5)
+  check(value == nil and err:find("unknown species", 1, true),
+    "an unknown species refuses and names it")
+  -- Pokemon.new writes the level through into the stat calc and the exp curve
+  -- verbatim, so a fraction has to be refused rather than rounded downstream
+  for _, lv in ipairs({ 0, 101, "nope", 5.5 }) do
+    check(api:startWildBattle("PIDGEY", lv) == nil,
+      "level " .. tostring(lv) .. " refuses")
+  end
+
+  local caterpie = Pokemon.new(data, "CATERPIE", 6)
+  game.save.party = { caterpie }
+  check(api:startWildBattle("PIDGEY", 25) == true, "a wild battle starts")
+
+  -- pushBattle pushes the entry transition, which pushes the battle from its
+  -- own callback; awardExp is the BattleState marker (screenId would not work,
+  -- only Screens.push stamps that and pushBattle pushes the battle directly)
+  check(game.stack:top() ~= nil and game.stack:top().awardExp == nil,
+    "the entry transition goes on first")
+  -- overworld() resolves the world from UNDER the battle, so a second call
+  -- while one is up has to refuse rather than stack another
+  check(api:startWildBattle("PIDGEY", 5) == nil,
+    "a battle already running refuses")
+
+  local battle
+  for _ = 1, 400 do
+    local t = game.stack:top()
+    if t and t.awardExp then battle = t break end
+    if t and t.update then t:update(1 / 60) else break end
+  end
+  check(battle ~= nil, "the transition hands off to the battle")
+
+  battle.participants = { [caterpie] = true }
+  battle:awardExp()
+  check(caterpie.level >= 7, "the mon levels past its evolution threshold")
+  check(battle.leveledUp and battle.leveledUp[caterpie],
+    "awardExp records the level-up for EvolveAfterBattle")
+
+  game.stack:pop()
+  battle.onFinish("win")
+  for _ = 1, 12 do
+    local t = game.stack:top()
+    if not t or t.screenId == "EvolutionState" then break end
+    game.stack:pop()
+    if t.onDone then t.onDone() end
+  end
+  check(game.stack:top() and game.stack:top().screenId == "EvolutionState",
+    "the win reaches the evolution screen")
 end
 
 do
@@ -1029,6 +1122,70 @@ do
   check(merged.byMap.SABLE_COVE == "WATER", "a field patch lands")
   check(merged.byMap.PALLET_TOWN == "PALLET", "and Kanto survives it")
   check(merged.default == "ROUTE", "including the fallthrough")
+end
+
+-- ------- mod.world, the Gen 2 arm
+--
+-- src/world/gen2/WorldAPI.lua is the other half of the same facade name.  The
+-- three verbs tested here were reported as unsupported and are the ones a
+-- placement/encounter mod actually needs: spawn an actor, drive a wild battle,
+-- and get a NAMED refusal for anything the Gen 2 arm has no home for.
+do
+  local Gen2Api = require("src.world.gen2.WorldAPI")
+
+  -- a World stand-in: the fields the facade reads, nothing else
+  local maps = { NEW_BARK_TOWN = { id = "NEW_BARK_TOWN", objects = {
+    { index = 0, name = "ELM", sprite = "SPRITE_ELM", x = 1, y = 1 },
+  } } }
+  local rebuilt, battled = 0, nil
+  local world = {
+    map = { id = "NEW_BARK_TOWN", def = maps.NEW_BARK_TOWN },
+    maps = maps,
+    npcPool = {},
+    player = { cellX = 3, cellY = 4, facing = "down" },
+    -- the two tables src/battle/gen2/Mon.lua reads to build a wild mon
+    game = { save = { party = {} }, data = {
+      moves = {},
+      growthRates = {},
+      pokemon = { FIXMON = { name = "FIXMON", types = { "NORMAL" },
+        baseStats = { hp = 50, attack = 50, defense = 50, speed = 50,
+                      specialAttack = 50, specialDefense = 50 },
+        growthRate = "MEDIUM_FAST", learnset = {} } },
+    } },
+    rebuildPeople = function() rebuilt = rebuilt + 1 end,
+    startBattle = function(_, opts, onDone)
+      battled = opts
+      if onDone then onDone("win") end
+    end,
+  }
+  local World2 = require("src.world.gen2.World")
+  world.addRuntimeObject = World2.addRuntimeObject
+  world.removeRuntimeObject = World2.removeRuntimeObject
+  local api = Gen2Api.new({ world = world }, "tester")
+
+  local id = api:spawnNpc("NEW_BARK_TOWN", { sprite = "SPRITE_LASS", x = 5, y = 5 })
+  check(id == "NEW_BARK_TOWN_obj_1", "Gen 2 spawnNpc returns a handle id")
+  check(#maps.NEW_BARK_TOWN.objects == 2, "and the object joins the map def")
+  check(maps.NEW_BARK_TOWN.objects[2].runtime == true, "marked runtime")
+  check(maps.NEW_BARK_TOWN.objects[2].owner == "tester", "and attributed")
+  check(rebuilt == 1, "the active map's people are rebuilt around it")
+  check(api:removeNpc(id) == true, "Gen 2 removeNpc drops it again")
+  check(#maps.NEW_BARK_TOWN.objects == 1, "and the map def is back to vanilla")
+  local gone, why = Gen2Api.new({ world = world }, "intruder")
+    :removeNpc("NEW_BARK_TOWN_obj_9")
+  check(gone == nil and why ~= nil, "an unknown runtime object is refused")
+
+  -- queueScript: the wild-battle verb, which is how a spawn mod starts a fight
+  local ok = api:queueScript({ { "start_battle", "wild", "FIXMON", 7 } })
+  check(ok == true, "Gen 2 queueScript runs a start_battle row")
+  check(battled ~= nil and battled.wild ~= nil, "and Gold's own startBattle ran")
+  check(battled.wild.level == 7, "with the row's level")
+
+  -- and a verb with no Gen 2 home is refused BY NAME before anything runs
+  local refused, reason = api:queueScript({ { "text", "hi" }, { "wait", 30 } })
+  check(refused == nil, "a queue with an unsupported verb is refused whole")
+  check(reason ~= nil and reason:find("wait", 1, true) ~= nil,
+    "and the refusal names the verb")
 end
 
 S.finish()

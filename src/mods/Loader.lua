@@ -2,16 +2,19 @@ local Json = require("src.link.Json")
 local Logger = require("src.core.Logger")
 local SaveData = require("src.core.SaveData")
 local Data = require("src.core.Data")
+local GameVersion = require("src.core.GameVersion")
 local Version = require("src.core.Version")
 local Assets = require("src.render.Assets")
 local ModUI = require("src.ui.ModUI")
 local AssetTransform = require("src.mods.AssetTransform")
 local Manifest = require("src.mods.Manifest")
 local Merge = require("src.mods.Merge")
+local ModTargets = require("src.mods.ModTargets")
 local Registry = require("src.mods.Registry")
 local Schemas = require("src.mods.Schemas")
 local Semver = require("src.mods.Semver")
 local Events = require("src.mods.Events")
+local Gen2Compat = require("src.mods.Gen2Compat")
 local Hooks = require("src.mods.Hooks")
 local Runtime = require("src.mods.Runtime")
 
@@ -19,6 +22,17 @@ local Loader = {}
 Loader.__index = Loader
 
 local MOD_STATE_FILE = "mod_state.lua" -- legacy migration only
+
+-- The working tree's engine version is the "0.0.0-dev" placeholder that CI
+-- restamps into the packed game.love (src/core/Version.lua:7), and it sorts
+-- BELOW every release, so a checkout would fail every mod that names a
+-- floor.  A placeholder is not a compatibility statement: skip the range
+-- check rather than answer it wrong.  A stamped build checks as it always did.
+-- Read at call time, not captured: a build stamps Version before this loads
+-- and a test stamps it after.
+local function devEngine()
+  return Version.engine:match("^0%.0%.0%-") ~= nil
+end
 
 -- walk a dotted target path without creating anything; the base view a
 -- registry folds against must never perturb Data on a mod-free boot
@@ -62,6 +76,37 @@ end
 
 local devShim = { installed = false, permissions = {}, warned = {}, depth = 0 }
 
+-- The Gen 1 engine modules a Gold boot never instantiates.  Each one still
+-- LOADS under Gen 2 -- require finds the file and hands back a module table --
+-- so a mod that captures src.core.Game and reads Game.overworld gets nil for
+-- the life of the process and its patches land on code nothing runs.  That is
+-- the failure the generation gate exists to prevent, and it is worth naming
+-- when a forced or gen2compat mod reaches for one anyway.  Gold's own
+-- counterparts are src/core/Game2.lua and the src/*/gen2/ trees; the live
+-- owner is in the game.ready payload and mod.world resolves per generation.
+local GEN1_ONLY_MODULES = {
+  ["src.core.Game"] = true,
+  ["src.world.OverworldController"] = true,
+  ["src.world.PikachuFollower"] = true,
+  ["src.world.NPC"] = true,
+  ["src.world.Collision"] = true,
+  ["src.world.WorldAPI"] = true,
+  ["src.world.Map"] = true,
+  ["src.battle.BattleState"] = true,
+  ["src.script.ScriptRunner"] = true,
+  -- Not a dead patch but a dead SCRIPT: Gold's registry carries mod verbs
+  -- only (src/mods/Builtins.lua:100), so every Gen 1 built-in in this table
+  -- resolves here and then runs as nothing.
+  ["src.script.Commands"] = true,
+  -- Loads fine under Gold and paints Red's chrome over Gold's options screen,
+  -- whose layout is one 18x16 box rather than four 20x4 ones.
+  ["src.ui.OptionRows"] = true,
+  ["src.ui.PartyMenu"] = true,
+  ["src.ui.BoxMenu"] = true,
+  ["src.ui.StartMenu"] = true,
+  ["src.ui.OptionsMenu"] = true,
+}
+
 -- the src.* modules the mod surface points authors at: another mod's
 -- exports carry a version string that wants range-checking before use, and
 -- ChipAsm is the authoring path for chip music and sfx
@@ -70,6 +115,20 @@ local SUPPORTED_REQUIRES = {
   ["src.audio.ChipAsm"] = true,
   ["src.pokemon.Stats"] = true, -- Stats.isShiny / calc for indicator mods
 }
+
+-- Where this file lives, so the shim can tell an engine require from a mod's:
+-- a mod chunk is named after its own directory, and this is the only test that
+-- survives a lazy require made long after Runtime.currentMod went back to nil.
+local ENGINE_PREFIX = (debug.getinfo(1, "S").source or "")
+  :gsub("^@", ""):gsub("mods[/\\]Loader%.lua$", "")
+
+local function callerIsMod(level)
+  if ENGINE_PREFIX == "" then return false end
+  local info = debug.getinfo(level, "S")
+  local source = info and info.source
+  if not source or source:sub(1, 1) ~= "@" then return false end
+  return source:sub(2, 1 + #ENGINE_PREFIX) ~= ENGINE_PREFIX
+end
 
 local function scanRequire(name)
   local modId = Runtime.currentMod
@@ -80,6 +139,23 @@ local function scanRequire(name)
     if devShim.warned[key] then return end
     devShim.warned[key] = true
     Logger.warn("[%s] undeclared %s require: %s", modId, permission, name)
+  end
+  -- A Gen 1-only module on a Gold boot is not a permissions question, it is a
+  -- dead patch: reported once, attributed, and onto the boot error feed the
+  -- manager shows the player rather than a dev-only log line.
+  if devShim.generation ~= 1 and GEN1_ONLY_MODULES[name]
+      and not Gen2Compat.serves(name) then
+    local key = modId .. "|gen2|" .. name
+    if not devShim.warned[key] then
+      devShim.warned[key] = true
+      local message = ("%s: requires %s, which a Gen 2 game never runs and "
+        .. "src/mods/Gen2Compat.lua has no adapter for; take the game from "
+        .. "the game.ready payload and mod.world")
+        :format(modId, name)
+      local errors = devShim.errors
+      if errors then errors[#errors + 1] = message end
+      Logger.error("%s", message)
+    end
   end
   -- link modules are the one place a mod can reach the wire, so network is
   -- the permission that governs them
@@ -115,7 +191,25 @@ function Loader:_installDevShim()
   _G.require = function(name, ...)
     -- only the mod's own call is the mod's doing; whatever that module
     -- requires in turn is the engine wiring itself up
-    if devShim.depth == 0 then scanRequire(name) end
+    if devShim.depth == 0 then
+      scanRequire(name)
+      -- The Gen 1 name a mod asked for, answered by the Gen 2 arm behind it.
+      -- Engine code keeps the real module: src/render/PaletteFX.lua:776
+      -- requires src.core.Game on both generations and means it.
+      if devShim.generation ~= 1 and Gen2Compat.serves(name)
+          and callerIsMod(3) then
+        local adapter = Gen2Compat.resolve(name, Runtime.currentMod)
+        if adapter then
+          local key = "adapter|" .. name
+          if not devShim.warned[key] then
+            devShim.warned[key] = true
+            Logger.info("gen2 facade: %s -> %s", name,
+              tostring(Gen2Compat.ADAPTERS[name]))
+          end
+          return adapter
+        end
+      end
+    end
     devShim.depth = devShim.depth + 1
     local ok, result = pcall(delegate, name, ...)
     devShim.depth = devShim.depth - 1
@@ -141,20 +235,67 @@ function Loader.new(opts)
     modInput = {},
     fs = (opts and opts.fs) or (love and love.filesystem),
     dev = dev,
+    -- Which generation this boot is (1 or 2).  Fixed at construction: the
+    -- active version is set once in main.lua's bootGame before anything
+    -- builds a loader, and a run never changes generation underneath one.
+    -- opts.generation is the test seam.
+    generation = (opts and opts.generation) or GameVersion.generation(),
   }, Loader)
   assert(self.fs, "Loader.new requires opts.fs when love is unavailable")
+  -- Schemas.shapeFor, not the catalog spec: a registry whose Gen 2 records are
+  -- shaped differently (a species' specialAttack/specialDefense, an encounter
+  -- table keyed by kind, a trainer CLASS hanging off .classes) carries its Gen
+  -- 2 shape beside the Gen 1 one, and resolving it once here is what makes
+  -- every reader downstream generation-blind: Schemas.check off registry.spec,
+  -- Registry's fold/baseAt/baseIds, _mergeOrder's depth and _merge's
+  -- spec.write / spec.semantics all read this one spec and never ask again.
+  -- Gen 1 and any registry with no Gen 2 shape get the catalog table itself.
   for name, spec in pairs(Schemas.REGISTRIES) do
-    self.content[name] = Registry.new(name, spec)
+    self.content[name] = Registry.new(name, Schemas.shapeFor(name, spec, self.generation))
   end
   self.disabled = {}
+  self.gen2Forced = {}
   return self
+end
+
+-- The game this boot is, or nil when a harness injected a generation the
+-- running version disagrees with (only the generation can be trusted then).
+function Loader:_targetVersion()
+  local version = GameVersion.get and GameVersion.get()
+  if not (version and GameVersion.VERSIONS[version]) then return nil end
+  if GameVersion.generation(version) ~= self.generation then return nil end
+  return version
+end
+
+-- The version an enable flag is read and written under: this game once
+-- per-game flags are live, nil (the shared flag) while they are a preview.
+-- Reads and writes go through the same answer so the two can never drift.
+function Loader:_enableScope()
+  return SaveData.modScope(self:_targetVersion())
 end
 
 function Loader:_loadState()
   self.disabled = {}
   local options = SaveData.loadOptions(self.fs)
-  for id, enabled in pairs(options.mods or {}) do
-    if enabled == false then self.disabled[id] = true end
+  local scope = self:_enableScope()
+  local ids = {}
+  for id in pairs(options.mods or {}) do ids[id] = true end
+  local bucket = scope and (options.modsByVersion or {})[scope]
+  if type(bucket) == "table" then
+    for id in pairs(bucket) do ids[id] = true end
+  end
+  for id in pairs(ids) do
+    if SaveData.modEnabled(options, id, scope) == false then
+      self.disabled[id] = true
+    end
+  end
+  -- the player's target override, resolved for THIS game: forcing a mod onto
+  -- Gold never changes whether it runs on Red (SaveData.modForced)
+  self.gen2Forced = {}
+  for id in pairs(options.modsGen2 or {}) do
+    if SaveData.modForced(options, id, self:_targetVersion(), self.generation) then
+      self.gen2Forced[id] = true
+    end
   end
   -- mod.options reads through this; M11 owns writing it back
   self.modOptions = options.modOptions or {}
@@ -185,8 +326,14 @@ function Loader:_saveState()
   if not self.fs.write then return end
   local options = SaveData.loadOptions(self.fs)
   options.mods = options.mods or {}
+  local scope = self:_enableScope()
+  local version = self:_targetVersion()
   for id in pairs(self.mods) do
-    options.mods[id] = not self.disabled[id]
+    SaveData.setModEnabled(options, id, not self.disabled[id], scope)
+    -- only the games this boot can answer for: another version's overrides
+    -- are not this run's to rewrite.  With no version (an injected-generation
+    -- harness) the override stays in memory for this boot only.
+    SaveData.setModForced(options, id, self.gen2Forced[id] == true, version)
   end
   SaveData.saveOptions(options, self.fs)
 end
@@ -197,6 +344,25 @@ function Loader:setEnabled(id, enabled)
   self.mods[id].enabled = enabled
   self:_saveState()
   return true
+end
+
+-- Takes effect on the next boot, like every other load-time decision: the
+-- gate runs once, before any entry chunk.  Second return is false when the
+-- choice could not be persisted for a game, so the caller does not promise a
+-- restart will honour it.
+function Loader:setGen2Forced(id, forced)
+  if not self.mods[id] then return false, false end
+  self.gen2Forced[id] = forced or nil
+  self:_saveState()
+  local persisted = self:_targetVersion() ~= nil and self.fs.write ~= nil
+  if not persisted then
+    Logger.warn("mod %s: target override kept for this boot only", id)
+  end
+  return true, persisted
+end
+
+function Loader:isGen2Forced(id)
+  return self.gen2Forced[id] == true
 end
 
 function Loader:_discover()
@@ -240,8 +406,71 @@ function Loader:_fail(mod, state, reason)
   Logger.error("mod %s failed: %s", mod.manifest.id, reason)
 end
 
+-- left out rather than broken: inactive like a failure, but off the boot
+-- error list and rendered with its own manager row state (ManagerState:264)
+function Loader:_skip(mod, state, reason)
+  if mod.failed then return end
+  mod.failed, mod.state, mod.skipReason = true, state, reason
+  Logger.info("mod %s skipped: %s", mod.manifest.id, reason)
+end
+
 local function isActive(mod)
   return mod.enabled and not mod.failed
+end
+
+-- the Data path a registry merges into for THIS boot's generation, or nil
+-- when it has no home here (Schemas.GEN2)
+function Loader:_target(name, spec)
+  return Schemas.targetFor(name, spec, self.generation)
+end
+
+-- Which games a mod runs on is opt-in per manifest (`games`, and the legacy
+-- gen2compat it subsumes).  A mod that did not claim THIS game is left out of
+-- the boot whole: not loaded, no registrations, no subscriptions.  The
+-- alternative is what this replaces -- the mod loads, the manager shows it
+-- enabled, and roughly four of its hooks out of a hundred actually fire --
+-- which reads as a broken mod rather than an absent one.  This is a skip and
+-- not a failure: it is not the mod's bug, so it stays off the boot error list
+-- and out of the log's error stream, and the manager gives it its own row
+-- state.
+--
+-- The gate is per VERSION, not only per generation: `games: ["blue"]` is a
+-- claim about Blue, and the two mod UIs already say "For Blue, not Red" off
+-- the same ModTargets answer, so enforcing it here is what makes that line a
+-- verdict instead of a decoration.
+--
+-- The player owns the override.  The manifest is the AUTHOR's claim, and a mod
+-- written before the field existed can never carry it, so `options.modsGen2`
+-- (the manager's TRY HERE ANYWAY toggle, scoped to one game) forces one on for
+-- this boot; a forced mod loads normally and keeps a note saying it was never
+-- verified here.
+function Loader:_gateGeneration()
+  local version = self:_targetVersion()
+  for _, id in ipairs(orderedIds(self.mods, isActive)) do
+    local mod = self.mods[id]
+    if ModTargets.supports(mod.manifest, version, self.generation) then
+      -- nothing to say: the author claimed this game
+    elseif self.gen2Forced[id] then
+      mod.forcedGen2 = true
+      mod.skipReason = ("forced onto this Gen %d game; not verified by its author")
+        :format(self.generation)
+      Logger.warn("mod %s: %s", id, mod.skipReason)
+    elseif self.generation == 2 and not mod.manifest.gen2compat then
+      -- the whole-generation miss keeps its own wording: gen2compat is the
+      -- field the author has to add, so the skip line names it
+      self:_skip(mod, "wrong_generation",
+        ("not marked gen2compat; this is a Gen %d game"):format(self.generation))
+    elseif version then
+      -- claimed some game, just not this one (ModTargets.detail)
+      self:_skip(mod, "wrong_generation", ModTargets.detail(mod.manifest, version))
+    else
+      -- worded from the loader's own generation, not from GameVersion's
+      -- current id: the two agree in a real boot, and a harness that injects
+      -- a generation should not produce a sentence naming the wrong game
+      self:_skip(mod, "wrong_generation",
+        ("not made for a Gen %d game"):format(self.generation))
+    end
+  end
 end
 
 function Loader:_exists(path)
@@ -264,7 +493,7 @@ function Loader:_validate()
     elseif manifest.assets_transforms
         and not self:_exists(mod.path .. "/" .. manifest.assets_transforms) then
       reason = "assets_transforms file missing: " .. manifest.assets_transforms
-    elseif manifest.game_version then
+    elseif manifest.game_version and not devEngine() then
       local ok, err = Semver.satisfies(Version.engine, manifest.game_version)
       if not ok then
         reason = ("needs game version %s, engine is %s")
@@ -286,11 +515,20 @@ function Loader:_enforceDependencies()
       local mod = self.mods[id]
       for _, spec in ipairs(mod.manifest.dependencySpecs) do
         local dep = self.mods[spec.id]
-        local reason
+        local reason, skip
         if not dep then
           reason = "missing dependency: " .. spec.id
         elseif not dep.enabled then
           reason = ("dependency %s is disabled"):format(spec.id)
+        elseif dep.state == "wrong_generation" then
+          -- the gate's skip is contagious as a SKIP, not as a failure: the
+          -- dependency has no bug to report and neither does this mod, so
+          -- nothing here lands on the boot error list
+          skip = true
+          -- carry the dependency's own reason: it names the game or the
+          -- missing gen2compat, and a guess here would name the wrong one
+          reason = ("depends on %s, which does not run here (%s)")
+            :format(spec.id, dep.skipReason or "not made for this game")
         elseif dep.failed then
           reason = ("dependency %s failed to load"):format(spec.id)
         elseif spec.range
@@ -299,7 +537,11 @@ function Loader:_enforceDependencies()
             :format(spec.id, spec.range, dep.manifest.version)
         end
         if reason then
-          self:_fail(mod, "blocked_dependency", reason)
+          if skip then
+            self:_skip(mod, "wrong_generation", reason)
+          else
+            self:_fail(mod, "blocked_dependency", reason)
+          end
           changed = true
           break
         end
@@ -443,7 +685,9 @@ function Loader:_mergeOrder()
   for name, registry in pairs(self.content) do
     names[#names + 1] = name
     local segments = 0
-    for _ in (registry.spec.target or ""):gmatch("[^%.]+") do
+    -- the routed path, not spec.target: nesting is a property of where the
+    -- content actually lands, and that is per generation (Schemas.GEN2)
+    for _ in (self:_target(name, registry.spec) or ""):gmatch("[^%.]+") do
       segments = segments + 1
     end
     depth[name] = segments
@@ -484,27 +728,57 @@ function Loader:_contentApi(mod, registry, deprecation)
     if apiLevel >= 2 then error(err, 0) end
     Logger.warn("[%s] %s", modId, err)
   end
+  -- A registry with no home in this generation (Schemas.routing) takes the
+  -- write and drops it.  Reported once per mod per registry, into the same feed
+  -- the manager shows, because a mod that declared gen2compat and then wrote
+  -- here is owed the reason -- but NOT fatal: a mod that supports both
+  -- generations registers its content unconditionally and should still load
+  -- the half that does apply.
+  --
+  -- Worded from loader.generation, the way _gateGeneration's skipReason is,
+  -- because the gating runs BOTH ways now: Schemas.GEN1 gates the six Gen
+  -- 2-only registries (held_items, phone_contacts, decorations, apricorns,
+  -- landmarks, radio_channels), so a Red boot rejecting a write to
+  -- `decorations` must not claim it has "no Gen 2 target".
+  local gated = Schemas.gatedFor(registry.name, loader.generation)
+  local toldGated = false
+  local function dropped()
+    if not gated then return false end
+    if not toldGated then
+      toldGated = true
+      local message = ("%s: the %s registry has no Gen %d target; those "
+        .. "registrations do not apply here")
+        :format(modId, registry.name, loader.generation)
+      loader.errors[#loader.errors + 1] = message
+      Logger.warn("%s", message)
+    end
+    return true
+  end
   return {
     register = function(_, id, value)
       note()
+      if dropped() then return nil end
       validate("register", id, value)
       loader:_journal(registry.name)
       return registry:register(id, value, modId)
     end,
     override = function(_, id, value)
       note()
+      if dropped() then return nil end
       validate("override", id, value)
       loader:_journal(registry.name)
       return registry:override(id, value, modId)
     end,
     patch = function(_, id, partial)
       note()
+      if dropped() then return nil end
       validate("patch", id, partial)
       loader:_journal(registry.name)
       return registry:patch(id, partial, modId)
     end,
     remove = function(_, id)
       note()
+      if dropped() then return nil end
       loader:_journal(registry.name)
       return registry:remove(id, modId)
     end,
@@ -767,10 +1041,21 @@ function Loader:_api(mod)
   -- acts on is still being wired when the entry chunk runs
   local world
   setmetatable(api, { __index = function(_, key)
+    -- mod.game is the live service owner, resolved per generation the way
+    -- mod.world is: src/core/Game.lua's singleton under Gen 1, the Game2
+    -- INSTANCE Gold injected under Gen 2.  Read on every touch rather than
+    -- cached, because the Gen 1 singleton's stack and save fill in after the
+    -- entry chunk runs.  This is what a mod should hold instead of requiring
+    -- src.core.Game, which under Gold hands back a table nothing instantiated.
+    if key == "game" then return loader:_game() end
     if key ~= "world" then return nil end
     if world then return world end
     local game = loader:_game()
-    local module = game and engineRequire("src.world.WorldAPI")
+    -- one facade name, one arm per generation: Gold's world is not a stack
+    -- state and its flags are a bitfield, so the resolution differs even
+    -- where the method set does not (src/world/gen2/WorldAPI.lua)
+    local module = game and engineRequire(loader.generation == 2
+      and "src.world.gen2.WorldAPI" or "src.world.WorldAPI")
     if not module then return nil end
     world = module.new(game, modId)
     return world
@@ -781,8 +1066,16 @@ end
 -- the live Game.  An injected reference wins so a headless caller can hand
 -- over a stub; otherwise the boot singleton, whose stack and overworld fill
 -- in after this loader returns -- holding the table keeps the facade live.
+--
+-- Gen 2 has no fallback to reach for: src/core/Game.lua is the Gen 1 service
+-- owner and a Gold boot never loads it, so returning it would hand mod.world a
+-- live-looking object with no stack, no save and no overworld.  Gold injects
+-- itself (src/core/Game2.lua), and nil here is the honest answer if it
+-- somehow did not.
 function Loader:_game()
-  return self.game or engineRequire("src.core.Game")
+  if self.game then return self.game end
+  if self.generation ~= 1 then return nil end
+  return engineRequire("src.core.Game")
 end
 
 function Loader:_loadMod(mod)
@@ -926,8 +1219,8 @@ function Loader:load(data)
   self.baseData = data
   -- every registry folds against the pristine view of its Data target;
   -- resolution is lazy so optional namespaces may appear later
-  for _, registry in pairs(self.content) do
-    local target = registry.spec.target
+  for name, registry in pairs(self.content) do
+    local target = self:_target(name, registry.spec)
     if target then
       registry.base = function()
         return data and resolvePath(data, target)
@@ -936,7 +1229,10 @@ function Loader:load(data)
   end
   -- vanilla content is registrations too, and they land before discovery so
   -- a mod's register collides with the engine's and has to say override
-  require("src.mods.Builtins").install(self.content, data)
+  -- the generation decides WHICH module owns a registry's vanilla records:
+  -- Gold reimplements the battle rules, so its own statuses/balls/AI records
+  -- go in instead of Red's, not beside them (src/mods/Builtins.lua)
+  require("src.mods.Builtins").install(self.content, data, self.generation)
   self:_loadState()
   self:_discover()
   -- Experimental mods stay off until the player opts in: a missing
@@ -951,6 +1247,16 @@ function Loader:load(data)
       end
     end
   end
+  -- A manifest may name an env var that force-enables it regardless of a
+  -- saved disable in options.mods -- generic, not tied to any mod id, for
+  -- a mod (e.g. a native-launcher bridge) that cannot function disabled on
+  -- the one build where its env var is set.
+  for id, mod in pairs(self.mods) do
+    local envName = mod.manifest.force_enable_env
+    if envName and os.getenv(envName) == "1" then
+      self.disabled[id] = nil
+    end
+  end
   for id, mod in pairs(self.mods) do
     mod.enabled = not self.disabled[id]
     mod.state = mod.enabled and "pending" or "disabled"
@@ -958,9 +1264,26 @@ function Loader:load(data)
   -- engine call sites reach these buses -- and this error feed, for failures
   -- that only surface at play time -- through Runtime from here on
   Runtime.install(self.events, self.hooks, self.errors)
+  -- before _validate: a mod that is not running on this generation should not
+  -- also be reported for a missing entry file it will never be asked for
+  self:_gateGeneration()
   self:_validate()
   local ordered = self:_resolve()
-  if self.dev then self:_installDevShim() end
+  -- The shim is a process singleton, so whichever loader is running owns these
+  -- two: a harness that builds a Gen 1 loader after a Gen 2 one must not keep
+  -- reporting against the old generation or the old error feed.
+  devShim.generation = self.generation
+  devShim.errors = self.errors
+  -- The Gen 1 Game facade proxies THIS loader's live game, and reads it on
+  -- every touch: a mod captures the facade at file scope, before Game2 has a
+  -- save or a world (src/mods/Gen2Compat.lua).
+  Gen2Compat.bind(function() return self:_game() end)
+  -- Dev mode wants the permissions tripwire; a Gold boot with mods on it wants
+  -- the Gen 1-only require report, which is the difference between "the mod
+  -- does nothing" and knowing why.  A Gold boot with no mods pays nothing.
+  if self.dev or (self.generation ~= 1 and next(self.mods) ~= nil) then
+    self:_installDevShim()
+  end
   for _, mod in ipairs(ordered) do
     -- a mod ahead of this one may have failed and taken its dependents with
     -- it, so the order list is filtered as it is walked
@@ -995,8 +1318,9 @@ function Loader:load(data)
   for _, name in ipairs(self:_mergeOrder()) do
     local registry = self.content[name]
     local spec = registry.spec
-    if data and spec.target and next(registry.ops) ~= nil then
-      local target = Data.ensure(data, spec.target)
+    local path = self:_target(name, spec)
+    if data and path and next(registry.ops) ~= nil then
+      local target = Data.ensure(data, path)
       if spec.write then
         -- ids that do not map one-to-one onto target keys (type_chart's
         -- ordered rows, battle_anims' per-kind subtables) place themselves
@@ -1094,6 +1418,12 @@ function Loader:status()
     manifest.enabled = mod.enabled ~= false
     manifest.state = mod.state or (manifest.enabled and "loaded" or "disabled")
     manifest.error = mod.failure
+    -- set instead of `error` when the mod was left out for a reason that is
+    -- not a fault of the mod (today: the gen2compat gate)
+    manifest.note = mod.skipReason
+    -- the player's override, which the manager offers on a Gen 2 boot for a
+    -- mod whose author never claimed one
+    manifest.gen2Forced = self.gen2Forced[mod.manifest.id] == true
     available[#available + 1] = manifest
     if manifest.state == "loaded" then loaded[#loaded + 1] = manifest end
   end

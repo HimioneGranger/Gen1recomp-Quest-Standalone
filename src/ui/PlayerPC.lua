@@ -72,6 +72,7 @@ end
 local function withdraw(game)
   local pc = game.save.pcItems
   game.stack:push(ListMenu.new(game, "WITHDRAW ITEM", buildItems(game, pc), {
+    kind = "pc_item_withdraw",
     messageBox = true,
     noSound = true, -- PlayerPCMenu holds BIT_NO_MENU_BUTTON_SOUND (#570)
     onChoose = function(item, list)
@@ -110,6 +111,7 @@ local function deposit(game)
     if not Bag.isBadge(id) then depositable[id] = count end
   end
   game.stack:push(ListMenu.new(game, "DEPOSIT ITEM", buildItems(game, depositable), {
+    kind = "pc_item_deposit",
     messageBox = true,
     noSound = true, -- PlayerPCMenu holds BIT_NO_MENU_BUTTON_SOUND (#570)
     onChoose = function(item, list)
@@ -131,6 +133,7 @@ end
 local function toss(game)
   local pc = game.save.pcItems
   game.stack:push(ListMenu.new(game, "TOSS ITEM", buildItems(game, pc), {
+    kind = "pc_item_toss",
     messageBox = true,
     noSound = true, -- PlayerPCMenu holds BIT_NO_MENU_BUTTON_SOUND (#570)
     onChoose = function(item, list)
@@ -161,8 +164,14 @@ local function toss(game)
   }))
 end
 
-function PlayerPC.new(game)
+-- opts.direct marks the bedroom PC (OpenRedsPC), the one entry outside the main menu
+function PlayerPC.new(game, opts)
   game.save.pcItems = game.save.pcItems or {}
+  -- ExitPlayerPC (players_pc.asm) rings SFX_TURN_OFF_PC only while
+  -- BIT_USING_GENERIC_PC is clear (#960)
+  local logOff = function()
+    if opts and opts.direct then Sound.play(game.data, "Turn_Off_PC") end
+  end
   return Menu.new(game, {
     -- keepOpen so B in the item lists returns here instead of dropping the
     -- whole PC session (players_pc.asm re-shows the PC menu); same pattern
@@ -170,10 +179,10 @@ function PlayerPC.new(game)
     { label = Strings("WITHDRAW ITEM"), keepOpen = true, onSelect = function() withdraw(game) end },
     { label = Strings("DEPOSIT ITEM"), keepOpen = true, onSelect = function() deposit(game) end },
     { label = Strings("TOSS ITEM"), keepOpen = true, onSelect = function() toss(game) end },
-    { label = Strings("LOG OFF") },
+    { label = Strings("LOG OFF"), onSelect = logOff },
     -- silent PC session (BIT_NO_MENU_BUTTON_SOUND); players_pc.asm
     -- PlayersPCMenu TextBoxBorder (0,0) b=8 c=14 → 16x10
-  }, { tx = 0, ty = 0, tw = 16, th = 10, noSound = true })
+  }, { tx = 0, ty = 0, tw = 16, th = 10, noSound = true, onCancel = logOff })
 end
 
 return PlayerPC

@@ -4,20 +4,43 @@
 -- `raw_base64` field -- into this project's save.lua format, or export a
 -- save.lua back out to a raw .sav. Run from the repo root:
 --
---   luajit tools/save_convert/convert.lua import <in.json|in.sav> <out.lua>
---   luajit tools/save_convert/convert.lua export <in.lua> <out.sav>
+--   luajit tools/save_convert/convert.lua import <in.json|in.sav> <out.lua> [game]
+--   luajit tools/save_convert/convert.lua export <in.lua> <out.sav> [game]
 --
 -- This is a thin shell: all the actual work (size/checksum validation, the
 -- GenSave codec, crosswalk data loading, the merge over new-game defaults)
 -- lives in src/save_convert/SaveConvert.lua, shared with the runtime. This
 -- file only handles the filesystem + the JSON/base64 input framing. See
 -- src/save_convert/GenSave.lua for the codec and its documented scope.
+--
+-- `game` names the game a save belongs to ("red"/"blue"/"yellow"). It is what
+-- picks the crosswalk tables -- Yellow renumbers the event bits -- and what
+-- SaveConvert answers "Gen 2 cart save" to, so it has to reach both entry
+-- points or a Gold save.lua would be pushed straight through the Gen 1 SRAM
+-- offsets and written out as a 32768-byte file that looks like a Red battery.
 
 package.path = "./?.lua;" .. package.path
 
 local SaveConvert = require("src.save_convert.SaveConvert")
 local SaveSerializer = require("src.core.SaveSerializer")
 local Version = require("src.core.Version")
+
+-- A raw .sav carries no game name, and the un-named crosswalk set resolves to
+-- Red's tables anyway, so that is what an unqualified run means.
+local DEFAULT_GAME = "red"
+
+-- Which game a save.lua belongs to.  Gen 2 stamps `version` at the top level
+-- (src/core/gen2/Save.lua Save.normalize); a Gen 1 slot written by the game
+-- carries the game name in meta.version, while one written by this CLI carries
+-- the save-FORMAT number there instead, which names no game.
+local function gameOf(save)
+  if type(save.version) == "string" then return save.version end
+  local meta = save.meta
+  if type(meta) == "table" and type(meta.version) == "string" then
+    return meta.version
+  end
+  return DEFAULT_GAME
+end
 
 local B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local B64_LOOKUP = {}
@@ -49,7 +72,7 @@ local function readFile(path, mode)
   return content
 end
 
-local function cmdImport(inPath, outPath)
+local function cmdImport(inPath, outPath, game)
   local content = readFile(inPath, "rb")
   local bytes
   if #content == SaveConvert.SAVE_SIZE then
@@ -62,7 +85,8 @@ local function cmdImport(inPath, outPath)
           ("decoded raw_base64 is %d bytes, want %d"):format(#bytes, SaveConvert.SAVE_SIZE))
   end
 
-  local save, err = SaveConvert.importSav(bytes, Version.saveFormat)
+  local save, err = SaveConvert.importSav(bytes, Version.saveFormat,
+    game or DEFAULT_GAME)
   assert(save, err)
 
   local out = assert(io.open(outPath, "w"))
@@ -74,10 +98,10 @@ local function cmdImport(inPath, outPath)
     (function() local n = 0 for _ in pairs(save.flags) do n = n + 1 end return n end)()))
 end
 
-local function cmdExport(inPath, outPath)
+local function cmdExport(inPath, outPath, game)
   local content = readFile(inPath)
   local save = assert(SaveSerializer.decode(content))
-  local bytes, err = SaveConvert.exportSav(save)
+  local bytes, err = SaveConvert.exportSav(save, game or gameOf(save))
   assert(bytes, err)
   local out = assert(io.open(outPath, "wb"))
   out:write(bytes)
@@ -87,12 +111,13 @@ end
 
 local cmd = arg[1]
 if cmd == "import" and arg[2] and arg[3] then
-  cmdImport(arg[2], arg[3])
+  cmdImport(arg[2], arg[3], arg[4])
 elseif cmd == "export" and arg[2] and arg[3] then
-  cmdExport(arg[2], arg[3])
+  cmdExport(arg[2], arg[3], arg[4])
 else
   io.stderr:write(
-    "usage: luajit tools/save_convert/convert.lua import <in.json|in.sav> <out.lua>\n" ..
-    "       luajit tools/save_convert/convert.lua export <in.lua> <out.sav>\n")
+    "usage: luajit tools/save_convert/convert.lua import <in.json|in.sav> <out.lua> [game]\n" ..
+    "       luajit tools/save_convert/convert.lua export <in.lua> <out.sav> [game]\n" ..
+    "       game: red (default) | blue | yellow\n")
   os.exit(1)
 end

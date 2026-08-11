@@ -76,6 +76,22 @@ function Sprites.playerPath(data, side, opts)
     trueColor = false,
     data = data,
   }
+  return Sprites.playerPic(path, ctx)
+end
+
+-- Raise player.sprite over an ALREADY-resolved path.  Gold's trainer art is
+-- not in field.playerPics -- its back pic comes off gen2MenuGfx.battleHud, its
+-- card and Hall of Fame off their own tables -- so its call sites resolve
+-- their own path and hand it here, which keeps one hook name, one payload and
+-- one mod source across both generations (src/ui/gen2/BattleState.lua).
+-- ctx wants { side, kind, demo, oakDemo, battle, trueColor, data }.
+-- Returns path, trueColor.
+function Sprites.playerPic(path, ctx)
+  ctx = ctx or {}
+  ctx.side = ctx.side == "back" and "back" or "front"
+  ctx.kind = ctx.kind or "battle"
+  ctx.demo = ctx.demo and true or false
+  ctx.oakDemo = ctx.oakDemo and true or false
   if path and Runtime.wantsHook("player.sprite") then
     local hooked = Runtime.call("player.sprite", samePath, path, ctx)
     if type(hooked) == "string" and hooked ~= "" then path = hooked end

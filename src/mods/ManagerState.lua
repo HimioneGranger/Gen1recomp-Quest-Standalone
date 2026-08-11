@@ -5,7 +5,10 @@
 -- before they land, edits stage until one apply/restart, and safe mode is
 -- read from Runtime.safeMode (19 owns the detection).
 local Font = require("src.render.Font")
+local GameVersion = require("src.core.GameVersion")
+local ModTargets = require("src.mods.ModTargets")
 local Runtime = require("src.mods.Runtime")
+local SaveData = require("src.core.SaveData")
 local Semver = require("src.mods.Semver")
 local Version = require("src.core.Version")
 local Theme = require("src.ui.Theme")
@@ -28,7 +31,10 @@ end
 
 -- the charmap has no * ~ + < > glyphs, so the status gutter uses what it
 -- does have: staged-awaiting-restart, disabled, errored, dep-unhealthy
-local GLYPH = { staged = ".", disabled = "-", errored = "!", blocked = "?" }
+-- `skipped` is not a fault: the mod is enabled and intact, this game is just
+-- not the generation it declared (Loader:_gateGeneration)
+local GLYPH = { staged = ".", disabled = "-", errored = "!", blocked = "?",
+                skipped = "-" }
 
 local TABS = { "MODS", "PROFILES", "ERRORS" }
 local TAB_LINE = { "[MODS] PROF ERRS", "MODS [PROF] ERRS", "MODS PROF [ERRS]" }
@@ -208,7 +214,9 @@ function ManagerState:refresh()
   if self.currentMod then
     self.currentMod = self.byId[self.currentMod.id]
   end
-  self.restartPending = #self:stagedList() > 0
+  -- gen2Pending is not in stagedList: the Gen 2 override is not an enable flag
+  -- and there is nothing in `available` to diff it against
+  self.restartPending = #self:stagedList() > 0 or self.gen2Pending == true
   -- a live set that drifted off the named profile reverts to ad-hoc
   local opts = self:optionsTable()
   if opts.activeProfile then
@@ -255,9 +263,29 @@ function ManagerState:stagedList()
   return out
 end
 
+-- The game this manager judges targets against: the running version, unless a
+-- harness injected a loader generation that disagrees with it (Loader.new
+-- opts.generation), where only the generation can be trusted.
+function ManagerState:targetGame()
+  local loader = self.game and self.game.mods
+  local gen = loader and loader.generation
+  local version = GameVersion.get()
+  if gen and GameVersion.generation(version) ~= gen then return nil, gen end
+  return version, GameVersion.generation(version)
+end
+
+-- will this mod run on this game at all (src/mods/ModTargets.lua, the same
+-- derivation the launcher panel shows)
+function ManagerState:runsHere(m)
+  local version, gen = self:targetGame()
+  return ModTargets.runsHere(m, version, gen, m.gen2Forced)
+end
+
 function ManagerState:glyphFor(m)
   if self:isStaged(m) then return GLYPH.staged end
   if not m.enabled then return GLYPH.disabled end
+  if m.state == "wrong_generation" then return GLYPH.skipped end
+  if not self:runsHere(m) then return GLYPH.skipped end
   if m.state == "blocked_dependency" then return GLYPH.blocked end
   if m.error then return GLYPH.errored end
   return " "
@@ -345,6 +373,22 @@ function ManagerState:detailRows(m)
     rows[#rows + 1] = { label = Strings("PERMISSIONS.."),
       action = function() self:goTo("permissions") end }
   end
+  -- The manifest's games list is the AUTHOR's claim, and a mod written before
+  -- the field existed can never carry one, so the player gets the override
+  -- here rather than being told to edit a manifest they do not own.  Exactly
+  -- the answer the loader gates on (Loader:_gateGeneration reads the same
+  -- ModTargets.supports), so the row appears only where a restart can change
+  -- what this mod does.
+  local loader = self.game.mods
+  local version, gen = self:targetGame()
+  if loader and loader.setGen2Forced and not ModTargets.supports(m, version, gen) then
+    rows[#rows + 1] = {
+      label = m.gen2Forced and Strings("DON'T TRY HERE") or Strings("TRY HERE ANYWAY"),
+      action = function() self:toggleGen2Force(m) end }
+  end
+  -- which games the mod says it is for, in the one place the player is
+  -- already looking when they wonder why it did not run
+  rows[#rows + 1] = { inert = true, label = "FOR " .. ModTargets.chip(m) }
   if m.github then
     rows[#rows + 1] = { inert = true, label = "GH " .. m.github }
   end
@@ -660,15 +704,52 @@ function ManagerState:beginToggle(m)
   proceed()
 end
 
+-- The gate runs once, before any entry chunk, so this can only take effect on
+-- the next boot: it stages a restart the way an enable toggle does.  The
+-- override is scoped to THIS game, and a boot that cannot name one keeps it in
+-- memory only, which the notice says rather than promising a restart.
+function ManagerState:toggleGen2Force(m)
+  local loader = self.game.mods
+  if not (loader and loader.setGen2Forced) then return end
+  local want = not m.gen2Forced
+  local function apply()
+    local _, persisted = loader:setGen2Forced(m.id, want)
+    self.gen2Pending = persisted ~= false
+    if loader.status then self.game.modStatus = loader:status() end
+    self:refresh()
+    if persisted == false then
+      -- the gate already ran, so an unsaved override changes no boot at all
+      self:notify("COULD NOT SAVE")
+    else
+      self:notify(want and "WILL TRY ON RESTART" or "WILL BE SKIPPED")
+    end
+  end
+  if not want then
+    apply()
+    return
+  end
+  self:openConfirm({
+    "NOT MADE FOR",
+    "THIS GAME.",
+    "TRY IT ANYWAY?",
+  }, apply)
+end
+
+-- Where the loader persisted an enable flag: this game's slot once it keeps
+-- them per game, the shared flag until then (SaveData.modScope).
+function ManagerState:enableScope()
+  return SaveData.modScope((self:targetGame()))
+end
+
 function ManagerState:commitToggle(apply)
   local loader = self.game.mods
   local opts = self:optionsTable()
+  local scope = self:enableScope()
   for id, en in pairs(apply) do
     if loader and loader.setEnabled then loader:setEnabled(id, en) end
     -- mirror into the live options so a later writeOptions cannot revert
     -- what setEnabled just persisted
-    opts.mods = opts.mods or {}
-    opts.mods[id] = en
+    SaveData.setModEnabled(opts, id, en, scope)
   end
   if loader and loader.status then self.game.modStatus = loader:status() end
   self:refresh()
@@ -677,11 +758,11 @@ end
 function ManagerState:discardChanges()
   local loader = self.game.mods
   local opts = self:optionsTable()
+  local scope = self:enableScope()
   for _, m in ipairs(self:stagedList()) do
     local en = bootEnabled(m)
     if loader and loader.setEnabled then loader:setEnabled(m.id, en) end
-    opts.mods = opts.mods or {}
-    opts.mods[m.id] = en
+    SaveData.setModEnabled(opts, m.id, en, scope)
   end
   if loader and loader.status then self.game.modStatus = loader:status() end
   self:refresh()
@@ -710,7 +791,9 @@ function ManagerState:matchesProfile(p)
     local want = p.enabled[m.id] ~= false
     if (m.enabled and true or false) ~= want then return false end
   end
-  return true
+  -- the per-game answers count too, or a profile that only differs on Gold
+  -- would read as still active after the player changed it
+  return ModProfile.matchesVersions(p, self:optionsTable())
 end
 
 function ManagerState:persistOptions()
@@ -749,6 +832,8 @@ function ManagerState:applyProfile(p)
   for _, move in ipairs(ModProfile.slotMoves(p)) do
     require("src.core.SaveData").setActiveSlot(move[1], move[2])
   end
+  -- the per-game half of the setup, restored beside the shared enable set
+  ModProfile.restoreVersions(p, self:optionsTable())
   self:optionsTable().activeProfile = p.name
   self:persistOptions()
   local missing = ModProfile.missingIds(p, self.byId)
@@ -768,11 +853,12 @@ function ManagerState:saveCurrentAs()
       local opts = self:optionsTable()
       opts.modProfiles = opts.modProfiles or {}
       local snap = ModProfile.capture(self.status.available,
-        self:modOptionsTable())
+        self:modOptionsTable(), opts.modsByVersion)
       local existing = self:findProfile(name)
       if existing then
         existing.enabled, existing.options, existing.slots =
           snap.enabled, snap.options, snap.slots
+        existing.enabledByVersion = snap.enabledByVersion
       else
         snap.name = name
         opts.modProfiles[#opts.modProfiles + 1] = snap
@@ -1082,7 +1168,10 @@ function ManagerState:drawDetail()
   local title = wrap(m.name or m.id, 14)
   drawTruncated(title[1] .. " " .. (m.version or ""), 16, 2 * 8, 17)
   local statusLine = m.enabled and "ENABLED" or "DISABLED"
-  if m.state == "blocked_dependency" then
+  if m.state == "wrong_generation" or not self:runsHere(m) then
+    -- enabled and fine, just not for this game; the detail body says why
+    statusLine = statusLine .. " (NOT THIS GAME)"
+  elseif m.state == "blocked_dependency" then
     statusLine = statusLine .. " ?"
   elseif m.error then
     statusLine = statusLine .. " !"
@@ -1091,7 +1180,8 @@ function ManagerState:drawDetail()
   drawTruncated(statusLine, 16, 3 * 8, 17)
   drawTruncated((m.category or "OTHER") .. " / " .. (m.profile or "content"),
                 16, 4 * 8, 17)
-  local lines = wrap(m.error and ("FAILED: " .. m.error) or m.description, 16)
+  local lines = wrap(m.error and ("FAILED: " .. m.error)
+    or (m.note and ("SKIPPED: " .. m.note)) or m.description, 16)
   local visible = 5
   for i = 1, visible do
     local line = lines[self.descScroll + i - 1]

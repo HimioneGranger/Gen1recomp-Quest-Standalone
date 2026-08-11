@@ -1,0 +1,119 @@
+==============================================================================
+==============================================================================
+==============================================================================
+
+(c06)
+------------------------------------------------
+---- 6 > Chikorita, Cyndaquil, or Totodile? ----
+------------------------------------------------
+
+Video Playthrough Link (Introduction through Violet City Gym):
+https://www.youtube.com/watch?v=dqJtkx8DcE0
+
+|-------------|
+|New Bark Town|
+|-------------|
+
+Pokémon found in New Bark Town:
+
+#152 Chikorita
+#155 Cyndaquil
+#158 Totodile
+
+Items found in New Bark Town:
+
+Everstone
+Pokegear
+
+When you first start, you will be in New Bark Town. Choose new game and start.
+Afterwards, Professor Oak will ask you the time. First answer what hour it is
+and what minute it is, so you are setting the game's time.
+
+There is a default time, which is 10:00 AM, but you may set the time for
+whatever you'd like it to be. Preferably, it should be the time that it is where
+you live, because then it'd make more sense. They have it well-programmed on
+Gold/Silver that even if you don't have the GBA on, the time will keep running. 
+
+Then, Professor Oak will welcome you to the world of Pokémon like the older
+versions of Pokémon and introduces you to Professor Elm. Basically Pokémon
+cannot be lived without in the worlds of Johto and Kanto. Then he asks you what
+your name is, so input that. Choose something as your name and your Pokémon
+Gold/Silver adventure finally unfolds!
+
+You are in your room at the beginning. Exit the room, and you will meet your
+mom. She tells you that your Pokegear is back from the repair shop. You get the
+Pokegear. Pokegear is used to call people on a phone and also see the day and
+time of the day. Then, when she asks you to input the day of the week, put that
+in. You can even put in Daylight Savings Time. How cool! Remember, that's the
+cycle from April to October. The other half of the year is not. The Phone is
+part of the Pokegear, so simply go there and phone whoever. Kinda cool,
+actually. She'll want you to call from time to time.
+
+Leave your house and head left to Professor Elm's lab. Notice the guy standing
+left of it in that little corner. That will be your rival. If you talk to him,
+he'll push you out of the way. So rude. Anyway, go into Elm's lab. He'll want
+you to do him a favor by raising up a Pokémon. Win-win situation, no? He rants
+on about Mr. Pokémon's real discovery which wouldn't make any sense yet. You get
+to pick your starter Pokémon. Which Pokémon should you take?
+
+|------------|
+|THE STARTERS|
+|------------|
+
+As I mentioned before, your starter Pokémon choice really matters. You can't get
+the other two starters short of restarting your game save, getting a second game
+(like the other version), or trading someone else for one. Which Pokémon should
+YOU choose? Let's analyze all three starters. Thard_Verad notes that the
+evolution levels vary in this game:
+
+"Chikorita -16-> Bayleef -32-> Meganium
+Cyndaquil -14-> Quilava -36-> Typhlosion
+Totodile -18-> Croconaw -30-> Feraligatr
+
+As you can see, Cyndaquil is first to evolve into its intermediate form, but
+slowest to reach its final form. Totodile is the other way 
+around, and Chikorita is in the middle."
+
+Here are additional thoughts below on each type.
+
+CHIKORITA: Grass Type. 
+
+Chikorita is the hardest starter to start with and will struggle against the
+first two gyms. Chikorita will also struggle a bit against the fourthgym. And
+Team Rocket likes using poison types, which have a type advantage against grass
+types. Expert trainers should use Chikorita if they want a challenge.
+
+Moves to Keep:
+
+Tackle (35 PWR) => Body Slam (85 PWR)
+Growl => Poison Powder => HM04 Strength (80 PWR)
+Razor Leaf (55 PWR) => Solar Beam (120 PWR)
+Reflect => Synthesis
+
+CYNDAQUIL: Fire Type.
+
+Cyndaquil evolves to its second form faster than the other two starters and has
+a powerful Flamethrower move in its final form. Cyndaquil is the best starter
+for the first two gyms, but slows down a bit after that because Cyndaquil only
+really has fire and normal type moves.
+
+Moves to Keep:
+
+Tackle (35 PWR) => Quick Attack (40 PWR)
+Leer => Swift (60 PWR) => HM04 Strength (80 PWR)
+SmokeScreen  => Flamethrower (95 PWR)
+Ember (40 PWR) => Flame Wheel (60 PWR)
+
+TOTODILE: Water Type.
+
+Totodile is a great choice for speedrunning. When evolved, it can make use of
+two powerful HMs: Surf AND Strength. Totodile also eventually gets Bite, a dark
+type move, for balance.
+
+Moves to Keep:
+
+Scratch (40 PWR) => Slash (70 PWR) => Hydro Pump (120 PWR)
+Leer => Bite (60 PWR)
+Rage (20 PWR) => HM04 Strength (80 PWR)
+Water Gun (40 PWR) => HM03 Surf (95 PWR)
+
