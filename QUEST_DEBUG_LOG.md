@@ -1329,3 +1329,25 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   experimental-mod dialog blocker is resolved.
 - Visual cleanup of the native highlighter remains desirable but does not
   prevent use. It is ranked as low-priority polish above further Pokédex sizing.
+
+## 2026-08-11 - Wild Skies first-stage compatibility sample
+
+- Tested the intended visual baseline (Dramaless Shape, Kanto First Person,
+  and Wilds of Kanto) with Wild Skies added. Dramatic Sky Ride, HGSS Sprites,
+  Crystal 251, and Side Door Fix were excluded so Wild Skies was the only new
+  variable. Route: Saffron -> Route 7 -> Celadon -> Celadon Mart 1F -> Celadon.
+- User observed no unusual performance or visual problems. App frame-count
+  telemetry yielded roughly 29.5-31.3 rendered frames/second over successive
+  500/1000-frame intervals, consistent with or slightly above the earlier
+  approximately 25-29 FPS Celadon sample rather than a new regression.
+- Post-route memory was 1,923,876 KB total PSS (about 1.92 GB), including
+  717,528 KB Graphics. The previous Celadon sample was about 2.01 GB PSS.
+  These are single samples, not proof that Wild Skies reduces memory, but they
+  show no new memory-pressure step. No crash, ANR, OOM, or trim-memory event
+  was logged.
+- Battery moved from 77%/38 C before the run to 74%/43 C afterward while USB
+  powered. This remained below the earlier 55 C stress sample.
+- One nonfatal Wilds of Kanto occupancy-conflict warning appeared on Route 7;
+  wild spawning and map travel continued. Treat separately from Wild Skies.
+- Result: Wild Skies passes initial Quest compatibility/performance testing.
+  Next controlled variable is Dramatic Sky Ride added to this same stack.
