@@ -51,14 +51,33 @@ do
   -- exist in 1.6.4 and therefore cannot be mixed into this installation.
   local questVR = love.filesystem.read("src/quest/dramaless/VR.lua")
   local questVRGL = love.filesystem.read("lib/VRGL.lua")
-  if C and replacement and questVR and questVRGL
-      and replacement:find("questxr_request_launcher_shutdown", 1, true) then
-    local okXR = love.filesystem.write(
-      "mods/DRAMALESS_SHAPE/lib/VRXR.lua", replacement)
-    local okVR = love.filesystem.write(
-      "mods/DRAMALESS_SHAPE/lib/VR.lua", questVR)
-    local okVRGL = love.filesystem.write(
-      "mods/DRAMALESS_SHAPE/lib/VRGL.lua", questVRGL)
+  if C then
+    -- The conductor and source adapters are shipped by the engine and must be
+    -- refreshed even when a packaging mistake omits one of the optional
+    -- native-transport companions.  Gating this whole block on VRXR/VRGL left
+    -- an old writable VR.lua active, which restored the 12-map preload policy
+    -- and silently skipped every mesher adapter.
+    local okVR = questVR and love.filesystem.write(
+      "mods/DRAMALESS_SHAPE/lib/VR.lua", questVR) or false
+    pcall(C.questxr_log, okVR and
+      "Dramaless Quest conductor installed" or
+      "Dramaless Quest conductor install failed")
+
+    local matchedTransport = replacement and questVRGL
+      and replacement:find("questxr_request_launcher_shutdown", 1, true)
+    if matchedTransport then
+      local okXR = love.filesystem.write(
+        "mods/DRAMALESS_SHAPE/lib/VRXR.lua", replacement)
+      local okVRGL = love.filesystem.write(
+        "mods/DRAMALESS_SHAPE/lib/VRGL.lua", questVRGL)
+      pcall(C.questxr_log, okXR and okVRGL and
+        "Dramaless Shape matched Quest OpenXR transport installed" or
+        "Dramaless Shape matched Quest transport install failed")
+    else
+      pcall(C.questxr_log,
+        "Dramaless matched transport payload unavailable; retained installed transport")
+    end
+
     -- Dramaless 1.6.4 still uploads six complete vertices per terrain quad.
     -- Apply the isolated, source-guarded Quest index adapter to the installed
     -- writable shadow. Kanto First Person can continue patching that normal
@@ -101,9 +120,6 @@ do
           or love.filesystem.write(scenePath, streamed)
       end
     end
-    pcall(C.questxr_log, okXR and okVR and okVRGL and
-      "Dramaless Shape Quest OpenXR transport installed" or
-      "Dramaless Shape Quest transport install failed")
     pcall(C.questxr_log, okLifetime
       and ("Dramaless " .. lifetimeNote)
       or ("Dramaless lifetime seam skipped: " .. tostring(lifetimeNote)))
