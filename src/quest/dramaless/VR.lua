@@ -52,6 +52,7 @@ local Map = require("src.world.Map")
 local OverworldState = require("src.world.OverworldController")
 local FieldDefaults = require("src.world.FieldDefaults")
 local ModRuntime = require("src.mods.Runtime")
+local CanvasLifetime = require("src.quest.dramaless.CanvasLifetime")
 local FirstPerson = V.require("FirstPerson")
 local BattleCam = V.require("BattleCam")
 local VRRig = V.require("VRRig")
@@ -476,6 +477,7 @@ local function shutdown(reason)
   -- the placed camera may still be a VR eye's; the orbit must get the
   -- pass back clean
   Voxel3D.camera = nil
+  mirrorCanvas = CanvasLifetime.release(mirrorCanvas)
   mirrorSrc = nil
   releaseInputs()
   BattleCam.still = false
@@ -485,7 +487,10 @@ local function shutdown(reason)
     _G.QUEST_POKEDEX_CAPTURE = nil
     _G.QUEST_POKEDEX_CAPTURE_OWNER = nil
   end
-  dexSource, dexCanvas, dexBattle = nil, nil, false
+  dexSource = CanvasLifetime.release(dexSource)
+  dexCanvas = CanvasLifetime.release(dexCanvas)
+  dexBattle = false
+  for k in pairs(fboCache) do fboCache[k] = nil end
   zoom, heightOff = 1, 0
   fpYawOff, snapArmed = 0, true
   camMode, fadeAlpha = "explore", 0
@@ -533,9 +538,12 @@ local function captureDexFrame()
     local lx = math.floor((ww - frameW) / 2)
     local ly = math.floor((wh - frameH) / 2)
     local outW, outH = uiW * 2, uiH * 2
-    if not (dexSource and dexSource:getWidth() == outW
-            and dexSource:getHeight() == outH) then
-      dexSource = love.graphics.newCanvas(outW, outH, { dpiscale = 1 })
+    local made, changed, makeErr = CanvasLifetime.resize(
+      dexSource, outW, outH,
+      function(w, h) return love.graphics.newCanvas(w, h, { dpiscale = 1 }) end)
+    dexSource = made
+    if not dexSource then error(makeErr or "Pokedex capture canvas unavailable") end
+    if changed then
       pcall(dexSource.setFilter, dexSource, "nearest", "nearest")
     end
     local fbo = fboCache[dexSource]
@@ -583,9 +591,12 @@ local function dexScreen()
     return { dexSource, dexBattle and 0 or 0.01, 0,
              dexBattle and 1 or 0.99, 1 }
   end
-  if not (dexCanvas and dexCanvas:getWidth() == 320
-          and dexCanvas:getHeight() == 288) then
-    dexCanvas = love.graphics.newCanvas(320, 288, { dpiscale = 1 })
+  local made, changed = CanvasLifetime.resize(
+    dexCanvas, 320, 288,
+    function(w, h) return love.graphics.newCanvas(w, h, { dpiscale = 1 }) end)
+  dexCanvas = made
+  if not dexCanvas then return nil end
+  if changed then
     pcall(dexCanvas.setFilter, dexCanvas, "nearest", "nearest")
   end
   local pushed = pcall(love.graphics.push, "all")
@@ -1182,12 +1193,10 @@ end
 -- path as ever).
 function VR.mirror(sw, sh)
   if not (VR.active() and mirrorSrc) then return nil end
-  if not (mirrorCanvas and mirrorCanvas:getWidth() == sw
-          and mirrorCanvas:getHeight() == sh) then
-    local ok, c = pcall(love.graphics.newCanvas, sw, sh)
-    if not ok then return nil end
-    mirrorCanvas = c
-  end
+  mirrorCanvas = CanvasLifetime.resize(
+    mirrorCanvas, sw, sh,
+    function(w, h) return love.graphics.newCanvas(w, h) end)
+  if not mirrorCanvas then return nil end
   local ok = pcall(function()
     love.graphics.setCanvas(mirrorCanvas)
     love.graphics.clear(0, 0, 0, 1)
@@ -1206,12 +1215,11 @@ end
 -- canvases
 function VR.invalidate()
   maskCache = {}
-  if mirrorCanvas and mirrorCanvas.release then
-    pcall(mirrorCanvas.release, mirrorCanvas)
-  end
-  mirrorCanvas, mirrorSrc = nil, nil
-  if dexCanvas and dexCanvas.release then pcall(dexCanvas.release, dexCanvas) end
-  dexCanvas = nil
+  mirrorCanvas = CanvasLifetime.release(mirrorCanvas)
+  mirrorSrc = nil
+  dexSource = CanvasLifetime.release(dexSource)
+  dexCanvas = CanvasLifetime.release(dexCanvas)
+  lastDexMetrics = nil
   Pokedex.invalidate()
   for k in pairs(fboCache) do fboCache[k] = nil end
 end
