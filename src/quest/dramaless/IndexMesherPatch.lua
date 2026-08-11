@@ -17,6 +17,7 @@ Patch.TRACE_MARKER = "quest transition mesh trace"
 Patch.PHASE_MARKER = "quest Route 2 mesh phase trace"
 Patch.GEOMETRY_PHASE_MARKER = "quest Route 2 geometry section trace"
 Patch.WARM_LIVE_MARKER = "quest startup warm live set"
+Patch.BODY_DROP_MARKER = "quest promoted body release"
 Patch.PACING_MARKER = "quest paced neighbour meshing"
 Patch.REJECTED_CACHE_MARKER = "quest persistent indexed mesh cache"
 
@@ -37,6 +38,7 @@ function Patch.apply(source)
   local alreadyPhased = source:find(Patch.PHASE_MARKER, 1, true) ~= nil
   local alreadyGeometryPhased = source:find(Patch.GEOMETRY_PHASE_MARKER, 1, true) ~= nil
   local alreadyWarmLive = source:find(Patch.WARM_LIVE_MARKER, 1, true) ~= nil
+  local alreadyBodyDrop = source:find(Patch.BODY_DROP_MARKER, 1, true) ~= nil
   local alreadyPaced = source:find(Patch.PACING_MARKER, 1, true) ~= nil
   local rejectedCache = source:find(Patch.REJECTED_CACHE_MARKER, 1, true) ~= nil
   local cacheRemoved = false
@@ -112,7 +114,7 @@ local COVERED_SLICE = 0.030
     source, alreadyPaced = restored, false
   end
   if alreadyIndexed and alreadyTraced and alreadyPhased and alreadyGeometryPhased
-     and alreadyWarmLive then
+     and alreadyWarmLive and alreadyBodyDrop then
     return source, cacheRemoved and "indexed and traced; rejected persistent cache removed"
       or "indexed, traced, and phase-profiled"
   end
@@ -446,7 +448,36 @@ function ChunkMesher.setLive(live)
     if not source then return nil, err end
   end
 
-  return source, "indexed, traced, phase-profiled, and startup-warm"
+  if not alreadyBodyDrop then
+    source, err = replaceOnce(source, [=[
+function ChunkMesher.setLive(live)
+]=], [=[
+-- quest promoted body release: once a prebuilt full destination becomes the
+-- current map, its neighbour-only body variant is redundant. Release just
+-- that GPU pair; shared Structures analysis and the full mesh stay live.
+function ChunkMesher.dropBody(mapId)
+  local c = cache[mapId]
+  if not c then return false end
+  local key = jobKey(mapId, "body")
+  local job = jobIndex[key]
+  if job then
+    jobIndex[key] = nil
+    for i = #jobs, 1, -1 do
+      if jobs[i] == job then table.remove(jobs, i) break end
+    end
+  end
+  swapSlot(c, "body", nil)
+  swapSlot(c, waterSlot("body"), nil)
+  if c.stale then c.stale.body = nil end
+  return true
+end
+
+function ChunkMesher.setLive(live)
+]=], "promoted body release API")
+    if not source then return nil, err end
+  end
+
+  return source, "indexed, traced, phase-profiled, startup-warm, and bounded"
 end
 
 return Patch

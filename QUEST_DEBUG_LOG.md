@@ -1209,3 +1209,34 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   cities in the save-aware corridor from body-only to full preload, while
   reducing or releasing other warm meshes so the existing memory pressure is
   not made worse. Celadon provides the first measured candidate.
+
+## 2026-08-10 - Bounded major-location and interior preload candidate
+
+- Checked Dramaless 1.6.4's actual `ChunkMesher` cache lifecycle before
+  changing policy. It retains only the current and previous live map sets and
+  releases GPU meshes plus Structures analysis outside them. A destination
+  city temporarily needs both its body variant (while visible as neighbour
+  scenery) and full variant (when current), explaining the measured Celadon
+  overlap.
+- Startup now selects at most one nearby major fly destination for a full
+  preload, ranked by checked map area. The cap is one; it does not bake every
+  Saffron-adjacent city. The preload log records the selected `full=` id so the
+  Celadon choice and timing can be verified on hardware.
+- Seamless travel starts one closest major destination's full mesh per source
+  map, excluding the map just left. This applies the same policy to all eleven
+  vanilla fly towns/Indigo Plateau without hard-coding a playthrough route.
+- Warp events now prepare exactly one resolved destination during the covered
+  transition and temporarily pin only source plus destination. Because this is
+  derived from the engine's checked warp destination, it covers ordinary
+  interiors, Silph floors, caves, ships, and mod-authored interiors without an
+  incomplete name list.
+- Added a source-guarded `ChunkMesher.dropBody(mapId)` adapter. Once a promoted
+  destination's full mesh is current, it releases only the redundant body and
+  body-water GPU slots; the full mesh and shared analysis remain. This bounds
+  the temporary dual-variant cost and leaves normal current/previous-live
+  eviction authoritative.
+- This is a candidate pending cooled-headset validation. Required evidence is
+  Saffron startup selecting Celadon, Celadon entry avoiding the 8.71-second
+  urgent build, body-release diagnostics, memory below/equal to the prior
+  roughly 2.01 GB peak, and working enter/exit transitions for a representative
+  interior.

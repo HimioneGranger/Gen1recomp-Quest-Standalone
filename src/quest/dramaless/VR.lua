@@ -48,8 +48,10 @@ local Voxel3D = V.require("Voxel3D")
 local VoxelScene = V.require("VoxelScene")
 local ChunkMesher = V.require("ChunkMesher")
 local MapLoader = require("src.world.MapLoader")
+local Map = require("src.world.Map")
 local OverworldState = require("src.world.OverworldController")
 local FieldDefaults = require("src.world.FieldDefaults")
+local ModRuntime = require("src.mods.Runtime")
 local FirstPerson = V.require("FirstPerson")
 local BattleCam = V.require("BattleCam")
 local VRRig = V.require("VRRig")
@@ -106,18 +108,25 @@ local status = "off"
 -- session to hand OpenXR to gameplay, prepare the selected save's real map and
 -- its live neighbours. This is derived from the constructed overworld state,
 -- so every save/location gets its own set rather than a hard-coded route.
-local preload = { state = nil, started = nil, maps = nil, live = nil }
+local preload = {
+  state = nil, started = nil, maps = nil, live = nil, promoteFull = nil,
+}
 local PRELOAD_TIMEOUT = 90
 local PRELOAD_HOPS = 4
 local PRELOAD_MAP_CAP = 12
+local PRELOAD_FULL_CAP = 1
 local CONNECTION_ORDER = { "north", "south", "west", "east" }
-local route2Masks = nil
+local maskCache = {}
+local warpHooksInstalled = false
+local warpPinned = nil
+local majorTravel = { current = nil, previous = nil, target = nil }
+local bodyDropPending = {}
 
 -- A full mesh includes the border ring, so it must be built with Route 2's
 -- own neighbour-body masks rather than the currently occupied map's masks.
 -- These placements are static for imported game data and can be reused.
 local function masksForMap(Game, map)
-  if map.id == "ROUTE_2" and route2Masks then return route2Masks end
+  if maskCache[map.id] then return maskCache[map.id] end
   local hops = FieldDefaults.world(Game.data, "neighborHops") or 2
   local vw, vh = Game.renderer:worldViewSize()
   local masks = {}
@@ -129,14 +138,123 @@ local function masksForMap(Game, map)
       n.ox, n.oy, n.ox + def.width * 32, n.oy + def.height * 32,
     }
   end
-  if map.id == "ROUTE_2" then route2Masks = masks end
+  maskCache[map.id] = masks
   return masks
 end
 
-local function requestRegionalMap(Game, map)
-  local full = map.id == "ROUTE_2"
+local function requestRegionalMap(Game, map, promoteFull)
+  local full = map.id == "ROUTE_2" or promoteFull == true
+  if promoteFull then bodyDropPending[map.id] = true end
   ChunkMesher.request(map, not full, full and masksForMap(Game, map) or nil)
   return ChunkMesher.pair(map, not full)
+end
+
+local function isMajorLocation(def)
+  return def and Map.isFlyTown(def) and Map.isOutside(def)
+end
+
+-- Pick only the largest nearby hub. Its body remains necessary while the hub
+-- is still neighbour scenery, but is released after the full mesh becomes
+-- current. The one-map speculative-full cap is deliberate:
+-- Celadon measured 8.71 seconds to build but the live Quest process was
+-- already near 2 GB, so baking every Saffron-adjacent city would be unsafe.
+local function fullPromotions(Game, maps)
+  local candidates = {}
+  for _, map in ipairs(maps or {}) do
+    local def = Game.data.maps[map.id]
+    if isMajorLocation(def) then
+      candidates[#candidates + 1] = {
+        id = map.id,
+        area = (tonumber(def.width) or 0) * (tonumber(def.height) or 0),
+      }
+    end
+  end
+  table.sort(candidates, function(a, b)
+    if a.area ~= b.area then return a.area > b.area end
+    return a.id < b.id
+  end)
+  local out = {}
+  for i = 1, math.min(PRELOAD_FULL_CAP, #candidates) do
+    out[candidates[i].id] = true
+  end
+  return out
+end
+
+-- Warps announce their resolved destination before the fade/map swap. Build
+-- that one map while the transition covers the world. This naturally handles
+-- every interior (including Silph, caves and ordinary houses) without a giant
+-- hard-coded dungeon list. Source+destination are pinned only until entry;
+-- ChunkMesher's normal current/previous-live eviction owns them afterward.
+local function ensureWarpPreloadHooks()
+  if warpHooksInstalled then return end
+  local events = ModRuntime.events
+  if not (events and events.on) then return end
+  events:on("player.warped", function(payload)
+    if not rawget(_G, "QUEST_PANEL_ACTIVE") or not VR.enabled() then return end
+    local ok, Game = pcall(require, "src.core.Game")
+    local toId = payload and payload.toMap
+    local def = ok and Game.data and Game.data.maps and Game.data.maps[toId]
+    if not def then return end
+    local map = MapLoader.load(Game.data, toId)
+    bodyDropPending[toId] = true
+    warpPinned = { [toId] = true }
+    if payload.fromMap then warpPinned[payload.fromMap] = true end
+    if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(warpPinned) end
+    ChunkMesher.request(map, false, masksForMap(Game, map), true)
+    local log = rawget(_G, "QUEST_XR_LOG")
+    if log then
+      log(("VRWARP preload from=%s to=%s interior=%s")
+        :format(tostring(payload.fromMap), tostring(toId),
+          tostring(not Map.isOutside(def))))
+    end
+  end, 1000, "DRAMALESS_SHAPE")
+  events:on("map.entered", function(payload)
+    if not (warpPinned and payload and warpPinned[payload.mapId]) then return end
+    warpPinned = nil
+    if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(nil) end
+  end, -1000, "DRAMALESS_SHAPE")
+  warpHooksInstalled = true
+end
+
+-- Seamless outdoor crossings do not emit player.warped. On the first frame
+-- in each route/town, select the closest major hub other than the map just
+-- left and start its full mesh in the background. This makes the policy apply
+-- to all eleven fly towns/Plateau without retaining more than the normal live
+-- neighbourhood or guessing a fixed playthrough route.
+local function preloadNearbyMajor(Game, world)
+  local currentId = world.map.id
+  if majorTravel.current ~= currentId then
+    majorTravel.previous = majorTravel.current
+    majorTravel.current, majorTravel.target = currentId, nil
+  end
+  if majorTravel.target then return end
+  local px = world.player and world.player.px or 0
+  local py = world.player and world.player.py or 0
+  local best, bestDistance
+  for _, nb in ipairs(world.neighbors or {}) do
+    local map, def = nb.map, Game.data.maps[nb.map.id]
+    if map.id ~= majorTravel.previous and isMajorLocation(def) then
+      local x0, y0 = nb.ox or 0, nb.oy or 0
+      local x1 = x0 + (tonumber(def.width) or 0) * 32
+      local y1 = y0 + (tonumber(def.height) or 0) * 32
+      local dx = px < x0 and x0 - px or (px > x1 and px - x1 or 0)
+      local dy = py < y0 and y0 - py or (py > y1 and py - y1 or 0)
+      local distance = dx * dx + dy * dy
+      if not bestDistance or distance < bestDistance then
+        best, bestDistance = map, distance
+      end
+    end
+  end
+  if not best then return end
+  majorTravel.target = best.id
+  bodyDropPending[best.id] = true
+  ChunkMesher.request(best, false, masksForMap(Game, best), false)
+  local log = rawget(_G, "QUEST_XR_LOG")
+  if log then
+    log(("VRMAJOR preload from=%s previous=%s to=%s distance2=%.0f")
+      :format(tostring(currentId), tostring(majorTravel.previous),
+        tostring(best.id), bestDistance or 0))
+  end
 end
 
 -- Walk the selected save's actual connection graph, nearest first. Four hops
@@ -166,7 +284,7 @@ local function regionalWarmMaps(Game, world)
       end
     end
   end
-  return out, seen
+  return out, seen, fullPromotions(Game, out)
 end
 
 local function prepareQuestWorld()
@@ -174,18 +292,29 @@ local function prepareQuestWorld()
   local ok, Game = pcall(require, "src.core.Game")
   local world = ok and Game.overworld or nil
   if not (world and world.map) then return false end
+  ensureWarpPreloadHooks()
 
   if preload.state ~= world then
     preload.state = world
     preload.started = love.timer.getTime()
-    preload.maps, preload.live = regionalWarmMaps(Game, world)
+    preload.maps, preload.live, preload.promoteFull = regionalWarmMaps(Game, world)
+    majorTravel.current, majorTravel.previous, majorTravel.target =
+      world.map.id, nil, nil
+    for id in pairs(preload.promoteFull) do
+      majorTravel.target = id
+      break
+    end
     if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(preload.live) end
     local log = rawget(_G, "QUEST_XR_LOG")
     if log then
-      local ids = {}
-      for _, map in ipairs(preload.maps) do ids[#ids + 1] = map.id end
-      log(("VRPRELOAD start map=%s warm=%s")
-        :format(tostring(world.map.id), table.concat(ids, ",")))
+      local ids, full = {}, {}
+      for _, map in ipairs(preload.maps) do
+        ids[#ids + 1] = map.id
+        if preload.promoteFull[map.id] then full[#full + 1] = map.id end
+      end
+      log(("VRPRELOAD start map=%s warm=%s full=%s")
+        :format(tostring(world.map.id), table.concat(ids, ","),
+          #full > 0 and table.concat(full, ",") or "-"))
     end
   end
 
@@ -199,7 +328,8 @@ local function prepareQuestWorld()
   if current then complete = complete + 1 end
   for _, map in ipairs(preload.maps or {}) do
     required = required + 1
-    local mesh = requestRegionalMap(Game, map)
+    local mesh = requestRegionalMap(Game, map,
+      preload.promoteFull and preload.promoteFull[map.id])
     if mesh then complete = complete + 1 end
   end
 
@@ -330,7 +460,10 @@ end
 
 local function shutdown(reason)
   _G.QUEST_VR_PRELOAD = nil
-  preload.state, preload.started, preload.maps, preload.live = nil, nil, nil, nil
+  preload.state, preload.started, preload.maps, preload.live,
+    preload.promoteFull = nil, nil, nil, nil, nil
+  majorTravel.current, majorTravel.previous, majorTravel.target = nil, nil, nil
+  bodyDropPending = {}
   if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(nil) end
   if started then
     VRXR.stop()
@@ -982,6 +1115,14 @@ function VR.update(dt)
       end
     end
     if nearRoute2 and route2 then requestRegionalMap(Game, route2) end
+    preloadNearbyMajor(Game, world)
+    if bodyDropPending[world.map.id]
+       and ChunkMesher.pair(world.map, false) then
+      if ChunkMesher.dropBody then ChunkMesher.dropBody(world.map.id) end
+      bodyDropPending[world.map.id] = nil
+      local log = rawget(_G, "QUEST_XR_LOG")
+      if log then log("VRMAJOR released body id=" .. tostring(world.map.id)) end
+    end
   end
 
   -- the headset paces the app now; vsync would fight it
@@ -1060,6 +1201,7 @@ end
 -- its invalidate; ours is the mirror and the FBO ids learned from dead
 -- canvases
 function VR.invalidate()
+  maskCache = {}
   if mirrorCanvas and mirrorCanvas.release then
     pcall(mirrorCanvas.release, mirrorCanvas)
   end
