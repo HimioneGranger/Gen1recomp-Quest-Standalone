@@ -210,9 +210,25 @@ local function ensureWarpPreloadHooks()
     end
   end, 1000, "DRAMALESS_SHAPE")
   events:on("map.entered", function(payload)
-    if not (warpPinned and payload and warpPinned[payload.mapId]) then return end
-    warpPinned = nil
-    if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(nil) end
+    if not (rawget(_G, "QUEST_PANEL_ACTIVE") and payload) then return end
+    -- A seamless crossing's new live set already contains the map behind the
+    -- player, so retaining the entire older neighbourhood buys no visual
+    -- continuity. Fly is one-way and has no immediate return either. Ordinary
+    -- door/interior warps keep Dramaless's one-set history for a flash-free
+    -- exit, preserving the immersion policy that history was added for.
+    if (payload.via == "connection" or payload.via == "fly")
+       and ChunkMesher.dropPrevious then
+      ChunkMesher.dropPrevious()
+      local log = rawget(_G, "QUEST_XR_LOG")
+      if log then
+        log(("VRMEM released previous mesh set via=%s map=%s")
+          :format(tostring(payload.via), tostring(payload.mapId)))
+      end
+    end
+    if warpPinned and warpPinned[payload.mapId] then
+      warpPinned = nil
+      if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(nil) end
+    end
   end, -1000, "DRAMALESS_SHAPE")
   warpHooksInstalled = true
 end

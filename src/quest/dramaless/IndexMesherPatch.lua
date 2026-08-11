@@ -18,6 +18,7 @@ Patch.PHASE_MARKER = "quest Route 2 mesh phase trace"
 Patch.GEOMETRY_PHASE_MARKER = "quest Route 2 geometry section trace"
 Patch.WARM_LIVE_MARKER = "quest startup warm live set"
 Patch.BODY_DROP_MARKER = "quest promoted body release"
+Patch.HISTORY_DROP_MARKER = "quest seamless previous-set release"
 Patch.PACING_MARKER = "quest paced neighbour meshing"
 Patch.REJECTED_CACHE_MARKER = "quest persistent indexed mesh cache"
 
@@ -39,6 +40,7 @@ function Patch.apply(source)
   local alreadyGeometryPhased = source:find(Patch.GEOMETRY_PHASE_MARKER, 1, true) ~= nil
   local alreadyWarmLive = source:find(Patch.WARM_LIVE_MARKER, 1, true) ~= nil
   local alreadyBodyDrop = source:find(Patch.BODY_DROP_MARKER, 1, true) ~= nil
+  local alreadyHistoryDrop = source:find(Patch.HISTORY_DROP_MARKER, 1, true) ~= nil
   local alreadyPaced = source:find(Patch.PACING_MARKER, 1, true) ~= nil
   local rejectedCache = source:find(Patch.REJECTED_CACHE_MARKER, 1, true) ~= nil
   local cacheRemoved = false
@@ -114,9 +116,9 @@ local COVERED_SLICE = 0.030
     source, alreadyPaced = restored, false
   end
   if alreadyIndexed and alreadyTraced and alreadyPhased and alreadyGeometryPhased
-     and alreadyWarmLive and alreadyBodyDrop then
+     and alreadyWarmLive and alreadyBodyDrop and alreadyHistoryDrop then
     return source, cacheRemoved and "indexed and traced; rejected persistent cache removed"
-      or "indexed, traced, and phase-profiled"
+      or "indexed, traced, phase-profiled, and route-history bounded"
   end
   if source:find("setVertexMap", 1, true) and not alreadyIndexed then
     return source, "foreign indexed sink preserved"
@@ -477,7 +479,26 @@ function ChunkMesher.setLive(live)
     if not source then return nil, err end
   end
 
-  return source, "indexed, traced, phase-profiled, startup-warm, and bounded"
+  if not alreadyHistoryDrop then
+    source, err = replaceOnce(source, [=[
+function ChunkMesher.setLive(live)
+]=], [=[
+-- quest seamless previous-set release: a route/town crossing already keeps
+-- the map behind the player in the new connected live set. Clear the extra
+-- one-generation history before that set is applied so far maps from the old
+-- neighbourhood can release immediately. Door warps deliberately do not call
+-- this API; their warm return path retains the town while an interior is live.
+function ChunkMesher.dropPrevious()
+  prevLive = {}
+end
+
+function ChunkMesher.setLive(live)
+]=], "seamless previous-set release API")
+    if not source then return nil, err end
+  end
+
+  return source,
+    "indexed, traced, phase-profiled, startup-warm, and route-history bounded"
 end
 
 return Patch
