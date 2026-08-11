@@ -1185,3 +1185,27 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - The lower `LOADING MAP DATA` caption remained too thin at headset distance.
   It now uses a larger medium-weight raster size and remains a single draw, so
   legibility improves without reintroducing offset ghosting.
+- Headset verification accepted the enlarged status caption as much better;
+  the classic loading-card presentation is now considered complete.
+
+## 2026-08-10 - Saffron to Celadon performance sample
+
+- The user walked west from Saffron through Route 7 into Celadon and reported
+  slight stuttering. Route 7 full geometry completed in 2.62 seconds and its
+  gate in 34 ms. On first Celadon entry, the startup preload's body-only warm
+  mesh was insufficient: `CELADON_CITY full` queued urgently and took 8.71
+  seconds across 160 resumptions. The associated ten-second window averaged
+  57.48 ms, with a 563.57 ms worst frame.
+- After the build completed, Celadon generally ran at 35-40 ms per frame
+  (roughly 25-29 FPS) with recurring approximately 90-120 ms tail spikes.
+  Texture accounting stabilized near 238.3 MB, but Android reported about
+  2.01 GB total PSS: approximately 769 MB Graphics, 285 MB native heap, and
+  850 MB Unknown. No app crash or out-of-memory exception occurred.
+- At capture time the headset was USB-powered but only 12% charged, and the
+  battery sensor reported 55.0 C. The app was force-stopped for a mandatory
+  cool/charge break. Do not continue hardware profiling until temperature and
+  charge recover.
+- Next design question: selectively promote a small number of expensive major
+  cities in the save-aware corridor from body-only to full preload, while
+  reducing or releasing other warm meshes so the existing memory pressure is
+  not made worse. Celadon provides the first measured candidate.
