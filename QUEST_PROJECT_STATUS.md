@@ -119,10 +119,10 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
   two-eye validation; screenshots alone are left-eye views.
 - Performance, thermals, long-session stability, save/load, suspend/resume,
   and broad map coverage have not yet passed a release test matrix.
-- Quest experimental-mod dialogs can display focus on `Enable`/`Update` while
-  discarding A/Trigger. The narrow Quest-only source fix now has 20 passing
-  regression checks across all four modal types and desktop behavior. It is
-  awaiting canonical packaging and physical headset validation.
+- Quest experimental-mod dialogs now route focus confirmation correctly. The
+  fix has 20 passing regression checks across all four modal types and desktop
+  behavior, and physical headset testing confirmed that the highlighted modal
+  control performs its matching action.
 - Never deploy `build/intermediates/apk` artifacts. One such APK contained an
   incomplete/older `game.love` and visibly regressed the Pokédex. Only the
   verified canonical `build/outputs/apk/questVrNoRecord/debug` APK is a
@@ -130,6 +130,10 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 
 ## Low-priority polish
 
+- Launcher modal highlighter appearance/alignment can be cleaned up further.
+  Input and activation are device-verified functional; rank this above Pokédex
+  presentation polish but below gameplay, loading, lifecycle, and performance
+  defects.
 - Pokédex sizing and framing: the current symmetric 1% horizontal crop is
   device-accepted, centered, and keeps the menu selector arrow visible. Defer
   any further bezel, scale, or per-screen alignment tuning unless it blocks
@@ -181,15 +185,12 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Package and device-test the covered Quest modal-input candidate.
-2. Re-test mod install, Enable/Update, release notes/details, Back, launch, and
-   ordinary launcher navigation after that fix.
-3. Device-test the bounded major-location/interior preload candidate, including
+1. Device-test the bounded major-location/interior preload candidate, including
    Celadon full preload, memory/body release, and representative interiors.
-4. Profile and fix intermittent startup and slow initial Yellow/voxel loading.
-5. Fix SDL/OpenAL suspend/resume lifecycle crashes.
-6. Determine whether missing distant buildings are culling, asset population,
+2. Profile and fix intermittent startup and slow initial Yellow/voxel loading.
+3. Fix SDL/OpenAL suspend/resume lifecycle crashes.
+4. Determine whether missing distant buildings are culling, asset population,
    shader failure, or a distance/LOD configuration issue.
-7. Run a controlled stereo alignment and long-session/thermal test.
-8. Commit only device-verified fixes as separate milestones and keep the debug
+5. Run a controlled stereo alignment and long-session/thermal test.
+6. Commit only device-verified fixes as separate milestones and keep the debug
    log current.

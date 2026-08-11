@@ -1315,3 +1315,17 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `LauncherView.keypressed` handler before `RomImporter`'s modal guard returns.
 - Next checkpoint is canonical full-payload packaging and physical validation
   of Enable, Update (when available), Back, and ordinary launcher navigation.
+
+## 2026-08-11 - Quest mod-modal device verification
+
+- Built the canonical `questVrNoRecordDebug` output from the verified full
+  payload and inspected its embedded archive before installation. The Quest
+  modal bridge and accepted symmetric Pokédex crop were present; generated ROM
+  data was absent. Candidate SHA-256:
+  `D08A72D213F424EE89C68C50018CE385FA0CBF85A548DB71376C890B0C6846D2`.
+- Installation and immersive relaunch succeeded. Physical headset testing
+  confirmed that the green highlighter moves within the mod dialog and the
+  highlighted control now performs the corresponding action. The functional
+  experimental-mod dialog blocker is resolved.
+- Visual cleanup of the native highlighter remains desirable but does not
+  prevent use. It is ranked as low-priority polish above further Pokédex sizing.
