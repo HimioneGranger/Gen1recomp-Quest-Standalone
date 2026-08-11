@@ -1351,3 +1351,22 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   wild spawning and map travel continued. Treat separately from Wild Skies.
 - Result: Wild Skies passes initial Quest compatibility/performance testing.
   Next controlled variable is Dramatic Sky Ride added to this same stack.
+
+## 2026-08-11 - Dramatic Sky Ride deferred on Quest
+
+- Added Dramatic Sky Ride 0.1.5 to the accepted Wild Skies stack and repeated
+  Saffron -> Route 7 -> Celadon -> Celadon Mart 1F -> Celadon. Mod diagnostics
+  confirmed it was enabled and recorded progression discoveries for every map.
+- Frame-count telemetry was approximately 31.3 FPS initially, 27.6 FPS through
+  the next interval, and 26.5 FPS across the Celadon-heavy interval. The
+  equivalent Wild Skies-only intervals were approximately 31.3, 29.5, and
+  30.5 FPS, indicating a modest but measurable cost in the relevant scene.
+- Post-route memory was 1,940,874 KB total PSS and 733,712 KB Graphics: about
+  17 MB total and 16 MB graphics above the preceding Wild Skies-only sample.
+  Temperature moved from 42 C to 45 C. No crash, ANR, OOM, or mod error was
+  observed.
+- The user could not see the mod's intended 3D flight experience working in VR.
+  With measurable cost and no visible Quest benefit, Dramatic Sky Ride is
+  disabled/deferred. Revisit only with a focused audit of its flight-camera
+  path and explicit stereo/OpenXR integration; do not optimize it in the
+  current gameplay/performance pass.
