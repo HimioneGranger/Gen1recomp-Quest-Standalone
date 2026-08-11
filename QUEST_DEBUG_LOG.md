@@ -1407,3 +1407,28 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   passes this extended first compatibility run. Missing Murkrow/Houndour
   overworld registrations and the single intermittent generic flyer remain
   visual follow-ups, not blockers.
+
+## 2026-08-11 - Crystal gameplay-state stress pass
+
+- Continued the same Crystal 251 stack without restarting and exercised an
+  interior round trip, world return, wild battle, menu/Pokédex use, and
+  subsequent overworld travel. Physical testing confirmed that A, B, triggers,
+  and both thumbsticks remained responsive through every state change.
+- Device logs confirm Lavender Town -> Pokémon Tower 1F -> Lavender Town ->
+  Route 12, followed by a Wilds of Kanto Slowpoke battle and a normal `win`
+  completion. Wild Skies continued spawning flyers afterward, demonstrating
+  that both gameplay and mod update loops survived the battle transition.
+- No crash, ANR, OOM, trim-memory event, or low-memory kill appeared. The user
+  observed only occasional slowdowns.
+- Post-test memory rose to 2,310,408 KB total PSS (about 2.31 GB), including
+  893,764 KB Graphics. Battery was 35%, USB powered through a weak charger, and
+  the reported temperature was 50 C. Compared with the preceding traversal's
+  roughly 2.01 GB/766 MB Graphics/47 C sample, the higher retained resource
+  footprint and temperature are plausible contributors to the intermittent
+  slowdown and warrant a longer memory/thermal optimization pass.
+- Additional nonfatal asset evidence: Wild Skies rendered Skarmory and Gligar;
+  Wilds of Kanto reported a missing Yanma overworld registration in addition to
+  the previously recorded Murkrow and Houndour fallbacks.
+- Result: controls and gameplay-state transitions pass; sustained memory,
+  graphics allocation, and thermal behavior—not functional input—are now the
+  primary concern for this stack.

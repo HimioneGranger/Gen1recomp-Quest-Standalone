@@ -133,8 +133,11 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 - Crystal 251 0.10.1 is device-verified with Dramaless Shape, Kanto First
   Person, Wilds of Kanto, and Wild Skies through Saffron -> Route 8 -> Lavender.
   Gen II flyers render and controls remained stable. Wilds of Kanto still uses
-  fallback overworld IDs for Murkrow and Houndour; investigate those sprite
-  registrations later.
+  fallback overworld IDs for Murkrow, Houndour, and Yanma; investigate those
+  sprite registrations later. A follow-up interior/battle/menu stress pass also
+  preserved all controls, but post-test memory reached about 2.31 GB PSS with
+  894 MB Graphics at 50 C. Long-session allocation and thermal optimization is
+  the next performance priority for this expanded mod stack.
 
 - Dramatic Sky Ride 0.1.5 is deferred: it was stable but reduced the measured
   Celadon interval from about 30.5 to 26.5 FPS. Its 3D flight works in VR, but
