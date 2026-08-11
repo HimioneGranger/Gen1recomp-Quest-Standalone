@@ -189,6 +189,13 @@ function LauncherView.clickAt(imp, x, y)
   imp._clickPt = { x = x, y = y }
 end
 
+-- Kept as a small policy seam so Quest's native-input path can be tested
+-- without constructing or rendering the whole immediate-mode launcher.
+function LauncherView._showFocusCursor(imp, loader)
+  return not loader
+    and (imp._ringArmed or rawget(_G, "QUEST_PANEL_ACTIVE")) and true or false
+end
+
 -- Keyboard focus ring.  Returns true when the key was consumed.  Arrows arm
 -- the ring; Enter only activates a focused control once the user has actually
 -- used the arrows this session, so the long-standing "Enter plays the visible
@@ -2635,8 +2642,13 @@ function LauncherView.draw(imp)
     end
   end
 
-  if imp._ringArmed and not rawget(_G, "QUEST_PANEL_ACTIVE")
-      and not spec and not modalUp(imp) then
+  -- Quest directions arrive through PanelBridge instead of keypressed, so they
+  -- intentionally never arm the desktop keyboard ring.  The native panel's
+  -- thin shader outline is not reliably visible after headset filtering; draw
+  -- the Kit cursor into the captured launcher surface as the authoritative
+  -- focus indicator.  A modal owns the navigation graph while it is open, so
+  -- the same cursor remains correct there as well.
+  if LauncherView._showFocusCursor(imp, spec) then
     Kit.drawFocusCursor()
   end
   Kit.endFrame()
