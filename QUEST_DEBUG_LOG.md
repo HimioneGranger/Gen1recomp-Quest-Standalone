@@ -1138,3 +1138,24 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   live neighbors in distance order, and derive progress from required completed
   jobs. A Route 2/forest/interior save must automatically prepare its own set.
   Call this `Preparing VR world`, not shader compilation.
+## 2026-08-10 — Location-aware startup preload and Route 2 full-mesh target
+
+- Added a ROM-free `Preparing VR world` handoff before gameplay OpenXR starts.
+  It derives a nearest-first outdoor corridor from the selected save instead
+  of assuming a fixed starting town, with four connection hops, a 12-map cap,
+  a 90-second safety timeout, and visible progress.
+- Pallet test completed 11 required meshes in 19.01 seconds: Pallet full plus
+  Route 1, Route 21, Viridian, Cinnabar, Route 2, Route 22, Route 20, Pewter,
+  Route 23, and Route 19 bodies. The user reported less-janky initial walking
+  and slightly smoother transitions.
+- Route 2 trees still popped in. Logs identified the exact remaining cause:
+  its preloaded body mesh was ready, but promotion to the full border-ring mesh
+  began only on entry and took 11.74 seconds. During that interval the runtime
+  fell well below frame rate and the user saw slight continuous stutter.
+- Next candidate treats Route 2 as a measured exception: whenever it is in the
+  location-derived startup corridor or normal two-hop neighbourhood, request
+  its full mesh early with masks computed from Route 2's own connection graph.
+  Other regional maps remain body-only to bound time and memory.
+- End-of-session safety snapshot: headset battery 7%, weak 5 V / 0.9 A USB
+  charging, battery 43 C, XR runtime about 49 C. The app was force-stopped so
+  the headset could cool and charge.

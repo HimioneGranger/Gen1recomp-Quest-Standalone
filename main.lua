@@ -507,6 +507,36 @@ function love.draw()
   end
 
   Game:draw()
+  -- Quest-only save-aware voxel preparation. Dramaless publishes real mesh
+  -- completion while the native launcher still owns OpenXR; draw the progress
+  -- into the captured game panel so the wait is explicit instead of looking
+  -- like another frozen immersive startup.
+  local vrPreload = rawget(_G, "QUEST_VR_PRELOAD")
+  if vrPreload and vrPreload.active then
+    local ww, wh = love.graphics.getDimensions()
+    local bw = math.max(240, math.floor(ww * 0.56))
+    local bh = math.max(18, math.floor(wh * 0.035))
+    local bx, by = math.floor((ww - bw) / 2), math.floor(wh * 0.62)
+    local p = math.max(0, math.min(1, tonumber(vrPreload.progress) or 0))
+    love.graphics.push("all")
+    love.graphics.origin()
+    love.graphics.setColor(0.025, 0.04, 0.09, 0.96)
+    love.graphics.rectangle("fill", 0, 0, ww, wh)
+    love.graphics.setColor(0.9, 0.95, 1, 1)
+    local title = "Preparing VR world"
+    local detail = ("%s  %d / %d"):format(tostring(vrPreload.map or "WORLD"),
+      tonumber(vrPreload.complete) or 0, tonumber(vrPreload.required) or 0)
+    love.graphics.printf(title, 0, by - 58, ww, "center")
+    love.graphics.printf(detail, 0, by - 30, ww, "center")
+    love.graphics.setColor(0.12, 0.16, 0.24, 1)
+    love.graphics.rectangle("fill", bx, by, bw, bh, 4, 4)
+    love.graphics.setColor(0.2, 0.85, 0.45, 1)
+    love.graphics.rectangle("fill", bx + 3, by + 3,
+      math.floor((bw - 6) * p), math.max(1, bh - 6), 3, 3)
+    love.graphics.setColor(0.9, 0.95, 1, 1)
+    love.graphics.rectangle("line", bx, by, bw, bh, 4, 4)
+    love.graphics.pop()
+  end
   -- Quest VR's handheld display needs the completed flat game composition,
   -- not the previous frame's OpenXR eye buffer.  The Dramaless conductor
   -- installs this optional callback while its session is active.  Calling it

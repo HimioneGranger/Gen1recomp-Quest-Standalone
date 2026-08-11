@@ -16,6 +16,7 @@ Patch.MARKER = "quest indexed FFI sink"
 Patch.TRACE_MARKER = "quest transition mesh trace"
 Patch.PHASE_MARKER = "quest Route 2 mesh phase trace"
 Patch.GEOMETRY_PHASE_MARKER = "quest Route 2 geometry section trace"
+Patch.WARM_LIVE_MARKER = "quest startup warm live set"
 Patch.PACING_MARKER = "quest paced neighbour meshing"
 Patch.REJECTED_CACHE_MARKER = "quest persistent indexed mesh cache"
 
@@ -35,6 +36,7 @@ function Patch.apply(source)
   local alreadyTraced = source:find(Patch.TRACE_MARKER, 1, true) ~= nil
   local alreadyPhased = source:find(Patch.PHASE_MARKER, 1, true) ~= nil
   local alreadyGeometryPhased = source:find(Patch.GEOMETRY_PHASE_MARKER, 1, true) ~= nil
+  local alreadyWarmLive = source:find(Patch.WARM_LIVE_MARKER, 1, true) ~= nil
   local alreadyPaced = source:find(Patch.PACING_MARKER, 1, true) ~= nil
   local rejectedCache = source:find(Patch.REJECTED_CACHE_MARKER, 1, true) ~= nil
   local cacheRemoved = false
@@ -109,7 +111,8 @@ local COVERED_SLICE = 0.030
     if not restored then return nil, restoreErr end
     source, alreadyPaced = restored, false
   end
-  if alreadyIndexed and alreadyTraced and alreadyPhased and alreadyGeometryPhased then
+  if alreadyIndexed and alreadyTraced and alreadyPhased and alreadyGeometryPhased
+     and alreadyWarmLive then
     return source, cacheRemoved and "indexed and traced; rejected persistent cache removed"
       or "indexed, traced, and phase-profiled"
   end
@@ -407,7 +410,43 @@ end
     if not source then return nil, err end
   end
 
-  return source, "indexed, traced, and phase-profiled"
+  if not alreadyWarmLive then
+    source, err = replaceOnce(source, [=[
+local prevLive = {}
+
+function ChunkMesher.setLive(live)
+]=], [=[
+local prevLive = {}
+
+-- quest startup warm live set: retain a bounded location-derived corridor
+-- while the native launch handoff prepares it.
+local questWarmLive = {}
+
+function ChunkMesher.setWarmLive(live)
+  questWarmLive = live or {}
+end
+
+function ChunkMesher.setLive(live)
+]=], "startup warm-live API")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+    if not live[id] and not prevLive[id] then
+]=], [=[
+    if not live[id] and not prevLive[id] and not questWarmLive[id] then
+]=], "startup warm-live cache retention")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+    if not live[job.id] and not prevLive[job.id] then
+]=], [=[
+    if not live[job.id] and not prevLive[job.id]
+       and not questWarmLive[job.id] then
+]=], "startup warm-live job retention")
+    if not source then return nil, err end
+  end
+
+  return source, "indexed, traced, phase-profiled, and startup-warm"
 end
 
 return Patch

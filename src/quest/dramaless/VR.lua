@@ -46,6 +46,10 @@ local ModSetting = V.require("ModSetting")
 local Voxel = V.require("VoxelState")
 local Voxel3D = V.require("Voxel3D")
 local VoxelScene = V.require("VoxelScene")
+local ChunkMesher = V.require("ChunkMesher")
+local MapLoader = require("src.world.MapLoader")
+local OverworldState = require("src.world.OverworldController")
+local FieldDefaults = require("src.world.FieldDefaults")
 local FirstPerson = V.require("FirstPerson")
 local BattleCam = V.require("BattleCam")
 local VRRig = V.require("VRRig")
@@ -97,6 +101,140 @@ local dexCanvas = nil           -- physical-device presentation texture
 local dexSource = nil           -- completed flat UI captured after Game:draw
 local dexBattle = false         -- state captured into dexSource
 local status = "off"
+
+-- Quest starts inside the native launcher session. Before asking that stable
+-- session to hand OpenXR to gameplay, prepare the selected save's real map and
+-- its live neighbours. This is derived from the constructed overworld state,
+-- so every save/location gets its own set rather than a hard-coded route.
+local preload = { state = nil, started = nil, maps = nil, live = nil }
+local PRELOAD_TIMEOUT = 90
+local PRELOAD_HOPS = 4
+local PRELOAD_MAP_CAP = 12
+local CONNECTION_ORDER = { "north", "south", "west", "east" }
+local route2Masks = nil
+
+-- A full mesh includes the border ring, so it must be built with Route 2's
+-- own neighbour-body masks rather than the currently occupied map's masks.
+-- These placements are static for imported game data and can be reused.
+local function masksForMap(Game, map)
+  if map.id == "ROUTE_2" and route2Masks then return route2Masks end
+  local hops = FieldDefaults.world(Game.data, "neighborHops") or 2
+  local vw, vh = Game.renderer:worldViewSize()
+  local masks = {}
+  for _, n in ipairs(OverworldState.computeNeighbors(
+      Game.data.maps, map.id, hops,
+      math.floor(vw / 2) + 64, math.floor(vh / 2) + 64)) do
+    local def = Game.data.maps[n.id]
+    masks[#masks + 1] = {
+      n.ox, n.oy, n.ox + def.width * 32, n.oy + def.height * 32,
+    }
+  end
+  if map.id == "ROUTE_2" then route2Masks = masks end
+  return masks
+end
+
+local function requestRegionalMap(Game, map)
+  local full = map.id == "ROUTE_2"
+  ChunkMesher.request(map, not full, full and masksForMap(Game, map) or nil)
+  return ChunkMesher.pair(map, not full)
+end
+
+-- Walk the selected save's actual connection graph, nearest first. Four hops
+-- from Pallet includes the Route 2 / Route 23 and Route 21 / Cinnabar sides;
+-- the cap keeps a dense region from becoming a whole-world startup bake.
+local function regionalWarmMaps(Game, world)
+  local defs, out = Game.data.maps, {}
+  local seen = { [world.map.id] = true }
+  local queue = { { id = world.map.id, depth = 0 } }
+  local qi = 1
+  while queue[qi] and #out < PRELOAD_MAP_CAP - 1 do
+    local node = queue[qi]
+    qi = qi + 1
+    local def = defs[node.id]
+    if def and node.depth < PRELOAD_HOPS then
+      for _, direction in ipairs(CONNECTION_ORDER) do
+        local conn = (def.connections or {})[direction]
+        if conn then
+          local id = conn.map
+          if defs[id] and not seen[id] then
+            seen[id] = true
+            out[#out + 1] = MapLoader.load(Game.data, id)
+            queue[#queue + 1] = { id = id, depth = node.depth + 1 }
+            if #out >= PRELOAD_MAP_CAP - 1 then break end
+          end
+        end
+      end
+    end
+  end
+  return out, seen
+end
+
+local function prepareQuestWorld()
+  if not rawget(_G, "QUEST_PANEL_ACTIVE") then return true end
+  local ok, Game = pcall(require, "src.core.Game")
+  local world = ok and Game.overworld or nil
+  if not (world and world.map) then return false end
+
+  if preload.state ~= world then
+    preload.state = world
+    preload.started = love.timer.getTime()
+    preload.maps, preload.live = regionalWarmMaps(Game, world)
+    if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(preload.live) end
+    local log = rawget(_G, "QUEST_XR_LOG")
+    if log then
+      local ids = {}
+      for _, map in ipairs(preload.maps) do ids[#ids + 1] = map.id end
+      log(("VRPRELOAD start map=%s warm=%s")
+        :format(tostring(world.map.id), table.concat(ids, ",")))
+    end
+  end
+
+  -- Request the current full map first and every currently visible neighbour
+  -- body through Dramaless's unchanged source of truth.
+  VoxelScene.prefetch(world)
+  ChunkMesher.pump(true)
+
+  local required, complete = 1, 0
+  local current = ChunkMesher.pair(world.map, false)
+  if current then complete = complete + 1 end
+  for _, map in ipairs(preload.maps or {}) do
+    required = required + 1
+    local mesh = requestRegionalMap(Game, map)
+    if mesh then complete = complete + 1 end
+  end
+
+  local now = love.timer.getTime()
+  local elapsed = now - (preload.started or now)
+  _G.QUEST_VR_PRELOAD = {
+    active = complete < required and elapsed < PRELOAD_TIMEOUT,
+    complete = complete,
+    required = required,
+    progress = required > 0 and complete / required or 1,
+    map = tostring(world.map.id or "WORLD"),
+    elapsed = elapsed,
+  }
+  if complete >= required then
+    if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(nil) end
+    local log = rawget(_G, "QUEST_XR_LOG")
+    if log then
+      log(("VRPRELOAD complete map=%s complete=%d required=%d elapsed=%.2f")
+        :format(tostring(world.map.id), complete, required, elapsed))
+    end
+    _G.QUEST_VR_PRELOAD = nil
+    return true
+  end
+  if elapsed >= PRELOAD_TIMEOUT then
+    if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(nil) end
+    local log = rawget(_G, "QUEST_XR_LOG")
+    if log then
+      log(("VRPRELOAD timeout map=%s complete=%d required=%d elapsed=%.2f")
+        :format(tostring(world.map.id), complete, required, elapsed))
+    end
+    _G.QUEST_VR_PRELOAD = nil
+    return true
+  end
+  return false
+end
 
 -- the diorama's live adjustments: the right stick's zoom (a multiplier on
 -- the model's size) and the grab-drag's height (metres of world travel)
@@ -191,6 +329,9 @@ local function releaseInputs()
 end
 
 local function shutdown(reason)
+  _G.QUEST_VR_PRELOAD = nil
+  preload.state, preload.started, preload.maps, preload.live = nil, nil, nil, nil
+  if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(nil) end
   if started then
     VRXR.stop()
     started = false
@@ -799,6 +940,10 @@ function VR.update(dt)
   if failed then return end
 
   if not started then
+    if not prepareQuestWorld() then
+      status = "preparing VR world"
+      return
+    end
     local qw, qh = 1024, 768
     pcall(function() qw, qh = love.graphics.getPixelDimensions() end)
     if VRXR.start(qw, qh) then
@@ -820,6 +965,24 @@ function VR.update(dt)
     return
   end
   if not VRXR.isRunning() then return end
+
+  -- Route 2's round-tree border ring is a measured outlier (roughly twelve
+  -- seconds on Quest). Start its correctly masked full build as soon as the
+  -- normal two-hop world set says it is close, instead of waiting to cross
+  -- onto Route 2. Repeated requests are cache/queue no-ops.
+  local okGame, Game = pcall(require, "src.core.Game")
+  local world = okGame and Game.overworld or nil
+  if world and world.map then
+    local nearRoute2 = world.map.id == "ROUTE_2"
+    local route2 = nearRoute2 and world.map or nil
+    for _, nb in ipairs(world.neighbors or {}) do
+      if nb.map.id == "ROUTE_2" then
+        nearRoute2, route2 = true, nb.map
+        break
+      end
+    end
+    if nearRoute2 and route2 then requestRegionalMap(Game, route2) end
+  end
 
   -- the headset paces the app now; vsync would fight it
   if savedVsync == nil then
