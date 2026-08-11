@@ -1255,3 +1255,50 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Device result: selector arrow visible and framing accepted by the user as
   sufficient. Any additional Pokédex sizing/alignment work is now low-priority
   polish unless required UI becomes hidden.
+
+## 2026-08-10/11 - Side Door integration and Quest modal-input defect
+
+- The standalone `Dramaless Side Door Fix` package was transferred to the
+  headset and appeared in the launcher. Its experimental-mod confirmation
+  dialog exposed a shared Quest launcher defect: the green focus border could
+  highlight `Enable` or `Update`, but A/Trigger did not activate that focused
+  modal button. The visual focus and the launcher's action target were not
+  equivalent inside this modal path.
+- Checked source identified the cause in `RomImporter:keypressed`: the modal
+  guard returned before `LauncherView.keypressed` could route Quest's native
+  focus/confirm input. A narrow Quest-only candidate now forwards input through
+  the existing launcher focus handler before the guard. It remains uncommitted
+  and is **not present in the currently installed APK** pending regression
+  coverage for Enable, Update, release notes, details, Escape/Back, and normal
+  desktop pointer/keyboard behavior.
+- The user was able to enable Side Door Fix through a workaround, but three
+  headset screenshots showed that the first placement candidate did not add
+  usable doors at the recorded locations. Development and validation of that
+  standalone mod have been moved to the separate Side Door Fix task/repository;
+  this main project retains only the launcher-integration finding.
+
+## 2026-08-10/11 - Incomplete intermediate APK regression and recovery
+
+- During an attempt to package the Quest modal candidate, Gradle's canonical
+  `build/outputs` APK remained the previous verified 55.6 MB file while a new
+  roughly 22.7 MB APK appeared only under `build/intermediates/apk`. That
+  intermediate package was mistakenly treated as installable output.
+- Installing the intermediate APK regressed the Pokédex/load-report framing:
+  report text became small and compressed near the upper-left because its
+  embedded `game.love` came from an older/incomplete Quest payload. The APK's
+  SHA-256 was
+  `62ED0B956F12EEAF1C89E17CBA806AA25ADF745A6C2F6BD18A1A6B9FC78F62A1`.
+- Recovery was immediate: reinstalled the last verified canonical output APK
+  (SHA-256
+  `F9FBFB2A9F8011F338D44AB05E08B219EADBE383A5597451877C0B54E123C8C3`).
+  The launcher, destination-aware preload, indexed Dramaless renderer, and
+  previously approved Pokédex/load-report presentation returned.
+- Subsequent Pokédex builds were made by extracting that verified APK's full
+  `game.love`, replacing only `src/quest/dramaless/VR.lua`, checking that no
+  `data/generated` or `assets/generated` entries existed, rebuilding through
+  the canonical Gradle output task, inspecting the packaged Lua entry, and
+  only then installing. Do not install APKs from `build/intermediates`.
+- Current installed/output APK after accepted centering has SHA-256
+  `96D2B7C0218D34B36A07DAA31EF69AA3EC3675F261B3C0057A087042C3CE0F56`
+  and is 55,885,323 bytes. Install succeeded without replacing user saves or
+  writable installed mods.

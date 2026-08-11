@@ -87,9 +87,9 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 - Touch controller events reach the existing launcher input handlers and can
   launch the imported Yellow ROM.
 - A thin green native OpenXR focus border was previously verified steady and
-  responsive, but later Mods-navigation testing exposed that it could advance
-  over a stale captured launcher image. The current atomic image/focus update
-  candidate is installed and awaiting device verification.
+  responsive. Normal launcher buttons are selectable and the border is aligned
+  with the displayed image. Experimental-mod confirmation dialogs still have
+  a separate Quest confirm-routing defect described below.
 - Yellow displays its main menu and transitions into voxel gameplay.
 - A/X, B/Y, triggers/Start, and left-stick movement are device-verified.
 - The launcher-to-gameplay OpenXR session handoff succeeds.
@@ -119,6 +119,14 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
   two-eye validation; screenshots alone are left-eye views.
 - Performance, thermals, long-session stability, save/load, suspend/resume,
   and broad map coverage have not yet passed a release test matrix.
+- Quest experimental-mod dialogs can display focus on `Enable`/`Update` while
+  discarding A/Trigger. A narrow Quest-only source fix exists locally in
+  `src/import/RomImporter.lua`, but it is uncommitted and absent from the
+  installed APK until modal regression coverage is added.
+- Never deploy `build/intermediates/apk` artifacts. One such APK contained an
+  incomplete/older `game.love` and visibly regressed the Pokédex. Only the
+  verified canonical `build/outputs/apk/questVrNoRecord/debug` APK is a
+  deployment candidate.
 
 ## Low-priority polish
 
@@ -173,13 +181,16 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Exercise the now-selectable Mods screen with a compatible user-supplied mod,
-   including install, enable/disable, launch, and Back behavior.
-2. Device-test the narrow Indigo Plateau/Route 23 deferred-neighbour policy.
-3. Profile and fix intermittent startup and slow initial Yellow/voxel loading.
-4. Fix SDL/OpenAL suspend/resume lifecycle crashes.
-5. Determine whether missing distant buildings are culling, asset population,
+1. Add regression coverage for Quest focus/confirm handling in experimental
+   mod dialogs, then package and device-test the local modal-input candidate.
+2. Re-test mod install, Enable/Update, release notes/details, Back, launch, and
+   ordinary launcher navigation after that fix.
+3. Device-test the bounded major-location/interior preload candidate, including
+   Celadon full preload, memory/body release, and representative interiors.
+4. Profile and fix intermittent startup and slow initial Yellow/voxel loading.
+5. Fix SDL/OpenAL suspend/resume lifecycle crashes.
+6. Determine whether missing distant buildings are culling, asset population,
    shader failure, or a distance/LOD configuration issue.
-6. Run a controlled stereo alignment and long-session/thermal test.
-7. Commit only device-verified fixes as separate milestones and keep the debug
+7. Run a controlled stereo alignment and long-session/thermal test.
+8. Commit only device-verified fixes as separate milestones and keep the debug
    log current.
