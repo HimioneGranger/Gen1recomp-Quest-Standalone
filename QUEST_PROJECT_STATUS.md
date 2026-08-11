@@ -120,6 +120,13 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 - Performance, thermals, long-session stability, save/load, suspend/resume,
   and broad map coverage have not yet passed a release test matrix.
 
+## Low-priority polish
+
+- Pokédex sizing and framing: the current symmetric 1% horizontal crop is
+  device-accepted, centered, and keeps the menu selector arrow visible. Defer
+  any further bezel, scale, or per-screen alignment tuning unless it blocks
+  gameplay or hides required UI.
+
 ## Key local commits
 
 Gen1Recomp `quest-openxr`:

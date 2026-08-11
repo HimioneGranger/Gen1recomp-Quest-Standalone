@@ -576,8 +576,12 @@ local function dexScreen()
     -- Android's completed classic frame retains a narrow unused column at
     -- the left edge. Dramatic Shape's near-correct Quest path established
     -- that this is source padding, not a misplaced physical device. Crop a
-    -- conservative 3.5% only for menus/dialog; battles need their full width.
-    return { dexSource, dexBattle and 0 or 0.035, 0, 1, 1 }
+    -- conservative, symmetric 1% crop for menus/dialog; this keeps the
+    -- source centered and its unused padding mostly hidden without clipping
+    -- the selector arrow at x=8.
+    -- Battles need their full width.
+    return { dexSource, dexBattle and 0 or 0.01, 0,
+             dexBattle and 1 or 0.99, 1 }
   end
   if not (dexCanvas and dexCanvas:getWidth() == 320
           and dexCanvas:getHeight() == 288) then

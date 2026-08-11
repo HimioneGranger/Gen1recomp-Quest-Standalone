@@ -1240,3 +1240,18 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   urgent build, body-release diagnostics, memory below/equal to the prior
   roughly 2.01 GB peak, and working enter/exit transitions for a representative
   interior.
+
+## 2026-08-11 - Pokédex selector visibility and accepted framing
+
+- A verified full Quest payload was used as the packaging base so the earlier
+  incomplete-intermediate-APK regression could not recur. No ROM or generated
+  game data was packaged.
+- Reducing the classic menu/dialog source crop from 3.5% to 1% restored the
+  left-edge selector arrow. A headset screenshot then confirmed that applying
+  that crop only on the left displaced the feed toward the right.
+- The classic source now uses a symmetric 1% horizontal crop. Battles retain
+  their uncropped path; loading/report rendering and physical Pokédex placement
+  are unchanged.
+- Device result: selector arrow visible and framing accepted by the user as
+  sufficient. Any additional Pokédex sizing/alignment work is now low-priority
+  polish unless required UI becomes hidden.
