@@ -1377,3 +1377,33 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   bridge (without hard-coding this mod) and, if desired, a VR-head-pitch input
   surface. Then repeat the same performance sample before deciding whether the
   immersive flight benefit justifies the approximately four-FPS Celadon cost.
+
+## 2026-08-11 - Crystal 251 and Wild Skies Quest compatibility run
+
+- Copied only the user's legally supplied ROM files from `D:\baseroms` to the
+  app-private external `baseroms` directory on the Quest. No ROM content was
+  added to the APK or Git. Crystal 251 automatically imported the supplied
+  Crystal Rev 1 ROM through the existing import workflow.
+- The first Crystal attempt remained flat because Dramaless Shape was installed
+  but disabled. Re-enabling Dramaless restored the voxel/VR pipeline; this was
+  configuration state, not a Crystal incompatibility.
+- The initial flat attempt also had one B-button failure. Android input events
+  still reached the Quest bridge, and a force-stop/relaunch recovered it. In
+  the clean retry, all controls including B remained functional for the entire
+  Saffron City -> Route 8 -> Lavender Town traversal.
+- The enabled stack was Dramaless Shape 1.6.4, Kanto First Person, Wilds of
+  Kanto, Wild Skies 1.6.3, and Crystal 251 0.10.1. Voxel rendering remained
+  active and Wild Skies visibly rendered Generation II flyers. Logs identified
+  Natu, Yanma, and Hoppip, plus Pidgey from Generation I.
+- One generic Generation I flyer was observed. Wild Skies logged no missing
+  flyer sprite warning, so the sample does not identify it conclusively beyond
+  the repeated Pidgey spawns. Separately, Wilds of Kanto explicitly lacked
+  pre-registered overworld sprites for Murkrow and Houndour and used its
+  fallback IDs. Keep those ground-spawn fallbacks separate from Wild Skies.
+- Post-route memory was 2,014,242 KB total PSS (about 2.01 GB), including
+  766,476 KB Graphics. Battery was 45% and 47 C. No crash, ANR, OOM, or
+  low-memory kill appeared in the clean sample.
+- Result: Crystal 251 plus the accepted Dramaless/Kanto/Wilds/Wild Skies stack
+  passes this extended first compatibility run. Missing Murkrow/Houndour
+  overworld registrations and the single intermittent generic flyer remain
+  visual follow-ups, not blockers.

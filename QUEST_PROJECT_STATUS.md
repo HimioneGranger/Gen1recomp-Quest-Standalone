@@ -130,6 +130,12 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 
 ## Low-priority polish
 
+- Crystal 251 0.10.1 is device-verified with Dramaless Shape, Kanto First
+  Person, Wilds of Kanto, and Wild Skies through Saffron -> Route 8 -> Lavender.
+  Gen II flyers render and controls remained stable. Wilds of Kanto still uses
+  fallback overworld IDs for Murkrow and Houndour; investigate those sprite
+  registrations later.
+
 - Dramatic Sky Ride 0.1.5 is deferred: it was stable but reduced the measured
   Celadon interval from about 30.5 to 26.5 FPS. Its 3D flight works in VR, but
   altitude control does not: Quest triggers currently map to Start rather than
