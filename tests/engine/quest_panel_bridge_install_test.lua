@@ -56,10 +56,12 @@ local handle = assert(io.open(
   "mobile/android/love/src/jni/questxr_bridge/questxr_bridge.c", "rb"))
 local native = handle:read("*a")
 handle:close()
-T.check(native:find("right_magnitude2", 1, true) ~= nil,
-  "launcher event selection reads the right thumbstick")
-T.check(native:find("event_stick", 1, true) ~= nil,
-  "launcher logs which thumbstick produced navigation")
+T.check(native:find("right_magnitude2", 1, true) == nil,
+  "launcher navigation ignores the right thumbstick")
+T.check(native:find("float x = left_x;", 1, true) ~= nil,
+  "launcher direction edges use the left thumbstick")
+T.check(native:find("Quest stick=left", 1, true) ~= nil,
+  "launcher navigation logs its left-stick source")
 T.check(native:find("if (left_magnitude2 > 0.1225f)", 1, true) ~= nil,
   "held gameplay movement remains gated by the left thumbstick")
 

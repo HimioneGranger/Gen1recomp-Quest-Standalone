@@ -576,30 +576,22 @@ static void *questxr_native_bootstrap(void *unused) {
             xrGetActionStateVector2f(session, &state_info, &left_stick);
             state_info.action = right_stick_action;
             xrGetActionStateVector2f(session, &state_info, &right_stick);
-            /* The left stick owns held emulated-d-pad movement. Either stick
-             * may emit a discrete launcher-navigation edge: Lua discards
-             * direction edges after the launcher handoff, so right-stick
-             * camera motion can never steal gameplay movement. This also
-             * keeps the launcher usable with only the right controller awake. */
+            /* The left stick owns launcher and emulated d-pad movement. The
+             * right stick is reserved for VR camera controls; allowing either
+             * stick to win here made small right-stick motion intermittently
+             * steal movement during gameplay. */
             static bool stick_emitted = false;
             float left_x = left_stick.currentState.x;
             float left_y = left_stick.currentState.y;
             float left_magnitude2 = left_x * left_x + left_y * left_y;
-            float right_x = right_stick.currentState.x;
-            float right_y = right_stick.currentState.y;
-            float right_magnitude2 = right_x * right_x + right_y * right_y;
-            float x = left_magnitude2 >= right_magnitude2 ? left_x : right_x;
-            float y = left_magnitude2 >= right_magnitude2 ? left_y : right_y;
-            float event_magnitude2 = left_magnitude2 >= right_magnitude2
-                ? left_magnitude2 : right_magnitude2;
-            const char *event_stick = left_magnitude2 >= right_magnitude2
-                ? "left" : "right";
+            float x = left_x;
+            float y = left_y;
             int new_direction = 0;
             uint32_t held_direction = 0;
             // Quest's launcher should respond before the stick reaches its
             // outer gate. Gameplay can use analogue values; menu navigation
             // needs only an intentional deflection and one event per flick.
-            if (event_magnitude2 > 0.1225f && !stick_emitted) {
+            if (left_magnitude2 > 0.1225f && !stick_emitted) {
                 /* Resolve diagonals by their dominant axis. */
                 if (fabsf(x) >= fabsf(y)) {
                     if (x > 0.35f) new_direction = QUESTXR_INPUT_RIGHT;
@@ -610,23 +602,22 @@ static void *questxr_native_bootstrap(void *unused) {
                 }
             }
             if (left_magnitude2 > 0.1225f) {
-                if (fabsf(left_x) >= fabsf(left_y)) {
-                    if (left_x > 0.35f) held_direction = QUESTXR_INPUT_RIGHT;
-                    else if (left_x < -0.35f) held_direction = QUESTXR_INPUT_LEFT;
+                if (fabsf(x) >= fabsf(y)) {
+                    if (x > 0.35f) held_direction = QUESTXR_INPUT_RIGHT;
+                    else if (x < -0.35f) held_direction = QUESTXR_INPUT_LEFT;
                 } else {
-                    if (left_y > 0.35f) held_direction = QUESTXR_INPUT_UP;
-                    else if (left_y < -0.35f) held_direction = QUESTXR_INPUT_DOWN;
+                    if (y > 0.35f) held_direction = QUESTXR_INPUT_UP;
+                    else if (y < -0.35f) held_direction = QUESTXR_INPUT_DOWN;
                 }
             }
             questxr_set_held(held_direction);
             if (new_direction) {
                 input_events |= (uint32_t) new_direction;
-                XR_LOG("Quest stick=%s x=%.3f y=%.3f direction=0x%x",
-                       event_stick, x, y, new_direction);
+                XR_LOG("Quest stick=left x=%.3f y=%.3f direction=0x%x",
+                       x, y, new_direction);
                 /* A held stick emits exactly once. */
                 stick_emitted = true;
-            } else if (left_magnitude2 < 0.04f
-                    && right_magnitude2 < 0.04f) {
+            } else if (left_magnitude2 < 0.04f) {
                 stick_emitted = false;
             }
             XrActionStateBoolean button = { XR_TYPE_ACTION_STATE_BOOLEAN };
