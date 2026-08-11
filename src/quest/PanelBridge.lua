@@ -2,6 +2,11 @@
 -- Inert everywhere except an Android build exporting the native bridge.
 
 local PanelBridge = {}
+-- Shared game code calls this on every platform. Keep the bridge inert on
+-- desktop/iOS builds that return before the Android implementation below.
+function PanelBridge.update() end
+function PanelBridge.capture() end
+function PanelBridge.captureBound() return false end
 local C
 local elapsed = 0
 local bit = require("bit")
