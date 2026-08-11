@@ -53,6 +53,7 @@ local OverworldState = require("src.world.OverworldController")
 local FieldDefaults = require("src.world.FieldDefaults")
 local ModRuntime = require("src.mods.Runtime")
 local CanvasLifetime = require("src.quest.dramaless.CanvasLifetime")
+local StreamingPolicy = require("src.quest.dramaless.StreamingPolicy")
 local FirstPerson = V.require("FirstPerson")
 local BattleCam = V.require("BattleCam")
 local VRRig = V.require("VRRig")
@@ -113,9 +114,9 @@ local preload = {
   state = nil, started = nil, maps = nil, live = nil, promoteFull = nil,
 }
 local PRELOAD_TIMEOUT = 90
-local PRELOAD_HOPS = 4
-local PRELOAD_MAP_CAP = 12
-local PRELOAD_FULL_CAP = 1
+local PRELOAD_HOPS = StreamingPolicy.PRELOAD_HOPS
+local PRELOAD_MAP_CAP = StreamingPolicy.PRELOAD_MAP_CAP
+local PRELOAD_FULL_CAP = StreamingPolicy.PRELOAD_FULL_CAP
 local CONNECTION_ORDER = { "north", "south", "west", "east" }
 local maskCache = {}
 local warpHooksInstalled = false
@@ -216,13 +217,18 @@ local function ensureWarpPreloadHooks()
     -- continuity. Fly is one-way and has no immediate return either. Ordinary
     -- door/interior warps keep Dramaless's one-set history for a flash-free
     -- exit, preserving the immersion policy that history was added for.
-    if (payload.via == "connection" or payload.via == "fly")
-       and ChunkMesher.dropPrevious then
-      ChunkMesher.dropPrevious()
+    if payload.via == "connection" or payload.via == "fly" then
+      local historyAPI = type(ChunkMesher.dropPrevious) == "function"
+      if historyAPI then ChunkMesher.dropPrevious() end
       local log = rawget(_G, "QUEST_XR_LOG")
       if log then
-        log(("VRMEM released previous mesh set via=%s map=%s")
-          :format(tostring(payload.via), tostring(payload.mapId)))
+        if historyAPI then
+          log(("VRMEM released previous mesh set via=%s map=%s")
+            :format(tostring(payload.via), tostring(payload.mapId)))
+        else
+          log(("VRMEM previous mesh release unavailable via=%s map=%s")
+            :format(tostring(payload.via), tostring(payload.mapId)))
+        end
       end
     end
     if warpPinned and warpPinned[payload.mapId] then
@@ -262,7 +268,9 @@ local function preloadNearbyMajor(Game, world)
       end
     end
   end
-  if not best then return end
+  if not best or not StreamingPolicy.allowMajorPreload(bestDistance) then
+    return
+  end
   majorTravel.target = best.id
   bodyDropPending[best.id] = true
   ChunkMesher.request(best, false, masksForMap(Game, best), false)
@@ -274,9 +282,9 @@ local function preloadNearbyMajor(Game, world)
   end
 end
 
--- Walk the selected save's actual connection graph, nearest first. Four hops
--- from Pallet includes the Route 2 / Route 23 and Route 21 / Cinnabar sides;
--- the cap keeps a dense region from becoming a whole-world startup bake.
+-- Walk the selected save's actual connection graph, nearest first. Physical
+-- profiling keeps this to the immediate connection ring: deeper regional
+-- baking made Saffron's native launch handoff take 50.86 seconds.
 local function regionalWarmMaps(Game, world)
   local defs, out = Game.data.maps, {}
   local seen = { [world.map.id] = true }
@@ -1114,6 +1122,13 @@ function VR.update(dt)
       started = true
       status = "session created"
       print("[DRAMALESS_SHAPE] VR: " .. VRXR.status())
+      log(("VRSTREAM policy hops=%d cap=%d majorDistance=%d "
+          .. "historyAPI=%s bodyAPI=%s warmAPI=%s")
+        :format(PRELOAD_HOPS, PRELOAD_MAP_CAP,
+          StreamingPolicy.MAJOR_PRELOAD_DISTANCE,
+          tostring(type(ChunkMesher.dropPrevious) == "function"),
+          tostring(type(ChunkMesher.dropBody) == "function"),
+          tostring(type(ChunkMesher.setWarmLive) == "function")))
     else
       failed = VRXR.status()
       print("[DRAMALESS_SHAPE] VR unavailable: " .. failed

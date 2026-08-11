@@ -63,11 +63,23 @@ do
     -- Apply the isolated, source-guarded Quest index adapter to the installed
     -- writable shadow. Kanto First Person can continue patching that normal
     -- Dramaless module afterward; no renderer module is replaced wholesale.
+    local okLifetime, lifetimeNote = false, "mesher unavailable"
+    local okLifetimePatch, MesherLifetimePatch = pcall(
+      require, "src.quest.dramaless.MesherLifetimePatch")
     local okIndexed, indexedNote = false, "mesher unavailable"
     local okPatch, IndexMesherPatch = pcall(
       require, "src.quest.dramaless.IndexMesherPatch")
     local mesherPath = "mods/DRAMALESS_SHAPE/lib/ChunkMesher.lua"
     local mesher = love.filesystem.read(mesherPath)
+    if okLifetimePatch and MesherLifetimePatch and mesher then
+      local bounded, note = MesherLifetimePatch.apply(mesher)
+      lifetimeNote = note or "unknown"
+      if bounded then
+        okLifetime = bounded == mesher
+          or love.filesystem.write(mesherPath, bounded)
+        if okLifetime then mesher = bounded end
+      end
+    end
     if okPatch and IndexMesherPatch and mesher then
       local indexed, note = IndexMesherPatch.apply(mesher)
       indexedNote = note or "unknown"
@@ -92,6 +104,9 @@ do
     pcall(C.questxr_log, okXR and okVR and okVRGL and
       "Dramaless Shape Quest OpenXR transport installed" or
       "Dramaless Shape Quest transport install failed")
+    pcall(C.questxr_log, okLifetime
+      and ("Dramaless " .. lifetimeNote)
+      or ("Dramaless lifetime seam skipped: " .. tostring(lifetimeNote)))
     pcall(C.questxr_log, okIndexed
       and ("Dramaless " .. indexedNote .. " mesher ready")
       or ("Dramaless indexed mesher skipped: " .. tostring(indexedNote)))
