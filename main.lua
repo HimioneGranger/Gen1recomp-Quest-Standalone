@@ -566,9 +566,6 @@ function love.draw()
 
     local titleY = cardY + math.floor(cardH * 0.16)
     love.graphics.setFont(titleFont)
-    love.graphics.setColor(0.31, 0.43, 0.22, 1)
-    love.graphics.printf("PREPARING VR WORLD", cardX, titleY + 2 * scale,
-      cardW, "center")
     love.graphics.setColor(0.15, 0.25, 0.16, 1)
     love.graphics.printf("PREPARING VR WORLD", cardX, titleY, cardW, "center")
 

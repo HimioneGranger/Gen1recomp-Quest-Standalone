@@ -1163,3 +1163,17 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - End-of-session safety snapshot: headset battery 7%, weak 5 V / 0.9 A USB
   charging, battery 43 C, XR runtime about 49 C. The app was force-stopped so
   the headset could cool and charge.
+
+## 2026-08-10 - Saffron save-aware preload verification
+
+- Imported the separate 100% test save and loaded into Saffron City. The
+  location-aware planner correctly selected Saffron plus Route 5, Route 6,
+  Route 7, Route 8, Cerulean, Vermilion, Celadon, Lavender, Route 24, Route 4,
+  and Route 9. Route 2 was correctly absent because it was not near this save.
+- All 12 required jobs completed in 36.52 seconds. Saffron's full mesh took
+  16.12 seconds and Celadon's body mesh was the largest warm job at 7.98
+  seconds. Moving out of and back into Saffron provided an additional live
+  transition sample without breaking the world load.
+- The user reported that the `PREPARING VR WORLD` title looked doubled. The
+  loading card intentionally drew a two-pixel title shadow, so that decorative
+  duplicate was removed; the title is now rendered once for clean VR legibility.
