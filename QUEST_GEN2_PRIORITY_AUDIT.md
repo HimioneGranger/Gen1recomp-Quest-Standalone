@@ -2,6 +2,20 @@
 
 Date: 2026-08-11
 
+## Official beta integration
+
+Official release tag `v0.1.78` (`2fabc038`) was fetched and merged into the
+isolated `quest-gen2-beta-v0.1.78` branch. The merge completed without a source
+conflict. The Gen 2 implementation in the tag descends from the same
+`ae6cac89` engine revision used for the rehearsal; the only tagged release
+content not already present in the rehearsal merge was generated iOS release
+metadata. Consequently, no Quest launcher or OpenXR compatibility resolution
+was needed for this beta.
+
+The Quest code remains an integration layer around the upstream launcher and
+Gold engine. It does not replace or independently implement the Gen 2 launcher,
+ROM importer, `Game2`, world, battle, or script systems.
+
 Source of truth: upstream `origin/dev` / `origin/g2` commit `ae6cac89`
 (`G2 support`) and the upstream guide, *Preparing your mod for Gen 2*.
 

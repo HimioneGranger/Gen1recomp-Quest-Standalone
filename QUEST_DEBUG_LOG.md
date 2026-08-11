@@ -1480,3 +1480,14 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   generated ROM/cache data were verified.
 - Next physical checkpoint is importing a legally obtained Gold ROM and
   proving launcher -> Gold -> gameplay on Quest with incompatible mods skipped.
+
+## 2026-08-11 - Official v0.1.78 beta integration
+
+- Fetched signed upstream tag `v0.1.78` at `2fabc038` and created isolated
+  branch `quest-gen2-beta-v0.1.78` from the completed rehearsal branch.
+- The tag merged cleanly with no launcher, importer, Android, or OpenXR source
+  conflicts. Its Gen 2 engine is descended from the rehearsed `ae6cac89`
+  revision; only iOS release metadata was newly applied by this merge.
+- Result: the preparation matched the released beta as intended. Quest keeps
+  upstream's launcher and Gold implementation, adding only its platform input,
+  panel capture, lifecycle, and XR handoff behavior.
