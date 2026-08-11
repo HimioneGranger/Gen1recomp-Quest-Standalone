@@ -1,19 +1,19 @@
 # Quest Gen 2 streaming/launcher candidate — physical validation
 
-Source tip: `613952af` (`quest: show launcher focus cursor`)
+Source tip: `287879a4` (`quest: restore left-stick launcher navigation`)
 
 The candidate includes the bounded-streaming work beginning at `bc2e2092`, the
-atomic Quest payload/transport refresh at `2aa5253e`, and the visible launcher
-focus fix at `613952af`.
+atomic Quest payload/transport refresh at `2aa5253e`, and the left-stick-only
+launcher correction at `287879a4`.
 
 Canonical APK:
 
 `mobile/android/app/build/outputs/apk/questVrNoRecord/debug/app-questVr-noRecord-debug.apk`
 
-- bytes: `58,598,459`
-- SHA-256: `F7698FDA20599491B01449B2C12929460C231FF88E9411D655A343D04EBDE491`
+- bytes: `58,594,071`
+- SHA-256: `EC7167DC0EEABA0D2BDA01DD8083B325166B85F9C48C1854AEF02E2F09403027`
 - embedded `game.love` SHA-256:
-  `F6F68B43C999F478B5BCC095B819380CC67BDFBBE617F9320F8D2ED7F3A6682D`
+  `260D9C464BBDFAF4C7F0CF8E029BF6B7BAA3170E20B2A4237467DB16D3E4499C`
 - stamped engine: `0.1.78`
 
 The APK passed Android APK Signature Scheme v2 verification. Its LÖVE payload
@@ -35,11 +35,10 @@ generated ROM data, ROM binaries, saves, or mod artwork.
 - Quest startup refreshes the current conductor and mesher adapters even when
   an optional packaged transport is absent. This fixes the stale writable
   conductor that kept showing the old 12-map warmup.
-- Launcher direction edges accept the right Touch thumbstick. Gameplay held
-  movement remains left-stick-only.
-- Quest paints the launcher's thick yellow focus ring and triangular pointer
-  into the captured surface, because the native overlay ring was not visibly
-  surviving headset filtering.
+- Launcher direction edges and gameplay held movement both use the left Touch
+  thumbstick. The right stick remains reserved for VR camera control.
+- The temporary Quest-only thick yellow pointer experiment was removed; the
+  launcher retains its existing appearance.
 
 ## Short headset test
 
@@ -49,9 +48,9 @@ generated ROM data, ROM binaries, saves, or mod artwork.
 2. Launch normally. Keep HGSS Visual Overhaul 0.3.0 and the usual Crystal 251,
    Dramaless Shape, Kanto First Person, Wilds of Kanto, and Wild Skies stack
    enabled.
-3. On the launcher, move the **right** stick in all four directions. A thick
-   yellow outline and yellow triangular pointer must visibly follow the focused
-   tab/control. Move down to the Gold ROM row and confirm with A.
+3. On the launcher, move the **left** stick in all four directions and confirm
+   that the focused tab/control changes. The right stick must not navigate the
+   menu. Move down to the Gold ROM row and confirm with A.
 4. Load the Saffron save. Confirm the Pokédex, game speed, tracking, and
    controls are normal before walking.
 5. Walk east from Saffron through the gate to Route 8, then continue into
@@ -90,5 +89,5 @@ throttling. This candidate should reduce startup work and stop retaining every
 previous outdoor region; one short run is directional evidence rather than an
 absolute memory threshold.
 
-Physical headset validation of the visible focus cursor and game handoff is the
-remaining gate.
+Physical headset validation of left-stick launcher navigation and game handoff
+is the remaining gate.
