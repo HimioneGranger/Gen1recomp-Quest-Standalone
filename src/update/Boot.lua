@@ -27,6 +27,17 @@ local Semver = require("src.update.Semver")
 
 local Boot = {}
 
+-- A downloaded engine payload replaces every src.* module while retaining the
+-- native executable.  That is safe for the desktop/mobile shells the payload
+-- targets, but not for the Quest fork: its Lua side contains the OpenXR panel,
+-- bounded streaming and mesh-lifetime adapters paired with the native Quest
+-- transport.  Mounting a generic newer payload there silently restores the
+-- upstream modules while keeping the Quest binary, producing a mixed build.
+-- Keep this decision pure so the platform contract has direct test coverage.
+function Boot.allowPayloadUpdates(questPanelActive, networkValidated)
+  return not questPanelActive and networkValidated ~= false
+end
+
 -- Save-directory layout (identity "pokemon-love2d"), per the shared contract.
 local PAYLOAD_DIR = "updates"
 local PENDING = "updates/pending.txt"
@@ -250,10 +261,14 @@ function Boot.run(args)
   if not (love.filesystem.isFused and love.filesystem.isFused()) then
     return false
   end
-  -- Switch (and any host without validated network): never probe payloads.
+  -- A Quest APK must remain an atomic native+Lua build.  Launcher-managed mod
+  -- updates use their own path and remain available; only whole-engine
+  -- chainloads are suppressed here.
   local okp, Platform = pcall(require, "src.core.Platform")
-  if okp and Platform and Platform.networkValidated
-      and not Platform.networkValidated() then
+  local networkValidated = not (okp and Platform and Platform.networkValidated)
+    or Platform.networkValidated()
+  if not Boot.allowPayloadUpdates(
+      rawget(_G, "QUEST_PANEL_ACTIVE") == true, networkValidated) then
     return false
   end
   -- The chainloaded love.load calls Boot.run again; the flag makes it a no-op.

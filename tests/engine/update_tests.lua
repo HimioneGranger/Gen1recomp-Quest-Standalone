@@ -15,6 +15,15 @@ local Boot = require("src.update.Boot")
 local Check = require("src.update.Check")
 local Json = require("src.link.Json")
 
+-- Whole-engine payloads must never replace the Lua half of the native Quest
+-- fork. Mod updates are a separate mechanism and are intentionally unaffected.
+eq(Boot.allowPayloadUpdates(true, true), false,
+  "Quest rejects generic engine payload chainloads")
+eq(Boot.allowPayloadUpdates(false, false), false,
+  "a platform without validated engine updates rejects payloads")
+eq(Boot.allowPayloadUpdates(false, true), true,
+  "validated non-Quest platforms retain engine payload updates")
+
 -- ---------------------------------------------------------------------------
 -- Semver.parse
 -- ---------------------------------------------------------------------------
