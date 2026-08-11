@@ -1113,3 +1113,28 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Retain the priority correction. The next optimization must reduce Route 2's
   own complete-mesh construction/draw cost without bypassing Kanto First Person
   object side effects or reintroducing terrain/tree pop from distance culling.
+
+## 2026-08-10 - Route 2 geometry phase profile
+
+- Added diagnostics-only phase markers to the exact-source indexed mesher;
+  rendering, queue order, geometry, budgets, and draw distance were unchanged.
+  First split showed Route 2 body at 9014.73 ms: 2207.20 ms auxiliary object
+  preparation, 6671.57 ms geometry, and 135.57 ms GPU upload. Full was
+  12094.20 ms: 11867.84 ms geometry and 226.10 ms upload. Shader/GPU upload is
+  therefore not the primary loading bottleneck.
+- Finer hardware trace separated `runGeometry`: Route 2 body spent 82.25 ms in
+  tiles/structures, 79.52 ms in ordinary object quads, and 2532.60 ms expanding
+  round-tree stamps. Full spent 190.98 ms in tiles, 182.70 ms in objects, and
+  13174.88 ms in tree stamps. The map contains 16,924 object quads and 862
+  repeated round-tree stamps; stamps consumed about 94% of body geometry and
+  97% of full geometry in this run.
+- BuildBudget already samples its cheap `tick()` clock check once per 32 calls.
+  Calling it less often would not remove the repeated tree expansion and risks
+  longer visible frame stalls, so that shortcut was rejected without a build.
+- User accepted a longer load in exchange for fewer runtime pop-ins, provided a
+  loading screen and progress bar are shown. Required design is save-aware, not
+  Pallet-specific: after the selected save constructs its overworld state, read
+  its actual map/player position, build the current full mesh first, then its
+  live neighbors in distance order, and derive progress from required completed
+  jobs. A Route 2/forest/interior save must automatically prepare its own set.
+  Call this `Preparing VR world`, not shader compilation.

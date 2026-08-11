@@ -14,6 +14,8 @@ local Patch = {}
 
 Patch.MARKER = "quest indexed FFI sink"
 Patch.TRACE_MARKER = "quest transition mesh trace"
+Patch.PHASE_MARKER = "quest Route 2 mesh phase trace"
+Patch.GEOMETRY_PHASE_MARKER = "quest Route 2 geometry section trace"
 Patch.PACING_MARKER = "quest paced neighbour meshing"
 Patch.REJECTED_CACHE_MARKER = "quest persistent indexed mesh cache"
 
@@ -31,6 +33,8 @@ function Patch.apply(source)
   source = source:gsub("\r\n", "\n")
   local alreadyIndexed = source:find(Patch.MARKER, 1, true) ~= nil
   local alreadyTraced = source:find(Patch.TRACE_MARKER, 1, true) ~= nil
+  local alreadyPhased = source:find(Patch.PHASE_MARKER, 1, true) ~= nil
+  local alreadyGeometryPhased = source:find(Patch.GEOMETRY_PHASE_MARKER, 1, true) ~= nil
   local alreadyPaced = source:find(Patch.PACING_MARKER, 1, true) ~= nil
   local rejectedCache = source:find(Patch.REJECTED_CACHE_MARKER, 1, true) ~= nil
   local cacheRemoved = false
@@ -105,9 +109,9 @@ local COVERED_SLICE = 0.030
     if not restored then return nil, restoreErr end
     source, alreadyPaced = restored, false
   end
-  if alreadyIndexed and alreadyTraced then
+  if alreadyIndexed and alreadyTraced and alreadyPhased and alreadyGeometryPhased then
     return source, cacheRemoved and "indexed and traced; rejected persistent cache removed"
-      or "indexed and traced"
+      or "indexed, traced, and phase-profiled"
   end
   if source:find("setVertexMap", 1, true) and not alreadyIndexed then
     return source, "foreign indexed sink preserved"
@@ -285,7 +289,125 @@ local function finishJob(job, ok, err)
     if not source then return nil, err end
   end
 
-  return source, "indexed and traced"
+  if not alreadyPhased then
+    source, err = replaceOnce(source, [=[
+local function runJob(job)
+  local map = job.map
+  local c = entry(job.id)
+]=], [=[
+local function runJob(job)
+  local map = job.map
+  local c = entry(job.id)
+  -- quest Route 2 mesh phase trace: diagnostics only.
+  local questPhaseStart = clock()
+]=], "phase start")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+    if c.stale then c.stale.aux = nil end
+  end
+  local sink = newSink()
+]=], [=[
+    if c.stale then c.stale.aux = nil end
+  end
+  local questAuxDone = clock()
+  local sink = newSink()
+]=], "phase auxiliary boundary")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+  local sink = newSink()
+  local waterSink = newSink()
+  runGeometry(map, job.slot == "body", job.masks, sink, waterSink)
+  local mesh = sink.finish()
+  local water = waterSink.finish()
+]=], [=[
+  local sink = newSink()
+  local waterSink = newSink()
+  local questGeometryStart = clock()
+  runGeometry(map, job.slot == "body", job.masks, sink, waterSink)
+  local questGeometryDone = clock()
+  local mesh = sink.finish()
+  local questTerrainUploadDone = clock()
+  local water = waterSink.finish()
+  local questWaterUploadDone = clock()
+  if job.id == "ROUTE_2" then
+    local questLog = rawget(_G, "QUEST_XR_LOG")
+    if questLog then
+      questLog(("MESHPHASE id=%s slot=%s aux=%.2fms geometry=%.2fms "
+          .. "terrainUpload=%.2fms waterUpload=%.2fms total=%.2fms")
+        :format(tostring(job.id), tostring(job.slot),
+          (questAuxDone - questPhaseStart) * 1000,
+          (questGeometryDone - questGeometryStart) * 1000,
+          (questTerrainUploadDone - questGeometryDone) * 1000,
+          (questWaterUploadDone - questTerrainUploadDone) * 1000,
+          (questWaterUploadDone - questPhaseStart) * 1000))
+    end
+  end
+]=], "phase geometry and upload boundaries")
+    if not source then return nil, err end
+  end
+
+  if not alreadyGeometryPhased then
+    source, err = replaceOnce(source, [=[
+local function runGeometry(map, bodyOnly, masks, sink, waterSink)
+  local push = sink.push
+]=], [=[
+local function runGeometry(map, bodyOnly, masks, sink, waterSink)
+  local push = sink.push
+  -- quest Route 2 geometry section trace: diagnostics only.
+  local questGeoClock = (love and love.timer and love.timer.getTime) or os.clock
+  local questTilesStart = questGeoClock()
+]=], "geometry section start")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+  for _, q in ipairs(S.objectQuads) do
+]=], [=[
+  local questTilesDone = questGeoClock()
+  for _, q in ipairs(S.objectQuads) do
+]=], "geometry object boundary")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+  -- true when the rect sits entirely inside one neighbour-body rect
+]=], [=[
+  local questObjectsDone = questGeoClock()
+  -- true when the rect sits entirely inside one neighbour-body rect
+]=], "geometry stamp preparation boundary")
+    if not source then return nil, err end
+
+    source, err = replaceOnce(source, [=[
+    end
+  end
+end
+
+-- The raw geometry for `map`: (vertex list, triangle index list, quad
+]=], [=[
+    end
+  end
+  local questStampsDone = questGeoClock()
+  if map.id == "ROUTE_2" then
+    local questLog = rawget(_G, "QUEST_XR_LOG")
+    if questLog then
+      questLog(("MESHGEOMETRY id=%s body=%s tiles=%.2fms objects=%.2fms "
+          .. "stamps=%.2fms total=%.2fms objectQuads=%d roundStamps=%d")
+        :format(tostring(map.id), tostring(bodyOnly == true),
+          (questTilesDone - questTilesStart) * 1000,
+          (questObjectsDone - questTilesDone) * 1000,
+          (questStampsDone - questObjectsDone) * 1000,
+          (questStampsDone - questTilesStart) * 1000,
+          #(S.objectQuads or {}), #(S.roundStamps or {})))
+    end
+  end
+end
+
+-- The raw geometry for `map`: (vertex list, triangle index list, quad
+]=], "geometry section finish")
+    if not source then return nil, err end
+  end
+
+  return source, "indexed, traced, and phase-profiled"
 end
 
 return Patch
