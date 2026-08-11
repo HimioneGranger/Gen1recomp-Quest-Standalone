@@ -1462,3 +1462,21 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   no generated ROM/cache paths.
 - The headset was shut down, so the candidate was built but not installed.
   Exact ordinary-play validation is in `QUEST_MEMORY_CANDIDATE_TEST.md`.
+
+## 2026-08-11 - Gen 2 priority pivot
+
+- Made upstream's *Preparing Your Mod For Gen 2* guide the top priority.
+- Created isolated branch `quest-gen2` and merged upstream `ae6cac89` while
+  retaining the prior playable Quest branch. The merge preserves Quest
+  launcher/OpenXR handoff and adds the parallel Gold boot path.
+- Audited the active mod stack with `tools/modkit.py gen2check`. All current
+  mods correctly remain Gen 1-only; none was falsely relabelled compatible.
+  Dramaless, Kanto First Person, Wilds of Kanto, and Wild Skies require real
+  Gen 2 ports. Crystal 251 duplicates native Gold functionality and contains
+  fatal Gen 1-only imports, so it should remain Gen 1-only by default.
+- Built a ROM-free Gold-capable Quest baseline. APK SHA-256 is
+  `A5D42655FDBA228AC480FF10625EC5DEEA20FCE69B71C2845FB44A6E2942E6C9`;
+  signature, embedded payload identity, ARM64/OpenXR libraries, and absence of
+  generated ROM/cache data were verified.
+- Next physical checkpoint is importing a legally obtained Gold ROM and
+  proving launcher -> Gold -> gameplay on Quest with incompatible mods skipped.

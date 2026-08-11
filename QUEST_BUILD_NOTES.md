@@ -249,3 +249,28 @@ excluded and archive inspection returned no generated-data entries. Only the
 three matched Dramatic Shape Quest transport files (`VRXR.lua`, `VR.lua`, and
 `VRGL.lua`) are embedded for startup refresh; user ROMs, saves, mod manifests,
 settings, and assets remain external.
+
+## 2026-08-11 Gen 2 priority baseline
+
+Upstream Gen 2 commit `ae6cac89` was merged on isolated branch `quest-gen2`.
+The Windows-safe clean-stage/JDK `jar` fallback packed the stock source set,
+including `tools/rom_manifest_gold.json`, while excluding both generated-data
+trees. The full canonical build command was used without ABI injection:
+
+```powershell
+$env:JAVA_HOME='E:\Gen1QuestVR\jdk-17.0.20+8'
+$env:ANDROID_SDK_ROOT='F:\CodexProjects\Gen1RecompQuest3-work\toolchain\android-sdk'
+$env:ANDROID_HOME=$env:ANDROID_SDK_ROOT
+$env:GRADLE_USER_HOME='F:\CodexProjects\Gen1RecompQuest3-work\toolchain\.gradle'
+Set-Location E:\Gen1QuestVR\gen1recomp\mobile\android
+.\gradlew.bat --no-daemon assembleQuestVrNoRecordDebug
+```
+
+Gradle completed 58 tasks successfully in 19 seconds. The resulting APK is
+61,646,052 bytes with SHA-256
+`A5D42655FDBA228AC480FF10625EC5DEEA20FCE69B71C2845FB44A6E2942E6C9`.
+Its embedded payload exactly matches SHA-256
+`7CFA91CA26F7DD6CBC563E63595881F0998DDE4547844B9E84A4A062596C3AB5`.
+APK v2 signing passed. ARM64-v8a, armeabi-v7a, and x86_64 `liblove.so` builds
+are present, and the OpenXR loader is packaged for those ABIs (plus its AAR's
+x86 loader). No generated ROM/cache entry is present.
