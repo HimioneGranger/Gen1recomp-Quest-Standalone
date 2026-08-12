@@ -6,7 +6,7 @@
       android:version="1" />
 
   <application>
-    <activity android:name="org.love2d.android.GameActivity">
+    <activity android:name="org.love2d.android.QuestGameActivity">
       <meta-data android:name="org.gen1recomp.QUEST_XR_BOOTSTRAP"
           android:value="true" />
       <!-- Validation flavor: enter Meta immersive mode immediately after the

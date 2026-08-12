@@ -32,7 +32,7 @@
       android:icon="@drawable/love"
       android:label="${NAME}" >
     <activity
-        android:name="org.love2d.android.GameActivity"
+        android:name="${ACTIVITY}"
         android:exported="true"
         android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
         android:label="${NAME}"

@@ -355,7 +355,7 @@ QUESTXR_EXPORT void questxr_log(const char *message) {
 }
 
 JNIEXPORT void JNICALL
-Java_org_love2d_android_GameActivity_nativeQuestXrSetActivity(
+Java_org_love2d_android_QuestGameActivity_nativeQuestXrSetActivity(
     JNIEnv *env, jclass clazz, jobject activity) {
     (void) clazz;
     if ((*env)->GetJavaVM(env, &questxr_vm) != JNI_OK) {
@@ -371,7 +371,7 @@ Java_org_love2d_android_GameActivity_nativeQuestXrSetActivity(
 }
 
 JNIEXPORT void JNICALL
-Java_org_love2d_android_GameActivity_nativeQuestXrStartBootstrap(
+Java_org_love2d_android_QuestGameActivity_nativeQuestXrStartBootstrap(
     JNIEnv *env, jclass clazz) {
     (void) env;
     (void) clazz;

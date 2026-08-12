@@ -81,6 +81,16 @@ android {
         embed {
             dimension 'mode'
         }
+        questVr {
+            dimension 'mode'
+            minSdk 24
+            matchingFallbacks = ['embed']
+            externalNativeBuild {
+                ndkBuild {
+                    arguments 'QUEST_XR=1'
+                }
+            }
+        }
     }
     sourceSets {
         main {
@@ -94,6 +104,12 @@ android {
             java {
                 srcDirs += 'src/normal/java'
             }
+        }
+        questVr {
+            java {
+                srcDirs += 'src/questVr/java'
+            }
+            res.srcDirs = ['src/embed/res']
         }
     }
     externalNativeBuild {
