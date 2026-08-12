@@ -130,8 +130,8 @@ route on physical Quest hardware without a new blocker.
 - [x] Center the current usable capture closely enough for play.
 - [x] Turn the screen off when no dialogue/text/menu feed is needed without hiding the device.
 - [ ] Verify current fixes survived v0.1.78 and the next Dramaless update.
-- [ ] **Medium priority:** repair the broken v0.1.79 Pokédex battle feed and
-  keep battle information readable; diagnose capture activation/framing first.
+- [ ] **Lower-medium priority:** repair the compromised v0.1.79 Pokédex view
+  of the 3D battle; battle UI and information remain visible and usable.
 - [ ] Improve battle framing, which has repeatedly appeared too zoomed.
 - [ ] Remove remaining black side bars/bezels without losing capture.
 - [ ] Ensure battle mirror/feed activates consistently.

@@ -1729,11 +1729,10 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 
 ## 2026-08-12 - v0.1.79 Pokédex battle-feed regression
 
-- User reports that the Pokédex battle screen appears broken on the current
-  v0.1.79/q6 combination. Exploration and lifecycle testing can continue, but
-  the battle feed must not be counted as validated on this release.
-- Classified as medium priority: below loading/suspend reliability and
-  sustained world performance, but above pixel-perfect Pokédex sizing and
-  other cosmetic polish because battle information must remain readable.
+- User clarified that the battle UI and information remain visible and usable.
+  The compromised element is the Pokédex's view of the 3D battle itself, not
+  access to battle commands or status information.
+- Reclassified as lower-medium presentation work: below loading/suspend
+  reliability and sustained world performance, but above pixel-perfect sizing.
 - Next investigation should capture a screenshot plus logs at battle entry and
-  distinguish failure to activate the mirror from incorrect crop/framing.
+  distinguish an incorrect 3D camera feed from crop/framing distortion.
