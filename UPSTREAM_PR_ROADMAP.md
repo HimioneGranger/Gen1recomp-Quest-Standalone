@@ -93,6 +93,13 @@ Acceptance:
 
 ### PR 3 — Engine payload compatibility contract
 
+Status: **submitted upstream** as
+[#1201](https://github.com/bryanthaboi/gen1recomp/pull/1201) from commit
+`0aab11b6`. The generic `payloadHost` family complements the existing numeric
+shell contract. Missing fields default to `love`, so old and current vanilla
+payloads retain their behavior; specialized hosts explicitly opt into their
+own family and cannot mount or delete another family's payload.
+
 Current evidence lives in `src/update/Boot.lua`. The prototype correctly
 prevents an incompatible generic Lua payload from being mounted over a paired
 Quest native binary, but the policy is tied to `QUEST_PANEL_ACTIVE`.
