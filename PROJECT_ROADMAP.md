@@ -19,8 +19,45 @@ prototype alone does not count as 100%.
 - **Gen 2/HGSS sprite-provider work:** 86%
 - **Portal/MR modes:** 10%
 - **PCVR release path:** 15%
+- **Upstream engine/API contribution gate:** 10%
 - **Overall playable Quest release:** **78%**
 - **Whole long-term vision, including Gen 2, MR and PCVR:** **44%**
+
+## Release gate — Upstream engine and API contributions (10%)
+
+Quest is not considered ready for an official release until its reusable host
+changes have been split into reviewable pull requests, accepted upstream, and
+regression-tested without changing vanilla desktop or stock Android behavior.
+`UPSTREAM_PR_ROADMAP.md` is the authoritative PR breakdown and acceptance
+matrix.
+
+- [x] Establish the ownership boundary: engine/API changes go upstream;
+  Dramaless and Kanto-specific changes remain in their approved Quest forks.
+- [x] Inventory the current Quest branch against official `v0.1.79` and reject
+  a monolithic PR (it mixes launcher, updater, Android, OpenXR and mod code).
+- [ ] Rebase each proposed change onto the current official development base.
+- [ ] Submit platform-neutral launcher focus/navigation changes with headless
+  tests covering vanilla keyboard/mouse behavior and controller behavior.
+- [ ] Submit a generic native-panel/capture host API without Quest globals in
+  ordinary launcher/game code and with a no-op default implementation.
+- [ ] Submit Android lifecycle/native-extension seams behind manifest/build
+  feature gates; stock `embed` must retain its current packaging and behavior.
+- [ ] Submit the optional OpenXR Quest flavor/backend separately from generic
+  engine APIs, without ROMs, saves, mods or commercial assets.
+- [ ] Run the complete upstream ROM-free CI suite for every PR.
+- [ ] Build and smoke-test vanilla desktop and stock Android for every affected
+  PR; compare launcher, import, update and gameplay behavior to upstream.
+- [ ] Build the ROM-free ARM64 Quest APK and complete the physical headset
+  regression matrix after the PR stack is combined.
+- [ ] Obtain upstream review/acceptance or revise the API until maintainers are
+  satisfied; do not describe downstream prototypes as official support.
+- [ ] Update the Quest integration branch to consume accepted APIs and remove
+  duplicated downstream engine patches.
+
+Completion condition: accepted upstream engine/API changes preserve vanilla
+behavior, the downstream mod forks contain all mod-specific adaptations, and a
+fresh official-source build passes desktop, stock Android and physical Quest
+regression testing.
 
 ## Priority 1 — Validate the official v0.1.79 build (100%)
 
