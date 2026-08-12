@@ -22,6 +22,8 @@ local questMake = read("mobile/android/love/src/jni/questxr_bridge/Android.mk")
 
 check(app:find("questVrImplementation", 1, true),
   "OpenXR loader dependency is scoped to questVr")
+check(app:find("abiFilters 'arm64-v8a'", 1, true),
+  "Quest application packaging is ARM64-only")
 check(not app:find("implementation 'org.khronos.openxr", 1, true),
   "OpenXR loader is not a global app dependency")
 check(love:find("arguments 'QUEST_XR=1'", 1, true),
