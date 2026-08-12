@@ -1846,3 +1846,22 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `3D663D53DA2D75E34C3D3EF5588FAE63E7E246D21EB863838B484BCE0B9B939B`.
 - Installed as an update with app data preserved. Runtime acceptance of 90 Hz
   remains the next physical/log validation checkpoint.
+
+### 72 Hz control test and q9 diagnostics
+
+- User selected `72 HZ`, but VrApi continued reporting `FPS=.../90`,
+  `DR90/91`, and Android measured the display at `90.00 Hz`. The options row
+  therefore works, but live OpenXR rate control is not yet validated and must
+  not be marked complete.
+- Added q9 diagnostics for the setting transition, extension availability,
+  supported runtime rates, request result, and post-request runtime rate.
+- q9 ZIP: 1,501,884 bytes, SHA-256
+  `3837AB9BAEFA4C8F8DA80B9003A196965D94CFE1219D397E901341AAD7818F05`.
+- Rebuilt all 58 Gradle tasks successfully and inspected the final APK plus
+  embedded `game.love`; neither contains ROM/save/generated-data paths.
+- Diagnostic APK: 59,765,447 bytes, SHA-256
+  `2395B973D251D64E8B090695DA97209CFF595F579E766BD60885F8B5F9B9D8B6`.
+- Embedded `game.love`: 5,648,974 bytes, SHA-256
+  `AFD785DAC1CC6EBD5591D21069B9B3721C238FFB2E37BCE52B19335F572395EC`.
+- Copied q9 to Quest Downloads and installed the matching APK as an update,
+  preserving app data. Physical import/load at 72 Hz is the next checkpoint.

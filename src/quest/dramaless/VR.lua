@@ -1159,9 +1159,16 @@ function VR.update(dt)
   if VRXR.isRunning() then
     local wantedRate = VR.refreshRate:get()
     if wantedRate ~= requestedRefresh then
+      VRXR.trace(("display refresh setting transition %s -> %s"):format(
+        tostring(requestedRefresh), tostring(wantedRate)))
       local okRate, selected = VRXR.requestRefreshRate(wantedRate)
       requestedRefresh = wantedRate
-      if okRate then status = ("running at %.0f Hz"):format(selected) end
+      if okRate then
+        status = ("running at %.0f Hz"):format(selected)
+      else
+        VRXR.trace("display refresh setting retained; runtime request failed: "
+          .. tostring(selected))
+      end
     end
   end
   if not VRXR.isRunning() then return end
