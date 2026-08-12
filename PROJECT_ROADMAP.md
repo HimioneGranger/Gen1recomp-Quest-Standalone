@@ -47,21 +47,21 @@ streaming as the next blocker, not the OpenXR transport.
 Completion condition: the official beta passes the ordinary Yellow VR test
 route on physical Quest hardware without a new blocker.
 
-## Priority 2 — Establish official Quest mod forks (30%)
+## Priority 2 — Establish official Quest mod forks (52%)
 
 - [x] Receive written permission from Kanto in First Person creator `briddsy`.
 - [x] Receive written permission/blessing from Dramaless creator Stahltier.
 - [x] Archive screenshots, hashes, dates and scope in `docs/permissions/`.
 - [x] Clone a pristine Dramaless upstream mirror.
-- [ ] Create a dedicated Dramaless Quest fork/repository and `quest-vr` branch.
+- [x] Create a dedicated Dramaless Quest fork/repository and `quest-vr` branch.
 - [ ] Create a dedicated Kanto in First Person Quest fork/repository and branch.
-- [ ] Preserve upstream licenses, credits and inherited third-party notices.
-- [ ] Clearly label builds as Quest-maintained and not headset-tested upstream.
-- [ ] Separate shared VR behavior from Quest Android/OpenXR transport code.
-- [ ] Add reproducible packaging scripts and version the APK/mod compatibility pair.
+- [x] Preserve upstream licenses, credits and inherited third-party notices.
+- [x] Clearly label builds as Quest-maintained and not headset-tested upstream.
+- [x] Move validated VR conductor helpers into the mod; retain a defined native host boundary.
+- [x] Add reproducible packaging scripts and version the APK/mod compatibility pair.
 - [ ] Add automatic upstream comparison notes for each new Dramaless release.
 
-## Priority 3 — Dramaless VR maintenance (65%)
+## Priority 3 — Dramaless VR maintenance (70%)
 
 - [x] Port OpenXR session creation to standalone Android/Quest.
 - [x] Render stereoscopic Quest frames with head tracking and 6DoF.
@@ -71,7 +71,7 @@ route on physical Quest hardware without a new blocker.
 - [x] Restore stable thin green launcher focus ring.
 - [x] Fix major Pokédex alignment/capture regressions to a usable state.
 - [x] Add Quest canvas lifetime cleanup and route-history release seams.
-- [ ] Rebase the Quest adapter onto the exact next stable Dramaless release.
+- [x] Rebase the Quest adapter onto stable Dramaless `v1.6.4` in the dedicated fork.
 - [ ] Track `battle-art-merge` / `1.6.5.PRE` without using it as stable yet.
 - [ ] Adapt VR capture to new battle-art, voxel-precache, mesh and loading systems.
 - [ ] Make Quest integration seams patchable without copying whole upstream files.

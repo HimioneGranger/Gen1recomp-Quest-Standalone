@@ -1515,3 +1515,25 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Resume returned to voxel, but its steady frame time returned to roughly
   36–38 ms and logged texture allocation rose to 278 MB. Continue with
   rendering/streaming profiling before declaring release-quality performance.
+
+## 2026-08-11 - Dedicated Dramaless Quest fork baseline
+
+- Created separate local repository `E:\Gen1QuestVR\Dramaless-Quest` from
+  upstream tag `v1.6.4` (`3e7138a`) on branch `quest-vr`. Its upstream remote
+  is named `upstream`, preventing an accidental default push to the creator's
+  repository.
+- Imported the exact physically validated Quest conductor and OpenXR/GLES
+  transports. Moved `CanvasLifetime` and `StreamingPolicy` into the mod
+  namespace so those helpers no longer depend on private host source paths.
+- Manifest version is `1.6.4-quest.1` and explicitly targets `games: ["gen1"]`.
+  `gen2check` therefore rejects Gold as intended; no false Gen 2 claim was made.
+- Added attribution/compatibility notes, `.envignore`, and a deterministic
+  Quest ZIP packager. Two consecutive builds produced identical SHA-256
+  `B09878B4DE4B161CAC593BC4877E09E8CFCDAEEBAD5AD7D3C029C24E8370ED1C`
+  (1,497,238 bytes), with canonical paths and no ROM/save/generated data.
+- Fork commits: `edc0afc` (Quest baseline) and `6606c44` (reproducible package).
+  Candidate copied to Quest Downloads as
+  `IMPORT_ME__DRAMALESS_QUEST_1.6.4-q1.zip`; physical import validation remains.
+- The host still owns source-guarded `ChunkMesher`/`VoxelScene` adapters for
+  the first milestone. Move those reviewed changes into the fork before
+  removing the host installer behavior.
