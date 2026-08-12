@@ -1537,3 +1537,20 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - The host still owns source-guarded `ChunkMesher`/`VoxelScene` adapters for
   the first milestone. Move those reviewed changes into the fork before
   removing the host installer behavior.
+
+## 2026-08-11 - Dramaless Quest 1.6.4-quest.1 physical import check
+
+- User imported the deterministic `DRAMALESS_SHAPE-1.6.4-quest.1` package and
+  confirmed the normal Yellow path: launcher, game handoff, voxel world and
+  ordinary rendering all loaded successfully.
+- The retained Quest log contained no Gen1Recomp fatal exception, ANR,
+  low-memory kill or new OpenXR failure during the reported run.
+- Warm voxel `PERF10` windows remained between 34.56 and 38.66 ms/frame, with
+  roughly 502-705 draw calls, six canvases, ten shaders and 277.1 MB of logged
+  textures. This matches the already-known world-rendering bottleneck rather
+  than indicating a regression caused by extracting the VR transport into the
+  dedicated mod fork.
+- Result: the reproducible fork package passes its first physical Yellow/voxel
+  checkpoint. Next engineering milestone is to move the reviewed
+  `ChunkMesher`/`VoxelScene` adaptations out of the host installer and into the
+  fork behind exact-source tests, then profile world draw work independently.

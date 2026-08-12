@@ -11,7 +11,7 @@ prototype alone does not count as 100%.
 
 - **Standalone Quest VR core:** 82%
 - **Current v0.1.78 beta integration:** 100% functional validation
-- **Stable Dramaless + Kanto experience:** 72%
+- **Stable Dramaless + Kanto experience:** 73%
 - **Performance and lifecycle hardening:** 63%
 - **Gen 2 engine readiness:** 70%
 - **Gen 2 voxel/VR gameplay:** 10%
@@ -47,7 +47,7 @@ streaming as the next blocker, not the OpenXR transport.
 Completion condition: the official beta passes the ordinary Yellow VR test
 route on physical Quest hardware without a new blocker.
 
-## Priority 2 — Establish official Quest mod forks (52%)
+## Priority 2 — Establish official Quest mod forks (56%)
 
 - [x] Receive written permission from Kanto in First Person creator `briddsy`.
 - [x] Receive written permission/blessing from Dramaless creator Stahltier.
@@ -59,6 +59,7 @@ route on physical Quest hardware without a new blocker.
 - [x] Clearly label builds as Quest-maintained and not headset-tested upstream.
 - [x] Move validated VR conductor helpers into the mod; retain a defined native host boundary.
 - [x] Add reproducible packaging scripts and version the APK/mod compatibility pair.
+- [x] Physically import `1.6.4-quest.1` and verify Yellow reaches the voxel world.
 - [ ] Add automatic upstream comparison notes for each new Dramaless release.
 
 ## Priority 3 — Dramaless VR maintenance (70%)
