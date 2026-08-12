@@ -40,3 +40,26 @@ Project policy: retain Dramaless and original Dramatic Shape attribution and
 license notices, clearly label Quest-maintained changes, avoid implying that
 Stahltier tested the VR build, and respect separate terms for inherited code,
 OpenXR components, and third-party assets.
+
+## HGSS Sprites / HGSS Overhaul
+
+- Creator/contact: `LucianoNeo`
+- Platform: public Discord mod channel
+- Permission received: 2026-08-11
+- Requested scope: trim or edit HGSS Sprites so it performs better in
+  standalone VR, publish a Quest-oriented fork, and retain creator credit.
+- Response: LucianoNeo placed an affirmative white-check-mark reaction on the
+  request and supplied the corrected official `HGSS_SPRITES-0.3.0.zip` link.
+- Evidence:
+  - `hgss-sprites-discord-permission-a-2026-08-11.jpg`
+  - `hgss-sprites-discord-permission-b-2026-08-11.jpg`
+- Evidence SHA-256:
+  - `437F2A48C53A309263B9A1B06E2CF5DB07D230DBEBBFF1BA3B1996310135D6E7`
+  - `63E270A611AD16CA706A6BD4F594A9217674C60AD4812BE550B3931A3414AB57`
+
+Project policy: treat this as permission for a credited Quest-performance
+adaptation of LucianoNeo's mod code and packaging. It is not a blanket grant
+over Pokémon imagery, ROM-derived data, or work owned by other contributors.
+Audit the repository license and asset provenance before distributing a fork;
+prefer runtime extraction from the user's legally imported ROM wherever
+redistribution rights are unclear.

@@ -16,7 +16,7 @@ prototype alone does not count as 100%.
 - **Gen 2 engine readiness:** 70%
 - **Gen 2 voxel/VR gameplay:** 10%
 - **Side Door Fix:** 35%
-- **Gen 2/HGSS sprite-provider work:** 85%
+- **Gen 2/HGSS sprite-provider work:** 86%
 - **Portal/MR modes:** 10%
 - **PCVR release path:** 15%
 - **Overall playable Quest release:** **74%**
@@ -151,7 +151,7 @@ route on physical Quest hardware without a new blocker.
 - [ ] Separate Kanto-only authored content from reusable camera behavior.
 - [ ] Decide whether any camera layer is appropriate for Gen 2.
 
-## Priority 9 — Gen 2/HGSS sprite provider (85%)
+## Priority 9 — Gen 2/HGSS sprite provider (86%)
 
 - [x] Create isolated Crystal ROM sprite-provider project.
 - [x] Avoid distributing ROM data or Pokémon artwork.
@@ -160,6 +160,9 @@ route on physical Quest hardware without a new blocker.
 - [x] Implement the `0.1.4` systemic flyer correction.
 - [x] Package clearly named Quest import ZIP.
 - [x] Add provider/runtime tests and documentation.
+- [x] Receive and archive permission from LucianoNeo for a credited Quest-performance fork.
+- [ ] Audit HGSS Sprites v0.3.0 code license and every bundled asset's provenance.
+- [ ] Create the isolated HGSS Quest fork only after the license/asset audit.
 - [ ] Import/enable `IMPORT_ME__NO_MORE_RHYDON_FLYERS__v0.1.4.zip` and restart.
 - [ ] Confirm Xatu/Delibird and other affected Gen 2 flyers use Crystal-derived art.
 - [ ] Confirm Pidgeotto/Spearow/Doduo use installed HGSS icons.
