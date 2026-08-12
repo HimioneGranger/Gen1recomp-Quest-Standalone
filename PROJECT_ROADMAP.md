@@ -10,7 +10,7 @@ prototype alone does not count as 100%.
 ## At a glance
 
 - **Standalone Quest VR core:** 82%
-- **Current v0.1.78 beta integration:** 95%
+- **Current v0.1.78 beta integration:** 100% functional validation
 - **Stable Dramaless + Kanto experience:** 72%
 - **Performance and lifecycle hardening:** 63%
 - **Gen 2 engine readiness:** 70%
@@ -22,7 +22,7 @@ prototype alone does not count as 100%.
 - **Overall playable Quest release:** **76%**
 - **Whole long-term vision, including Gen 2, MR and PCVR:** **43%**
 
-## Priority 1 — Validate the official v0.1.78 beta build (95%)
+## Priority 1 — Validate the official v0.1.78 beta build (100% functional)
 
 - [x] Fetch official signed `v0.1.78` source tag.
 - [x] Merge it into isolated `quest-gen2-beta-v0.1.78` branch.
@@ -37,7 +37,7 @@ prototype alone does not count as 100%.
 - [x] Test a building transition, route transition and battle.
 - [x] Test controller sleep/wake and headset suspend/resume.
 - [x] Capture logs, memory, GPU allocation, temperature and battery state.
-- [ ] Tag and preserve the validated APK/mod combination as the rollback build.
+- [x] Tag and preserve the validated APK/mod combination as the rollback build.
 
 Functional regression result: pass. Performance result: fail for release
 quality—the voxel overworld remains around 36–40 ms/frame while menu/Pokédex
