@@ -19,11 +19,11 @@ prototype alone does not count as 100%.
 - **Gen 2/HGSS sprite-provider work:** 86%
 - **Portal/MR modes:** 10%
 - **PCVR release path:** 15%
-- **Upstream engine/API contribution gate:** 10%
+- **Upstream engine/API contribution gate:** 18%
 - **Overall playable Quest release:** **78%**
 - **Whole long-term vision, including Gen 2, MR and PCVR:** **44%**
 
-## Release gate — Upstream engine and API contributions (10%)
+## Release gate — Upstream engine and API contributions (18%)
 
 Quest is not considered ready for an official release until its reusable host
 changes have been split into reviewable pull requests, accepted upstream, and
@@ -35,9 +35,11 @@ matrix.
   Dramaless and Kanto-specific changes remain in their approved Quest forks.
 - [x] Inventory the current Quest branch against official `v0.1.79` and reject
   a monolithic PR (it mixes launcher, updater, Android, OpenXR and mod code).
-- [ ] Rebase each proposed change onto the current official development base.
-- [ ] Submit platform-neutral launcher focus/navigation changes with headless
-  tests covering vanilla keyboard/mouse behavior and controller behavior.
+- [ ] Rebase each proposed change onto the current official development base
+  (`v0.1.80` / `c3136bf8` is now the first clean extraction base).
+- [x] Submit platform-neutral launcher modal focus/navigation fix with headless
+  vanilla-compatibility tests: upstream PR
+  [#1199](https://github.com/bryanthaboi/gen1recomp/pull/1199).
 - [ ] Submit a generic native-panel/capture host API without Quest globals in
   ordinary launcher/game code and with a no-op default implementation.
 - [ ] Submit Android lifecycle/native-extension seams behind manifest/build

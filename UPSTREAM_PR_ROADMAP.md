@@ -4,6 +4,11 @@ Last audited: 2026-08-12
 Comparison base: official `v0.1.79` (`04490c9b`)  
 Integration branch at audit: `quest-gen2-beta-v0.1.79`
 
+Current upstream extraction base: official `dev` at `c3136bf8` (`v0.1.80`
+source head). PR 1 was submitted as
+[#1199](https://github.com/bryanthaboi/gen1recomp/pull/1199) from commit
+`1642113d`.
+
 ## Objective and boundary
 
 Move reusable engine and host APIs into Gen1Recomp through small pull requests
@@ -30,6 +35,13 @@ must pass its own regression gate.
 ## Proposed PR stack
 
 ### PR 1 — Generic focus navigation and modal activation
+
+Status: **submitted upstream** as
+[#1199](https://github.com/bryanthaboi/gen1recomp/pull/1199). The submitted
+scope is deliberately smaller than the original proposal: it fixes routing of
+the existing generic focus handler through mod dialogs and adds 24 ROM-free
+checks. Optional focus visuals and broader host configuration remain future
+work rather than being bundled into this bug fix.
 
 Current evidence lives in `src/ui/kit/Kit.lua`, `src/import/LauncherView.lua`,
 `src/import/RomImporter.lua`, and
