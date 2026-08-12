@@ -2741,6 +2741,13 @@ function RomImporter:keypressed(key)
   end
   if self._modConfirm or self._modVersions or self._modReleaseNotes
       or self._findDetails then
+    -- Focus navigation belongs to the visible modal as well as the launcher
+    -- beneath it. Route arrows and an already-armed confirm before this guard
+    -- returns; unarmed Enter still falls through to the modal guard. Keep this
+    -- inside the modal branch so text fields retain exclusive keyboard input.
+    if self._flex and require("src.import.LauncherView").keypressed(self, key) then
+      return
+    end
     if key == "escape" then
       if self._findDetails then
         self._findDetails = nil
