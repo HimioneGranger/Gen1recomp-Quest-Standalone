@@ -1586,3 +1586,18 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `RES: 1/2`, `SHADOWS: LOW`, leaving every other mod and option unchanged.
   Compare visual clarity, frame time, draw count and texture allocation before
   changing streaming or geometry code further.
+
+## 2026-08-11 - B/cancel lost while changing Dramaless quality
+
+- While attempting to change the controlled performance settings, the user
+  could not exit with B and had to quit the application.
+- Retained logs showed no crash or ANR. After restart, OpenXR reacquired both
+  Touch controllers and emitted the B-class `0x20` event normally, alongside
+  stick and confirm events. This rules out a persistent controller/hardware
+  failure and makes menu-state routing or a lost release/ownership transition
+  the leading suspect.
+- Do not count the interrupted run as the `1/2` + `LOW` performance sample.
+  Next isolation pass: verify B once at the Yellow title/start menu, then open
+  the Dramaless settings, change only the two quality rows, and verify B again.
+  If only the second check fails, capture the active screen stack and input
+  dispatch around that settings exit.
