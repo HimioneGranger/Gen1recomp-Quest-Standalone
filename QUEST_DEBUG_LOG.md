@@ -1667,3 +1667,22 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Archive inspection confirmed ARM64 OpenXR, v0.1.79 source, retained-history
   integration and no generated ROM data. v0.1.78 remains the rollback build
   until the complete physical Quest regression passes.
+
+## 2026-08-12 - v0.1.79 Route 8 return and mod-options cancel test
+
+- Physical Quest test reached Lavender and returned to Route 8 under Dramaless
+  Quest `1.6.4-quest.3`. Lavender's neighborhood queued once; the return to
+  Route 8 produced no second queue or mesh rebuild. This validates the bounded
+  retained-history policy for the tested reversal.
+- Warm ten-second windows after background work settled averaged approximately
+  29.81-32.52 ms/frame. Transition/background work reached 37.26-46.38
+  ms/frame, with roughly 445-634 draws and 215.6 MB reported texture use.
+- B still failed specifically inside Mod Manager -> Dramaless Shape -> OPTIONS.
+  This is not a controller-wide failure. The engine screen consumes a queued
+  `wasPressed("b")` edge, while Quest also exposes a reliable held state.
+- Built Dramaless Quest `1.6.4-quest.4` with a narrowly scoped Android-only,
+  edge-latched held-B fallback on the schema-driven mod-options page. It cannot
+  back through multiple screens on one hold and does not change desktop or
+  gameplay input. Deterministic ZIP is 1,499,018 bytes, SHA-256
+  `96BE19281DE160C934E45F2662FFD90320A3C5D14163BDB010113C9566CF86D1`.
+  Physical validation is pending.
