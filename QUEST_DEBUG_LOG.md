@@ -1726,3 +1726,14 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   approximately 30.57-35.47 ms/frame.
 - This validates short lifecycle recovery for v0.1.79/q6. Long-duration sleep
   remains a distinct test and is not implied by this result.
+
+## 2026-08-12 - v0.1.79 Pokédex battle-feed regression
+
+- User reports that the Pokédex battle screen appears broken on the current
+  v0.1.79/q6 combination. Exploration and lifecycle testing can continue, but
+  the battle feed must not be counted as validated on this release.
+- Classified as medium priority: below loading/suspend reliability and
+  sustained world performance, but above pixel-perfect Pokédex sizing and
+  other cosmetic polish because battle information must remain readable.
+- Next investigation should capture a screenshot plus logs at battle entry and
+  distinguish failure to activate the mirror from incorrect crop/framing.
