@@ -162,7 +162,10 @@ route on physical Quest hardware without a new blocker.
 - [x] Add provider/runtime tests and documentation.
 - [x] Receive and archive permission from LucianoNeo for a credited Quest-performance fork.
 - [ ] Audit HGSS Sprites v0.3.0 code license and every bundled asset's provenance.
-- [ ] Create the isolated HGSS Quest fork only after the license/asset audit.
+- [ ] Create the isolated **private** HGSS Quest fork only after the license/asset audit.
+- [ ] Keep its repository, Git history, packages and assets outside this public project.
+- [ ] Configure no public remote, public CI artifact or automatic release path.
+- [ ] Add private-fork leak-response and credential-hygiene notes to its own README.
 - [ ] Import/enable `IMPORT_ME__NO_MORE_RHYDON_FLYERS__v0.1.4.zip` and restart.
 - [ ] Confirm Xatu/Delibird and other affected Gen 2 flyers use Crystal-derived art.
 - [ ] Confirm Pidgeotto/Spearow/Doduo use installed HGSS icons.
@@ -275,3 +278,4 @@ route on physical Quest hardware without a new blocker.
 - Link new specialized task logs here instead of creating competing master lists.
 - If a task regresses, uncheck it; a previously working result is evidence, not a guarantee.
 - Keep ROMs, extracted game data, saves and commercial assets out of Git/releases.
+- Keep the private HGSS derivative entirely outside this public repository and APK.

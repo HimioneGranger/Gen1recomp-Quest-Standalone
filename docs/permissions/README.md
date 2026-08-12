@@ -63,3 +63,24 @@ over Pokémon imagery, ROM-derived data, or work owned by other contributors.
 Audit the repository license and asset provenance before distributing a fork;
 prefer runtime extraction from the user's legally imported ROM wherever
 redistribution rights are unclear.
+
+### Private-fork boundary
+
+The HGSS derivative is owner-private and must remain separate from the public
+Gen1Recomp Quest project:
+
+- no HGSS source, assets, binaries, ZIPs, or Git history in the public Quest
+  repository or APK;
+- no public remote, public CI artifact, public release, or automatic upload;
+- no ROM, extracted ROM data, save, cache, token, credential, or private URL in
+  its repository;
+- keep only the minimum material needed for the private build and retain all
+  attribution/notices;
+- exchange builds only through an explicitly approved private destination;
+- treat accidental disclosure as possible: private status reduces exposure but
+  cannot guarantee that a copied file will never leak.
+
+If a leak occurs, rotate any exposed credentials/links, remove accessible
+artifacts where possible, record the affected version/hash, and notify relevant
+contributors. This separation is risk containment, not permission to
+redistribute material whose rights are held by third parties.
