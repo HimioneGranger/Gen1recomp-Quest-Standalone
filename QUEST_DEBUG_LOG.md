@@ -1890,3 +1890,20 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   38-41 FPS with periodic hitches, but the compositor target and stale-frame
   budget dropped from 90 to 72 Hz as intended. Refresh control is complete;
   renderer performance remains a separate optimization track.
+
+## 2026-08-12 - Dynamic Cries 1.4.3 optional-mod audit
+
+- Audited the original `Dynamic_Cries_v1.4.3.zip` as an optional immersion mod,
+  not a Quest fork or bundled project dependency.
+- Original ZIP: 335,643,271 bytes. SHA-256:
+  `103C08E40DB8A9B82ACC5E0D6B88F9CFA36F6566CA3A63364F3C7400A2708404`.
+- Manifest declares API 2 and both `gen1` and `gen2`. Package contains pure Lua,
+  configuration, and audio: no DLL/SO/executable, FFI, APK, ROM, or save data.
+- Payload contains 3,438 WAV files and approximately 417.8 MB of uncompressed
+  audio. It replaces cry playback through public content registration plus
+  guarded `Sound.playCry`/`Sound.playPikaCry` wrappers.
+- Audio sources are loaded lazily and cached per selected cry. Expected steady
+  CPU cost is low, but import/storage cost and long-session audio-cache growth
+  require physical measurement before recommending it.
+- Upload was attempted unchanged, but no ADB device was connected. Retry after
+  the charged Quest reconnects; do not add this payload to the APK or Git.
