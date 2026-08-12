@@ -1817,3 +1817,17 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   in the flat non-voxel path. It does not independently validate restoration
   of the Dramaless voxel renderer or an active gameplay OpenXR session.
 - No forced quit, reinstall, or headset reboot was reported for this wake.
+## 2026-08-12 - Dramaless q7 startup regression and q8 correction
+
+- Physical import failed twice. Logcat identified the deterministic error at
+  `mods/DRAMALESS_SHAPE/main.lua:547`: `VR.refreshRate` was nil while building
+  the mod-options schema.
+- Root cause: the installed APK refreshed q7's writable `VR.lua` with its older
+  embedded conductor before mod initialization. The old conductor did not yet
+  define the new display-rate setting.
+- Dramaless `1.6.4-quest.8` now supplies a backward-compatible setting
+  definition from `main.lua`, preventing startup failure under the older APK.
+- Corrected package copied to Quest Downloads. SHA-256:
+  `B526E2FF31AD7F862C67C72F3762B265D2130155EEF7518DB07E40D33C0BE2F5`.
+- q8 should load under the existing APK; the display-rate runtime request still
+  requires the matching rebuilt APK conductor before that feature is validated.
