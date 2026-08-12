@@ -70,4 +70,7 @@ HostDisplay.setBackend(nil)
 HostDisplay.endFrame("game", {})
 eq(partialCalls, 1, "clearing backend detaches old callbacks")
 
+check(HostDisplay.installPackagedBackend() == false,
+  "ordinary test host has no packaged display backend")
+
 T.finish("host display")

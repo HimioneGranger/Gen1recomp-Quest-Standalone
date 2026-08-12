@@ -16,6 +16,18 @@ local HostDisplay = {}
 
 local backend
 
+function HostDisplay.installPackagedBackend()
+  local ok, packaged = pcall(require, "src.host.PackagedDisplay")
+  if not ok or type(packaged) ~= "table"
+      or type(packaged.detect) ~= "function" then
+    return false
+  end
+  local detected = packaged.detect()
+  if detected == nil then return false end
+  HostDisplay.setBackend(detected)
+  return true
+end
+
 function HostDisplay.setBackend(value)
   if value ~= nil and type(value) ~= "table" then
     error("host display backend must be a table or nil", 2)

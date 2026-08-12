@@ -267,6 +267,7 @@ local function bootGame(version)
 end
 
 function love.load(args)
+  HostDisplay.installPackagedBackend()
   -- Before anything can shell out (update check, mod index, ROM picker),
   -- claim one hidden console on Windows so those children inherit it instead
   -- of each flashing their own cmd.exe window (#606).  No-op elsewhere.
