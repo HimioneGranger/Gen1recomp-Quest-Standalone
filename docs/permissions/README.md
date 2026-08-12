@@ -77,10 +77,7 @@ Gen1Recomp Quest project:
 - keep only the minimum material needed for the private build and retain all
   attribution/notices;
 - exchange builds only through an explicitly approved private destination;
-- treat accidental disclosure as possible: private status reduces exposure but
-  cannot guarantee that a copied file will never leak.
+- the owner chooses and manages any additional privacy precautions.
 
-If a leak occurs, rotate any exposed credentials/links, remove accessible
-artifacts where possible, record the affected version/hash, and notify relevant
-contributors. This separation is risk containment, not permission to
-redistribute material whose rights are held by third parties.
+This separation is not permission to redistribute material whose rights are
+held by third parties.

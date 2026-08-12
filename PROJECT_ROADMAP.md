@@ -165,7 +165,6 @@ route on physical Quest hardware without a new blocker.
 - [ ] Create the isolated **private** HGSS Quest fork only after the license/asset audit.
 - [ ] Keep its repository, Git history, packages and assets outside this public project.
 - [ ] Configure no public remote, public CI artifact or automatic release path.
-- [ ] Add private-fork leak-response and credential-hygiene notes to its own README.
 - [ ] Import/enable `IMPORT_ME__NO_MORE_RHYDON_FLYERS__v0.1.4.zip` and restart.
 - [ ] Confirm Xatu/Delibird and other affected Gen 2 flyers use Crystal-derived art.
 - [ ] Confirm Pidgeotto/Spearow/Doduo use installed HGSS icons.
