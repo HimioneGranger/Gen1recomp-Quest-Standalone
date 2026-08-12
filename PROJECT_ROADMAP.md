@@ -57,14 +57,15 @@ streaming as the next blocker, not the OpenXR transport.
 Completion condition: the official beta passes the ordinary Yellow VR test
 route on physical Quest hardware without a new blocker.
 
-## Priority 2 — Establish official Quest mod forks (56%)
+## Priority 2 — Establish official Quest mod forks (75%)
 
 - [x] Receive written permission from Kanto in First Person creator `briddsy`.
 - [x] Receive written permission/blessing from Dramaless creator Stahltier.
 - [x] Archive screenshots, hashes, dates and scope in `docs/permissions/`.
 - [x] Clone a pristine Dramaless upstream mirror.
 - [x] Create a dedicated Dramaless Quest fork/repository and `quest-vr` branch.
-- [ ] Create a dedicated Kanto in First Person Quest fork/repository and branch.
+- [x] Create dedicated public `Kanto-First-Person-Quest` repository with
+  isolated `quest-vr` default branch and preserved upstream remote/history.
 - [x] Preserve upstream licenses, credits and inherited third-party notices.
 - [x] Clearly label builds as Quest-maintained and not headset-tested upstream.
 - [x] Move validated VR conductor helpers into the mod; retain a defined native host boundary.
@@ -170,13 +171,17 @@ comparison must start after cooling and with enough battery for matched runs.
 - [ ] Port Wilds/Wild Skies only where features make sense for Gold.
 - [ ] Keep Crystal 251 Gen 1-only unless a nonduplicated feature is deliberately redesigned.
 
-## Priority 8 — Kanto in First Person Quest fork (55%)
+## Priority 8 — Kanto in First Person Quest fork (68%)
 
 - [x] Run Kanto First Person successfully with Dramaless on Quest.
 - [x] Obtain explicit creator permission for a Quest fork and optimization.
 - [x] Identify first/third-person as the intended primary experience.
 - [x] Confirm standard third-person is explicitly disabled while VR is active.
-- [ ] Create the formal Quest fork and retain creator attribution.
+- [x] Create the formal Quest fork and retain creator attribution.
+- [x] Sync the creator's official 1.60.0 release-package source as a separate
+  provenance commit because its Git tag still identifies 1.57.2 internally.
+- [x] Add ROM/save/cache/credential packaging guards and a reproducible
+  `1.60.0-quest.1` package script.
 - [ ] Rebase current Quest compatibility changes onto that fork.
 - [ ] Fix Dramaless third-person mode in ordinary opaque VR.
 - [ ] Add optional visible/hidden/automatic trainer presentation.
