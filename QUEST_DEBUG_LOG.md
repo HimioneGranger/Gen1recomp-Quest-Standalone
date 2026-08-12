@@ -1601,3 +1601,28 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   the Dramaless settings, change only the two quality rows, and verify B again.
   If only the second check fails, capture the active screen stack and input
   dispatch around that settings exit.
+
+## 2026-08-11 - Saffron 1/2 resolution and low-shadow comparison
+
+- Completed a two-minute physical run at `RES: 1/2` and `SHADOWS: LOW`. The
+  route was Saffron, Silph Co. 1F, Route 8 and its gate, Lavender, then back
+  toward Route 8. It exercised an interior warp, major outdoor connections
+  and the same connection chain in both directions.
+- Initial regional work remained extremely expensive: the first two `PERF10`
+  windows averaged 116.82 and 67.99 ms/frame while Celadon, Cerulean,
+  Vermilion and a full Celadon mesh were generated. Individual active mesh
+  jobs took approximately 1.46-9.91 seconds despite cooperative yielding.
+- Once that queue settled, quiet/warm windows improved to roughly 28.73-35.60
+  ms/frame. Transition-driven background queues raised other windows to
+  44.56-53.70 ms/frame. Draw counts remained approximately 433-736, showing
+  that lowering pixel/shadow quality does not reduce CPU draw submission.
+- Returning from Lavender requeued Route 8 and nearby route bodies, exposing
+  duplicated/repeated connection work as a concrete optimization target.
+- End-of-run memory was 1,812,088 KB total PSS and 655,084 KB graphics, down
+  from the prior FULL/HIGH baseline's roughly 2.03-2.06 GB PSS and 775-783 MB
+  graphics. Battery moved from 70% to 68% and temperature from 45 C to 47 C.
+- Conclusion: `1/2` + `LOW` is the correct Quest default candidate and gives a
+  meaningful memory/fill-rate benefit, but mesh generation, over-eager major
+  location preloading and hundreds of world draw submissions are now the
+  dominant performance targets. Do not sacrifice more image quality before
+  reducing that CPU/streaming work.

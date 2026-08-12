@@ -93,6 +93,8 @@ route on physical Quest hardware without a new blocker.
 - [ ] Make suspend/resume reliable after short and long sleep.
 - [ ] Prevent occasional strange boot into mod screen with mouse cursor.
 - [ ] Profile and reduce sustained ~2.0–2.3 GB memory use and large graphics allocation.
+- [x] Compare FULL/HIGH against `1/2`/LOW on physical Quest; keep the lower
+  preset as the Quest default candidate while targeting CPU mesh/draw work.
 - [ ] Reduce thermal slowdown during long mod-heavy sessions.
 - [ ] Revisit Route 2/Victory Road tree pop-in without restoring constant stutter.
 - [ ] Profile Indigo Plateau/Victory Road loading and add safe regional preloading.
