@@ -1554,3 +1554,21 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   checkpoint. Next engineering milestone is to move the reviewed
   `ChunkMesher`/`VoxelScene` adaptations out of the host installer and into the
   fork behind exact-source tests, then profile world draw work independently.
+
+## 2026-08-11 - Dramaless Quest update-channel isolation
+
+- Physical testing revealed that the launcher still offered an update to the
+  regular Dramaless package. Root cause was the Quest manifest inheriting
+  `github: artyrambles/DRAMALESS_SHAPE`; update discovery therefore queried
+  upstream's ordinary release feed for the shared `DRAMALESS_SHAPE` mod id.
+- Released local candidate `1.6.4-quest.2` with the inherited GitHub update
+  field removed. The shared mod id remains unchanged for dependency, conflict
+  and save continuity. A Quest-specific feed can be added after the fork has a
+  stable public release repository.
+- The deterministic replacement ZIP is 1,497,799 bytes with SHA-256
+  `40BCC8DFBBF2F79F793E6DE1FD5652B3FFBBB360C8599DACE07EFB84A2B2C876`.
+  Two consecutive builds were byte-identical, and the packager now rejects a
+  future accidental reintroduction of a `github` field.
+- Copied to the headset as
+  `Download/IMPORT_ME__DRAMALESS_QUEST_1.6.4-q2.zip`; import and launcher update
+  indicator validation are pending.
