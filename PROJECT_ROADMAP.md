@@ -10,7 +10,7 @@ prototype alone does not count as 100%.
 ## At a glance
 
 - **Standalone Quest VR core:** 82%
-- **Current v0.1.79 integration:** 99% (short and long lifecycle regression passed)
+- **Current v0.1.79 integration:** 100% (promotable Quest baseline)
 - **Stable Dramaless + Kanto experience:** 73%
 - **Performance and lifecycle hardening:** 63%
 - **Gen 2 engine readiness:** 70%
@@ -22,7 +22,7 @@ prototype alone does not count as 100%.
 - **Overall playable Quest release:** **76%**
 - **Whole long-term vision, including Gen 2, MR and PCVR:** **43%**
 
-## Priority 1 — Validate the official v0.1.79 build (99%)
+## Priority 1 — Validate the official v0.1.79 build (100%)
 
 - [x] Preserve the fully validated `v0.1.78` APK as the rollback baseline.
 - [x] Fetch official signed `v0.1.79` source tag (`04490c9b`).
@@ -33,6 +33,7 @@ prototype alone does not count as 100%.
 - [x] Validate Dramaless Quest `1.6.4-quest.6` B/cancel across Mod Manager.
 - [x] Validate controller sleep/wake and two short headset suspend/resume cycles.
 - [x] Validate a 10+ minute headset suspend/resume cycle.
+- [x] Integrate and physically approve the full-color VR Unplugged loading card.
 - [x] Fetch official signed `v0.1.78` source tag.
 - [x] Merge it into isolated `quest-gen2-beta-v0.1.78` branch.
 - [x] Confirm zero launcher/Android/OpenXR merge conflicts.

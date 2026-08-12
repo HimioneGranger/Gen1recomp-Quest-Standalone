@@ -1736,6 +1736,22 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   complete for this candidate; promotion remains pending only on the separate
   loader-logo integration handoff and physical presentation check.
 
+## 2026-08-12 - Full-color VR Unplugged loader approved
+
+- Replaced the muted pixel-art loader mark with the full-color blue/yellow
+  transparent `Gen1Recomp++ VR Unplugged` logo and linear downsampling.
+- Restored the brighter approved loading-card palette sampled from its preview:
+  cream `#FFF4C2`, gold `#F6C445`, navy `#102A56`, and blue `#3B82D0`.
+- Map name, segmented preload progress and bold status text remain unchanged;
+  no streaming, OpenXR or lifecycle logic was modified.
+- The ROM-free APK installed successfully and the user completed the physical
+  headset appearance check. APK SHA-256 is
+  `A25CA14F5354E0815461C76593C3227DDD17281C05BD3ECC35E61877D7275039`;
+  embedded payload SHA-256 is
+  `C44A77CE8F4F2FD948A5CF6445213D1A811A7FB12D1CD93C1785FC56DFB5412D`.
+- Combined with Dramaless Quest q6 and completed short/long lifecycle tests,
+  this promotes v0.1.79 as the current known-good Quest baseline.
+
 ## 2026-08-12 - v0.1.79 Pokédex battle-feed regression
 
 - User clarified that the battle UI and information remain visible and usable.

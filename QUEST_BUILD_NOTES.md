@@ -296,3 +296,13 @@ Its embedded `game.love` exactly matches staged payload SHA-256
 `5F1610A7909E650BBF2C6DF25D2EED00C2DC7FFA3ACD70F52FA2623ADC1972CC`.
 Inspection confirmed the ARM64 OpenXR loader, v0.1.79 `DateTime.lua`, Quest
 Dramaless integration and Gold manifest, with no generated ROM-data trees.
+
+### Promoted full-color loader build
+
+The physically approved presentation rebuild embeds the full-color VR
+Unplugged logo and bright GBC loading-card palette without changing preload or
+XR logic. Final APK SHA-256 is
+`A25CA14F5354E0815461C76593C3227DDD17281C05BD3ECC35E61877D7275039`;
+embedded `game.love` SHA-256 is
+`C44A77CE8F4F2FD948A5CF6445213D1A811A7FB12D1CD93C1785FC56DFB5412D`.
+Archive inspection found no `data/generated` or `assets/generated` entries.
