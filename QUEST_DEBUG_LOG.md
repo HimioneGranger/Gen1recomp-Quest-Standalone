@@ -1865,3 +1865,28 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `AFD785DAC1CC6EBD5591D21069B9B3721C238FFB2E37BCE52B19335F572395EC`.
 - Copied q9 to Quest Downloads and installed the matching APK as an update,
   preserving app data. Physical import/load at 72 Hz is the next checkpoint.
+
+### q10 display-rate control physically validated
+
+- q9 proved that Quest exposed `XR_FB_display_refresh_rate` and all required
+  entry points, but `xrEnumerateDisplayRefreshRatesFB` returned a zero count.
+  This prevented the request even though the request function was available.
+- q10 treats enumeration as advisory in that case: it requests the selected
+  known numeric rate directly and preserves OpenXR's authoritative result.
+- Physical q10 trace at startup:
+  - extension ready;
+  - setting transition `nil -> 72`;
+  - empty enumeration detected;
+  - direct 72 Hz request accepted.
+- The immediate `xrGetDisplayRefreshRateFB` query still reported 90 Hz because
+  the runtime applies the accepted change asynchronously. Subsequent VrApi
+  telemetry switched from `/90` to `/72` and remained there, with `DR72/73`.
+  This is definitive compositor-level validation that the option works.
+- q10 ZIP: 1,502,084 bytes, SHA-256
+  `B7D9C26AF6353C91620B130AE70F6833A193FD74C05301C1FCE73E8912223ACD`.
+- Matching APK: 59,765,575 bytes, SHA-256
+  `BEDFAF850BB9C7B2F37DD0715F9FD3EC240CE459D363BB02D6970F816CEC208B`.
+- Observed gameplay delivery remained workload-bound, commonly around
+  38-41 FPS with periodic hitches, but the compositor target and stale-frame
+  budget dropped from 90 to 72 Hz as intended. Refresh control is complete;
+  renderer performance remains a separate optimization track.
