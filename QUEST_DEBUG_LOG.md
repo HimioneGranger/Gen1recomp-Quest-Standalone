@@ -1808,3 +1808,12 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - The q7 package built twice byte-identically: 1,501,135 bytes, SHA-256
   `4DA129EDC54E059B05728D839C5F6781AC9382F6821C165E86FDB817FA3D862C`.
 - Physical Quest validation remains required before promotion.
+
+## 2026-08-12 - Overnight flat-mode lifecycle recovery
+
+- User reported that the application woke and ran normally after remaining
+  asleep since the previous night while it was outside the voxel renderer.
+- This is positive evidence for long-duration Android/app lifecycle recovery
+  in the flat non-voxel path. It does not independently validate restoration
+  of the Dramaless voxel renderer or an active gameplay OpenXR session.
+- No forced quit, reinstall, or headset reboot was reported for this wake.
