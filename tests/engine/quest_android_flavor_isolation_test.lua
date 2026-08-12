@@ -32,6 +32,9 @@ local _, appAbiCount = app:gsub("abiFilters 'arm64%-v8a'", "")
 local _, loveAbiCount = love:gsub("abiFilters 'arm64%-v8a'", "")
 check(appAbiCount == 1 and loveAbiCount == 1,
   "both Quest application and native library flavors are ARM64-only")
+check(love:find("withFlavor('mode', 'questVr')", 1, true) and
+      love:find("variant.externalNativeBuild.abiFilters.set(['arm64-v8a'])", 1, true),
+  "merged Quest native variants override inherited stock ABI filters")
 check(not app:find("implementation 'org.khronos.openxr", 1, true),
   "OpenXR loader is not a global app dependency")
 check(love:find("arguments 'QUEST_XR=1'", 1, true),

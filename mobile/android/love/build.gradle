@@ -135,6 +135,15 @@ android {
     }
 }
 
+// NDK ABI filters from defaultConfig, build types, and product flavors merge as
+// a union. Override the fully merged Quest variant so the native task graph does
+// not compile the stock ARMv7/x86_64 compatibility targets for a Quest APK.
+androidComponents {
+    onVariants(selector().withFlavor('mode', 'questVr')) { variant ->
+        variant.externalNativeBuild.abiFilters.set(['arm64-v8a'])
+    }
+}
+
 dependencies {
     api fileTree(dir: 'libs', include: ['*.jar'])
     api 'androidx.appcompat:appcompat:1.6.1'
