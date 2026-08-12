@@ -1727,6 +1727,15 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - This validates short lifecycle recovery for v0.1.79/q6. Long-duration sleep
   remains a distinct test and is not implied by this result.
 
+## 2026-08-12 - Long suspend/resume pass
+
+- The v0.1.79/q6 candidate successfully resumed after a 10+ minute headset
+  sleep. This closes the planned long-duration companion to the prior
+  controller-timeout, rapid-resume and 30-second suspend tests.
+- No long-sleep loading-screen stall was observed. Lifecycle validation is now
+  complete for this candidate; promotion remains pending only on the separate
+  loader-logo integration handoff and physical presentation check.
+
 ## 2026-08-12 - v0.1.79 Pokédex battle-feed regression
 
 - User clarified that the battle UI and information remain visible and usable.
