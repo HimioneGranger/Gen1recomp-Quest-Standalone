@@ -81,6 +81,10 @@ VR.setting = ModSetting.new("vr", "VR", { false, true }, { "OFF", "ON" })
 VR.smoothTurn = ModSetting.new("smoothturn", "SMOOTH TURN",
                                { false, true }, { "OFF", "ON" })
 
+VR.refreshRate = ModSetting.new("refreshRate", "DISPLAY RATE",
+                                { 90, 72, 80, 120 },
+                                { "90 HZ", "72 HZ", "80 HZ", "120 HZ" })
+
 -- radians per second at full deflection, with a squared response so the
 -- first half of the throw aims and the rest turns -- the same curve
 -- FirstPerson gives the flat screen's right stick
@@ -98,6 +102,7 @@ local started = false           -- start() succeeded this enablement
 local failed = nil              -- start() failed; wait for a re-toggle
 local wasOn = false
 local savedVsync = nil
+local requestedRefresh = nil
 local fboCache = setmetatable({}, { __mode = "k" })   -- canvas -> GL FBO id
 local mirrorSrc = nil           -- last left-eye canvas, for the window
 local mirrorCanvas = nil
@@ -489,6 +494,7 @@ local function shutdown(reason)
     preload.promoteFull = nil, nil, nil, nil, nil
   majorTravel.current, majorTravel.previous, majorTravel.target = nil, nil, nil
   bodyDropPending = {}
+  requestedRefresh = nil
   if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(nil) end
   if started then
     VRXR.stop()
@@ -1149,6 +1155,14 @@ function VR.update(dt)
     shutdown("session lost")
     failed = "session lost -- toggle VR off and on to retry"
     return
+  end
+  if VRXR.isRunning() then
+    local wantedRate = VR.refreshRate:get()
+    if wantedRate ~= requestedRefresh then
+      local okRate, selected = VRXR.requestRefreshRate(wantedRate)
+      requestedRefresh = wantedRate
+      if okRate then status = ("running at %.0f Hz"):format(selected) end
+    end
   end
   if not VRXR.isRunning() then return end
 

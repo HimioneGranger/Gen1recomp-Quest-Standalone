@@ -68,6 +68,18 @@ do
       "Dramaless Quest conductor installed" or
       "Dramaless Quest conductor install failed")
 
+    local installedXR = love.filesystem.read(
+      "mods/DRAMALESS_SHAPE/lib/VRXR.lua")
+    -- A newly imported Quest fork may carry a newer compatible transport than
+    -- the APK. Never downgrade its optional runtime capabilities during boot.
+    if installedXR
+        and installedXR:find("XR_FB_display_refresh_rate", 1, true)
+        and not (replacement
+          and replacement:find("XR_FB_display_refresh_rate", 1, true)) then
+      replacement = installedXR
+      pcall(C.questxr_log,
+        "Dramaless installed Quest transport retained (newer capabilities)")
+    end
     local matchedTransport = replacement and questVRGL
       and replacement:find("questxr_request_launcher_shutdown", 1, true)
     if matchedTransport then

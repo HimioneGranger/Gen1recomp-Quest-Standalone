@@ -1791,3 +1791,20 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   reliability and sustained world performance, but above pixel-perfect sizing.
 - Next investigation should capture a screenshot plus logs at battle entry and
   distinguish an incorrect 3D camera feed from crop/framing distortion.
+## 2026-08-12 - Dramaless Quest display-rate candidate
+
+- Audited 1GenPokemonVR `v0.2.46` as clean-room research; its original Quest
+  additions have no outbound license and no source was copied.
+- Added independent `XR_FB_display_refresh_rate` capability detection and
+  request handling to Dramaless Quest `1.6.4-quest.7`.
+- Added `DISPLAY RATE` choices for 72/80/90/120 Hz with 90 Hz as the balanced
+  default. The runtime-reported list is authoritative and unsupported choices
+  fall back to the nearest rate; absence of the extension leaves the runtime
+  default unchanged.
+- Requests wait until `xrBeginSession` has completed and are applied live when
+  the setting changes. Unsupported sessions are attempted once, not per frame.
+- Updated the APK-side conductor and protected a newly imported q7 transport
+  from being downgraded by an older embedded transport during launcher handoff.
+- The q7 package built twice byte-identically: 1,501,135 bytes, SHA-256
+  `4DA129EDC54E059B05728D839C5F6781AC9382F6821C165E86FDB817FA3D862C`.
+- Physical Quest validation remains required before promotion.
