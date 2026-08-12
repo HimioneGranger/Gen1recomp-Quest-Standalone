@@ -1713,3 +1713,16 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   regression is resolved for the v0.1.79 candidate.
 - q6 deterministic ZIP is 1,499,394 bytes with SHA-256
   `59192098948328E95762B3528D26C2EBCB941D9D2B93CD09092885D13DC9CABA`.
+
+## 2026-08-12 - Controller wake and short suspend/resume pass
+
+- In active voxel gameplay, both controllers were left idle until timed out.
+  Picking them back up restored movement, A, B and snap turning without the
+  historical immersive-loading stall.
+- A deliberate 30-second headset sleep/wake and an immediate accidental second
+  pause/resume both returned successfully with gameplay responsive.
+- Post-resume logs show continued QuestXR `PERF10` output and controller
+  reacquisition, with no fatal exception or ANR. Subsequent warm windows were
+  approximately 30.57-35.47 ms/frame.
+- This validates short lifecycle recovery for v0.1.79/q6. Long-duration sleep
+  remains a distinct test and is not implied by this result.

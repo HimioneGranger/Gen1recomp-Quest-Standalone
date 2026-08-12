@@ -10,7 +10,7 @@ prototype alone does not count as 100%.
 ## At a glance
 
 - **Standalone Quest VR core:** 82%
-- **Current v0.1.79 integration:** 96% (core VR and Mod Manager regression passed)
+- **Current v0.1.79 integration:** 98% (short lifecycle regression passed)
 - **Stable Dramaless + Kanto experience:** 73%
 - **Performance and lifecycle hardening:** 63%
 - **Gen 2 engine readiness:** 70%
@@ -22,7 +22,7 @@ prototype alone does not count as 100%.
 - **Overall playable Quest release:** **76%**
 - **Whole long-term vision, including Gen 2, MR and PCVR:** **43%**
 
-## Priority 1 — Validate the official v0.1.79 build (96%)
+## Priority 1 — Validate the official v0.1.79 build (98%)
 
 - [x] Preserve the fully validated `v0.1.78` APK as the rollback baseline.
 - [x] Fetch official signed `v0.1.79` source tag (`04490c9b`).
@@ -31,6 +31,7 @@ prototype alone does not count as 100%.
 - [x] Import Dramaless Quest `1.6.4-quest.3` and run the physical regression.
 - [x] Verify Route 8 -> Lavender -> Route 8 avoids a second mesh rebuild.
 - [x] Validate Dramaless Quest `1.6.4-quest.6` B/cancel across Mod Manager.
+- [x] Validate controller sleep/wake and two short headset suspend/resume cycles.
 - [x] Fetch official signed `v0.1.78` source tag.
 - [x] Merge it into isolated `quest-gen2-beta-v0.1.78` branch.
 - [x] Confirm zero launcher/Android/OpenXR merge conflicts.
@@ -96,7 +97,7 @@ route on physical Quest hardware without a new blocker.
 - [x] Release superseded Quest canvases instead of waiting for garbage collection.
 - [x] Drop redundant previous route history after safe connection/Fly transitions.
 - [ ] Eliminate intermittent immersive loading-screen stalls.
-- [ ] Fix controller wake/reactivation causing a loading stall.
+- [x] Confirm controller wake/reactivation no longer stalls in the v0.1.79/q6 test.
 - [ ] Make suspend/resume reliable after short and long sleep.
 - [ ] Prevent occasional strange boot into mod screen with mouse cursor.
 - [ ] Profile and reduce sustained ~2.0–2.3 GB memory use and large graphics allocation.
