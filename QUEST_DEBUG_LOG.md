@@ -1572,3 +1572,17 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Copied to the headset as
   `Download/IMPORT_ME__DRAMALESS_QUEST_1.6.4-q2.zip`; import and launcher update
   indicator validation are pending.
+
+## 2026-08-11 - Dramaless quality baseline correction
+
+- User reported that all recent Yellow voxel tests, including the retained
+  34.56-38.66 ms/frame sample, were run at `RES: FULL` and `SHADOWS: HIGH`.
+- These numbers remain a useful maximum-quality/worst-case baseline, but they
+  must not be used as the Quest-tuned performance result. Dramaless documents
+  render scale as quadratic: `1/2` shades roughly one quarter as many scene
+  pixels as `FULL`. `LOW` shadows also use a smaller map, one sample, no
+  neighbouring-map casters and an every-other-frame moving redraw.
+- Next controlled comparison is the same save/location and traversal at
+  `RES: 1/2`, `SHADOWS: LOW`, leaving every other mod and option unchanged.
+  Compare visual clarity, frame time, draw count and texture allocation before
+  changing streaming or geometry code further.
