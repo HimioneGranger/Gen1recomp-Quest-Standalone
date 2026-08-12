@@ -283,6 +283,27 @@ comparison must start after cooling and with enough battery for matched runs.
 - [ ] Harden atomic SAF/mod imports and low-memory ZIP handling.
 - [ ] Revisit PCVR controller profiles only during the PCVR phase.
 
+## Priority 15 — Quest 2 feasibility and reduced-quality profile (0%, lowest priority)
+
+This begins only after the Quest 3 standalone release and PCVR release are
+stable. Quest 2 support is a feasibility goal, not a release promise: its lower
+CPU/GPU and memory headroom may require visual compromises that are not worth
+maintaining.
+
+- [ ] Obtain a physical Quest 2 for profiling and regression testing.
+- [ ] Establish a Quest 2 stock/flat baseline before attempting voxel VR.
+- [ ] Measure memory, GPU allocation, thermals and sustained frame delivery.
+- [ ] Create a separate auto-detected `QUEST 2` quality profile without
+  reducing Quest 3 defaults.
+- [ ] Test substantially lower render scale, shadows, draw distance, active
+  chunks, model density, effects and mirror/Pokédex resolution.
+- [ ] Prefer 72 Hz and conservative thermal settings unless measurements prove
+  another target viable.
+- [ ] Test the minimum essential stack first: Dramaless plus Kanto First Person.
+- [ ] Add Wilds of Kanto and other mods individually only if headroom remains.
+- [ ] Decide whether the result is playable and maintainable; document Quest 2
+  as unsupported if acceptable comfort and stability cannot be reached.
+
 ## Completed foundation
 
 - [x] Audit Gen1Recomp/LÖVE, Android, ARM64, SDL/EGL, graphics and mod loading.
@@ -319,6 +340,7 @@ comparison must start after cooling and with enough battery for matched runs.
 8. Track/rebase onto the next stable Dramaless release and its battle-art merge.
 9. Begin Gen 2 voxel renderer work after the stable Gen 1 Quest baseline holds.
 10. Resume Portal/MR, then PCVR, after the standalone release is dependable.
+11. Only after the PCVR release, evaluate the reduced-quality Quest 2 profile.
 
 ## How to use this file
 
