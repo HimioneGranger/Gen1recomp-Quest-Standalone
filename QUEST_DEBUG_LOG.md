@@ -1699,3 +1699,17 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `37A22B0C8FEDC26843D1790278B5C34A6951A987D34D1151BEC4C6ED824AA430`.
   Copied to Quest Downloads as
   `IMPORT_ME__DRAMALESS_QUEST_1.6.4-q5.zip`; physical validation is pending.
+
+## 2026-08-12 - Quest Mod Manager B/cancel validated
+
+- The visible `NO CHANGES` notice proved that physical Quest B was arriving in
+  ManagerState as START, whose normal manager action is apply/restart status.
+- Dramaless Quest `1.6.4-quest.6` intercepts that routed START edge only while
+  ManagerState owns input and treats it as Back. Gameplay and non-manager
+  controls remain unchanged; the held-state latch still prevents one hold from
+  crossing multiple menu levels.
+- Physical Quest test passed through the real hierarchy: Dramaless -> Mods ->
+  Options. Each B press returned exactly one screen. The Mod Manager cancel
+  regression is resolved for the v0.1.79 candidate.
+- q6 deterministic ZIP is 1,499,394 bytes with SHA-256
+  `59192098948328E95762B3528D26C2EBCB941D9D2B93CD09092885D13DC9CABA`.
