@@ -118,6 +118,14 @@ Acceptance:
 
 ### PR 4 — Android native-extension lifecycle seam
 
+Status: **submitted upstream** as
+[#1202](https://github.com/bryanthaboi/gen1recomp/pull/1202) from commit
+`ee00728e`. `GameActivity` now exposes protected no-op host library and
+lifecycle hooks while preserving `liblove.so` as SDL's final/main library.
+The stock `assembleEmbedNoRecordDebug` build passed, and APK inspection found
+only the existing LÖVE libraries for ARM64, ARMv7 and debug x86_64—no Quest or
+OpenXR payload.
+
 Current evidence lives in `GameActivity.java` and `Android.mk`. The prototype
 always calls a Quest JNI symbol from the shared activity and always compiles the
 Quest bridge into `liblove`; only bootstrap is manifest-gated. Replace this
@@ -193,7 +201,7 @@ version/hash, APK hash, device/runtime version and observed result.
 
 ## Immediate next action
 
-Start PR 1 from the current official development head. First capture existing
-launcher keyboard/mouse behavior in regression tests, then introduce the
-smallest explicit controller-focus mode needed by Quest. Do not include OpenXR,
-Android, Dramaless or loading-screen files in that branch.
+Prepare PR 5 as a separate optional Quest/OpenXR Android backend consuming the
+generic seams from PRs 2 and 4. Keep the stock `embed` flavor byte-clean of XR
+metadata/libraries, build the ROM-free ARM64 Quest flavor, then run the physical
+headset lifecycle and controller regression matrix before requesting review.
