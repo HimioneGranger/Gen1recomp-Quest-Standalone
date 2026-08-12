@@ -1768,6 +1768,20 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   voxel rendering, Dramaless compatibility, VR presentation, long gameplay,
   battles, saves or lifecycle recovery yet.
 
+## 2026-08-12 - Stock Gold functional regression pass
+
+- With all mods disabled, the user completed the requested Gold foundation
+  route successfully: created an in-game save, quit to the launcher, continued
+  the save, entered/exited a building, completed a wild-battle check, verified
+  movement/A/B/Start/Select, resumed after a 30-second headset suspend, saved
+  again and restarted successfully.
+- This validates stock flat Gold save persistence, basic controls, an interior
+  transition, battle entry/operation and short lifecycle recovery on Quest.
+- The Gen 2 foundation is ready for the next stage: source-audit Dramaless
+  against Gold's public/shared render seams before enabling or adapting voxel
+  VR. Long-duration Gold play, long suspend and broader map coverage remain
+  later reliability tests rather than blockers for beginning that audit.
+
 ## 2026-08-12 - v0.1.79 Pokédex battle-feed regression
 
 - User clarified that the battle UI and information remain visible and usable.
