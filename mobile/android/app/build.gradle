@@ -86,8 +86,8 @@ dependencies {
     api fileTree(dir: 'libs', include: ['*.jar'])
     api 'androidx.appcompat:appcompat:1.6.1'
     api project(':love')
-    // Khronos' official Android OpenXR loader. Quest-specific code uses the
-    // loader through LuaJIT FFI; the AAR also contributes the loader's required
+    // Khronos' official Android OpenXR loader. The flavor-scoped native bridge
+    // resolves it at runtime; the AAR also contributes the loader's required
     // global Android manifest declarations.
     questVrImplementation 'org.khronos.openxr:openxr_loader_for_android:1.1.60'
 }
