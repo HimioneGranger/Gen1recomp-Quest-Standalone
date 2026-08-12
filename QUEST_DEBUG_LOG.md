@@ -1831,3 +1831,18 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `B526E2FF31AD7F862C67C72F3762B265D2130155EEF7518DB07E40D33C0BE2F5`.
 - q8 should load under the existing APK; the display-rate runtime request still
   requires the matching rebuilt APK conductor before that feature is validated.
+
+### q8 load and matching APK
+
+- User confirmed q8 loads successfully and `DISPLAY RATE` is visible in the
+  Dramaless options, closing the q7 settings-schema startup regression.
+- Rebuilt the canonical `questVrNoRecordDebug` output with the matching tracked
+  conductor and q8 `VRXR.lua`. All 58 Gradle tasks passed.
+- Inspected the final `build/outputs` APK, not an intermediate: all three
+  refresh markers are embedded and no generated ROM-data paths are present.
+- APK: 59,766,935 bytes, SHA-256
+  `0101E8B60C3F24921F993887B8A0E099B61259E3809F5CD71256B9DC777FF7E3`.
+- Embedded `game.love`: 5,656,067 bytes, SHA-256
+  `3D663D53DA2D75E34C3D3EF5588FAE63E7E246D21EB863838B484BCE0B9B939B`.
+- Installed as an update with app data preserved. Runtime acceptance of 90 Hz
+  remains the next physical/log validation checkpoint.
