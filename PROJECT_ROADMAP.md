@@ -30,7 +30,7 @@ prototype alone does not count as 100%.
 - [x] Build and inspect a ROM-free multi-ABI Quest APK.
 - [x] Import Dramaless Quest `1.6.4-quest.3` and run the physical regression.
 - [x] Verify Route 8 -> Lavender -> Route 8 avoids a second mesh rebuild.
-- [ ] Validate the `1.6.4-quest.4` B/cancel fallback in mod OPTIONS.
+- [ ] Validate the `1.6.4-quest.5` B/cancel fallback across Mod Manager.
 - [x] Fetch official signed `v0.1.78` source tag.
 - [x] Merge it into isolated `quest-gen2-beta-v0.1.78` branch.
 - [x] Confirm zero launcher/Android/OpenXR merge conflicts.

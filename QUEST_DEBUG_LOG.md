@@ -1686,3 +1686,16 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   gameplay input. Deterministic ZIP is 1,499,018 bytes, SHA-256
   `96BE19281DE160C934E45F2662FFD90320A3C5D14163BDB010113C9566CF86D1`.
   Physical validation is pending.
+
+## 2026-08-12 - Mod Manager-wide B scope correction
+
+- User clarified that B fails throughout the complete Mod Manager, not only
+  Dramaless's schema-driven OPTIONS page. Quest.4 was therefore superseded
+  before validation.
+- Dramaless Quest `1.6.4-quest.5` applies the same Android-only held-state
+  fallback at ManagerState scope. Its latch returns exactly one manager level
+  per press and permits B to close the root manager without affecting gameplay.
+- Deterministic ZIP is 1,499,092 bytes, SHA-256
+  `37A22B0C8FEDC26843D1790278B5C34A6951A987D34D1151BEC4C6ED824AA430`.
+  Copied to Quest Downloads as
+  `IMPORT_ME__DRAMALESS_QUEST_1.6.4-q5.zip`; physical validation is pending.
