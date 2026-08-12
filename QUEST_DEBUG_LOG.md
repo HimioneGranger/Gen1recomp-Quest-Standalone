@@ -1626,3 +1626,29 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   location preloading and hundreds of world draw submissions are now the
   dominant performance targets. Do not sacrifice more image quality before
   reducing that CPU/streaming work.
+
+## 2026-08-11 - Reversible connection-history candidate
+
+- Root cause of the Route 8/Lavender return rebuild was the Quest conductor
+  calling `dropPrevious()` for every seamless outdoor connection. The new live
+  set retained the map directly behind the player, but not all completed and
+  queued bodies from its neighborhood; reversing direction therefore rebuilt
+  useful work.
+- Changed the bounded policy to retain Dramaless's existing one-generation
+  history for walking connections and ordinary warps. Fly alone clears the
+  previous set because its origin is geographically unrelated. Memory remains
+  bounded to the current and previous neighborhoods rather than an unbounded
+  travel cache.
+- Added policy checks for connection, warp and Fly behavior. The isolated LOVE
+  test process exited successfully. Dramaless Quest package
+  `1.6.4-quest.3` built twice byte-identically: 1,498,443 bytes, SHA-256
+  `B7094D6C0D0FADD15E009C0EE676C56DF8AD1D9BB07CBF2F1C5633B95B4C49F9`.
+- Canonical multi-ABI APK build passed. The APK is 58,594,191 bytes, SHA-256
+  `C7F56539E0360D01DA05ED139FC8D5D30B2B0F9B9E8DD72CB0B715783B2C967B`;
+  embedded `game.love` SHA-256 is
+  `C89D28E7BF53607D9103200092B27ECB9A99068167D53C540316A4BCCFB2F08B`.
+  Archive inspection confirmed the new policy and zero generated ROM-data
+  entries.
+- Installed the APK as an update without clearing app data and copied q3 to
+  Quest Downloads. Physical Route 8 -> Lavender -> Route 8 comparison and
+  end-of-run memory measurement remain pending.

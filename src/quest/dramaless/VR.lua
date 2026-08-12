@@ -212,12 +212,12 @@ local function ensureWarpPreloadHooks()
   end, 1000, "DRAMALESS_SHAPE")
   events:on("map.entered", function(payload)
     if not (rawget(_G, "QUEST_PANEL_ACTIVE") and payload) then return end
-    -- A seamless crossing's new live set already contains the map behind the
-    -- player, so retaining the entire older neighbourhood buys no visual
-    -- continuity. Fly is one-way and has no immediate return either. Ordinary
-    -- door/interior warps keep Dramaless's one-set history for a flash-free
-    -- exit, preserving the immersion policy that history was added for.
-    if payload.via == "connection" or payload.via == "fly" then
+    -- Keep one previous neighborhood for reversible walking connections.
+    -- Physical Route 8 -> Lavender -> Route 8 profiling showed that dropping
+    -- it canceled/rebuilt useful route bodies in both directions. Fly is
+    -- one-way and may cross the world, so only that path releases history.
+    -- Door/interior warps keep the same history for a flash-free exit.
+    if StreamingPolicy.dropPreviousFor(payload.via) then
       local historyAPI = type(ChunkMesher.dropPrevious) == "function"
       if historyAPI then ChunkMesher.dropPrevious() end
       local log = rawget(_G, "QUEST_XR_LOG")

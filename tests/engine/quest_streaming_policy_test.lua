@@ -21,4 +21,11 @@ check(not Policy.allowMajorPreload(893025),
 check(not Policy.allowMajorPreload(nil),
   "an unknown distance never starts speculative work")
 
+check(not Policy.dropPreviousFor("connection"),
+  "walking connections retain one neighborhood for a quick reversal")
+check(Policy.dropPreviousFor("fly"),
+  "Fly releases the unrelated previous neighborhood")
+check(not Policy.dropPreviousFor("warp"),
+  "door warps retain the warm return neighborhood")
+
 T.finish("Quest streaming policy")

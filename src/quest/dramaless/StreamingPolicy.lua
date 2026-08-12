@@ -18,4 +18,12 @@ function Policy.allowMajorPreload(distanceSquared)
      and distanceSquared <= distance * distance
 end
 
+-- Ordinary connected-map travel is reversible within seconds. Keep
+-- Dramaless's one-generation history so turning around does not cancel and
+-- rebuild the route bodies that just finished. Fly is one-way and may cross
+-- the whole world, so its unrelated previous neighborhood is released.
+function Policy.dropPreviousFor(via)
+  return via == "fly"
+end
+
 return Policy
