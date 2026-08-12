@@ -19,11 +19,11 @@ prototype alone does not count as 100%.
 - **Gen 2/HGSS sprite-provider work:** 86%
 - **Portal/MR modes:** 10%
 - **PCVR release path:** 15%
-- **Upstream engine/API contribution gate:** 18%
+- **Upstream engine/API contribution gate:** 32%
 - **Overall playable Quest release:** **78%**
 - **Whole long-term vision, including Gen 2, MR and PCVR:** **44%**
 
-## Release gate — Upstream engine and API contributions (18%)
+## Release gate — Upstream engine and API contributions (32%)
 
 Quest is not considered ready for an official release until its reusable host
 changes have been split into reviewable pull requests, accepted upstream, and
@@ -40,8 +40,9 @@ matrix.
 - [x] Submit platform-neutral launcher modal focus/navigation fix with headless
   vanilla-compatibility tests: upstream PR
   [#1199](https://github.com/bryanthaboi/gen1recomp/pull/1199).
-- [ ] Submit a generic native-panel/capture host API without Quest globals in
-  ordinary launcher/game code and with a no-op default implementation.
+- [x] Submit a generic native-panel/capture host lifecycle API without Quest
+  globals and with a no-op default implementation: upstream PR
+  [#1200](https://github.com/bryanthaboi/gen1recomp/pull/1200).
 - [ ] Submit Android lifecycle/native-extension seams behind manifest/build
   feature gates; stock `embed` must retain its current packaging and behavior.
 - [ ] Submit the optional OpenXR Quest flavor/backend separately from generic

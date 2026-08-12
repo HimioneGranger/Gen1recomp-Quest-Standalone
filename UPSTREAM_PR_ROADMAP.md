@@ -65,6 +65,12 @@ Acceptance:
 
 ### PR 2 — Native panel/capture host interface
 
+Status: **submitted upstream** as
+[#1200](https://github.com/bryanthaboi/gen1recomp/pull/1200) from commit
+`c2d9af69`. It introduces a generic optional `HostDisplay` lifecycle with
+no-op vanilla behavior and no Quest/OpenXR dependencies. The stock
+`assembleEmbedNoRecordDebug` Android build passed from source.
+
 Current evidence lives in `main.lua`, `src/quest/PanelBridge.lua`, and the
 Android `Graphics::present` hook. The current implementation directly imports
 Quest code from `main.lua`, overrides `love.graphics.getDimensions` during a
