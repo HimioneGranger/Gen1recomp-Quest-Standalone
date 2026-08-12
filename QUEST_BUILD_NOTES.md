@@ -274,3 +274,25 @@ Its embedded payload exactly matches SHA-256
 APK v2 signing passed. ARM64-v8a, armeabi-v7a, and x86_64 `liblove.so` builds
 are present, and the OpenXR loader is packaged for those ABIs (plus its AAR's
 x86 loader). No generated ROM/cache entry is present.
+
+## 2026-08-12 official v0.1.79 Quest integration build
+
+Official tag `v0.1.79` (`04490c9b`) was merged without conflicts on isolated
+branch `quest-gen2-beta-v0.1.79`. A clean payload excluded `data/generated`
+and `assets/generated`. The canonical build command was:
+
+```powershell
+$env:JAVA_HOME='E:\Gen1QuestVR\jdk-17.0.20+8'
+$env:ANDROID_SDK_ROOT='E:\Gen1QuestVR\android-sdk'
+$env:ANDROID_HOME=$env:ANDROID_SDK_ROOT
+$env:GRADLE_USER_HOME='E:\Gen1QuestVR\.gradle'
+Set-Location E:\Gen1QuestVR\gen1recomp\mobile\android
+.\gradlew.bat --no-daemon assembleQuestVrNoRecordDebug --rerun-tasks
+```
+
+All 58 tasks passed. The 58,613,359-byte APK has SHA-256
+`813418E5C48D66EB2EB6E5D60CDDCEDF1D21317734F1A98B6F1EA262278D7867`.
+Its embedded `game.love` exactly matches staged payload SHA-256
+`5F1610A7909E650BBF2C6DF25D2EED00C2DC7FFA3ACD70F52FA2623ADC1972CC`.
+Inspection confirmed the ARM64 OpenXR loader, v0.1.79 `DateTime.lua`, Quest
+Dramaless integration and Gold manifest, with no generated ROM-data trees.

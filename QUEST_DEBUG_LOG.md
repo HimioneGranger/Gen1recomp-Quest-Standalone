@@ -1652,3 +1652,18 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Installed the APK as an update without clearing app data and copied q3 to
   Quest Downloads. Physical Route 8 -> Lavender -> Route 8 comparison and
   end-of-run memory measurement remain pending.
+
+## 2026-08-12 - Official v0.1.79 integration candidate
+
+- Fetched signed tag `v0.1.79` at `04490c9b` and created isolated branch
+  `quest-gen2-beta-v0.1.79` from the v0.1.78 Quest line.
+- The merge completed cleanly. Upstream Gen 2, UI, checkpoint/mod-option
+  storage and Android TLS changes coexist with the Quest OpenXR activity hooks
+  and the Dramaless OptionsMenu wrapper seam.
+- A clean ROM-free multi-ABI build passed all 58 tasks. APK SHA-256 is
+  `813418E5C48D66EB2EB6E5D60CDDCEDF1D21317734F1A98B6F1EA262278D7867`;
+  embedded payload SHA-256 is
+  `5F1610A7909E650BBF2C6DF25D2EED00C2DC7FFA3ACD70F52FA2623ADC1972CC`.
+- Archive inspection confirmed ARM64 OpenXR, v0.1.79 source, retained-history
+  integration and no generated ROM data. v0.1.78 remains the rollback build
+  until the complete physical Quest regression passes.

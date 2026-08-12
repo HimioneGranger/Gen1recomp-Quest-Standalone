@@ -1,6 +1,6 @@
 # Gen1Recomp Quest VR — Master Roadmap
 
-Last reconciled: 2026-08-11
+Last reconciled: 2026-08-12
 
 This is the single checkbox list for the project. Percentages are estimates of
 the work completed for that item, including required physical headset testing.
@@ -10,7 +10,7 @@ prototype alone does not count as 100%.
 ## At a glance
 
 - **Standalone Quest VR core:** 82%
-- **Current v0.1.78 beta integration:** 100% functional validation
+- **Current v0.1.79 integration:** 85% (merged and built; physical regression pending)
 - **Stable Dramaless + Kanto experience:** 73%
 - **Performance and lifecycle hardening:** 63%
 - **Gen 2 engine readiness:** 70%
@@ -22,8 +22,14 @@ prototype alone does not count as 100%.
 - **Overall playable Quest release:** **76%**
 - **Whole long-term vision, including Gen 2, MR and PCVR:** **43%**
 
-## Priority 1 — Validate the official v0.1.78 beta build (100% functional)
+## Priority 1 — Validate the official v0.1.79 build (85%)
 
+- [x] Preserve the fully validated `v0.1.78` APK as the rollback baseline.
+- [x] Fetch official signed `v0.1.79` source tag (`04490c9b`).
+- [x] Merge it into isolated `quest-gen2-beta-v0.1.79` branch without conflicts.
+- [x] Build and inspect a ROM-free multi-ABI Quest APK.
+- [ ] Import Dramaless Quest `1.6.4-quest.3` and run the physical regression.
+- [ ] Recheck B/cancel and Route 8 -> Lavender -> Route 8 history retention.
 - [x] Fetch official signed `v0.1.78` source tag.
 - [x] Merge it into isolated `quest-gen2-beta-v0.1.78` branch.
 - [x] Confirm zero launcher/Android/OpenXR merge conflicts.
