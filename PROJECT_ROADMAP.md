@@ -9,18 +9,18 @@ prototype alone does not count as 100%.
 
 ## At a glance
 
-- **Standalone Quest VR core:** 82%
+- **Standalone Quest VR core:** 85%
 - **Current v0.1.79 integration:** 100% (promotable Quest baseline)
-- **Stable Dramaless + Kanto experience:** 73%
-- **Performance and lifecycle hardening:** 63%
+- **Stable Dramaless + Kanto experience:** 76%
+- **Performance and lifecycle hardening:** 65%
 - **Gen 2 engine readiness:** 90%
 - **Gen 2 voxel/VR gameplay:** 10%
 - **Side Door Fix:** 35%
 - **Gen 2/HGSS sprite-provider work:** 86%
 - **Portal/MR modes:** 10%
 - **PCVR release path:** 15%
-- **Overall playable Quest release:** **76%**
-- **Whole long-term vision, including Gen 2, MR and PCVR:** **43%**
+- **Overall playable Quest release:** **78%**
+- **Whole long-term vision, including Gen 2, MR and PCVR:** **44%**
 
 ## Priority 1 — Validate the official v0.1.79 build (100%)
 
@@ -72,7 +72,7 @@ route on physical Quest hardware without a new blocker.
 - [x] Physically import `1.6.4-quest.1` and verify Yellow reaches the voxel world.
 - [ ] Add automatic upstream comparison notes for each new Dramaless release.
 
-## Priority 3 — Dramaless VR maintenance (70%)
+## Priority 3 — Dramaless VR maintenance (76%)
 
 - [x] Port OpenXR session creation to standalone Android/Quest.
 - [x] Render stereoscopic Quest frames with head tracking and 6DoF.
@@ -83,13 +83,18 @@ route on physical Quest hardware without a new blocker.
 - [x] Fix major Pokédex alignment/capture regressions to a usable state.
 - [x] Add Quest canvas lifetime cleanup and route-history release seams.
 - [x] Rebase the Quest adapter onto stable Dramaless `v1.6.4` in the dedicated fork.
+- [x] Add Quest-selectable 72/80/90/120 Hz presentation-rate control.
+- [x] Physically prove 72 Hz through OpenXR acceptance and compositor `/72`
+  plus `DR72/73` telemetry (`1.6.4-quest.10`).
+- [x] Handle Quest's empty refresh-rate enumeration without disabling the
+  authoritative direct OpenXR request.
 - [ ] Track `battle-art-merge` / `1.6.5.PRE` without using it as stable yet.
 - [ ] Adapt VR capture to new battle-art, voxel-precache, mesh and loading systems.
 - [ ] Make Quest integration seams patchable without copying whole upstream files.
 - [ ] Add automated checks for expected Dramaless source versions/functions.
 - [ ] Perform the complete physical regression matrix after every update.
 
-## Priority 4 — Reliability, loading and performance (63%)
+## Priority 4 — Reliability, loading and performance (65%)
 
 - [x] Replace the original always-load-everything behavior with bounded streaming.
 - [x] Add location-aware preload and route/town transition preparation.
@@ -110,6 +115,14 @@ route on physical Quest hardware without a new blocker.
 - [ ] Profile Indigo Plateau/Victory Road loading and add safe regional preloading.
 - [ ] Validate Saffron, Celadon, Lavender, forests, caves and major interiors.
 - [ ] Run a 30–60 minute traversal/battle/suspend stress test.
+- [ ] Compare matched 72 Hz and 90 Hz traversal runs for frame pacing,
+  temperature, battery drain and visual comfort; choose the Quest default.
+- [ ] Investigate why the current heavy Route 8/mod-stack workload delivers
+  roughly 38–41 application FPS even with the compositor correctly at 72 Hz.
+
+Current checkpoint: headset is disconnected/charging after the successful
+72 Hz validation. The last session reached approximately 46–47 C, so the next
+comparison must start after cooling and with enough battery for matched runs.
 
 ## Priority 5 — Quest controls and launcher polish (85%)
 
@@ -255,6 +268,21 @@ route on physical Quest hardware without a new blocker.
 - [ ] Test multiple GPU vendors/drivers and desktop OpenGL contexts.
 - [ ] Package a PCVR beta and collect broader community testing.
 
+## Priority 14 — Clean-room competitive feature pass (20%)
+
+- [x] Audit `1GenPokemonVr` at revision `9a90448` and document its legal boundary.
+- [x] Confirm its inherited and original VR additions are not licensed for
+  verbatim reuse; keep all work clean-room and behavior-based.
+- [x] Record comparative strengths in `QUEST_1GENPOKEMONVR_AUDIT.md`.
+- [x] Complete the first clean-room feature milestone: working Quest display
+  refresh-rate selection, physically verified at 72 Hz.
+- [ ] Add controller ray-pointer UI with gaze fallback and drag scrolling.
+- [ ] Add Quest render-scale and draw-distance presets tied to measured budgets.
+- [ ] Evaluate directional/chunk culling against our location-aware streamer.
+- [ ] Improve layered battle presentation without regressing Pokédex UI.
+- [ ] Harden atomic SAF/mod imports and low-memory ZIP handling.
+- [ ] Revisit PCVR controller profiles only during the PCVR phase.
+
 ## Completed foundation
 
 - [x] Audit Gen1Recomp/LÖVE, Android, ARM64, SDL/EGL, graphics and mod loading.
@@ -271,24 +299,26 @@ route on physical Quest hardware without a new blocker.
 
 ## Waiting on outside events or user hardware
 
-- [ ] Quest connected, awake and USB debugging authorized for beta regression.
-- [ ] Legally obtained supported Gold ROM available for Gold import test.
+- [ ] Quest charged, cooled, connected, awake and USB debugging authorized for
+  the matched 72 Hz versus 90 Hz performance comparison.
 - [ ] Next stable Dramaless release/tag identified before rebasing the stable fork.
 - [ ] `battle-art-merge` declared stable or explicitly selected for an experimental build.
 - [ ] Kanto/Dramaless remote fork repositories created or destination names approved.
 
 ## Suggested execution order
 
-1. Complete the v0.1.78 physical Quest regression.
-2. Establish the two official Quest mod forks and reproducible packages.
-3. Fix loading/suspend/controller-wake reliability.
-4. Validate sprite provider 0.1.4 in its dedicated task.
-5. Build the targeted Route 7/8 side-door prototype in its dedicated task.
-6. Run the Gold flat-game baseline.
-7. Rebase VR onto the next stable Dramaless release and monitor its merge branch.
-8. Finish sustained performance/thermal hardening.
-9. Begin Gen 2 voxel renderer work only after Gold flat play is proven.
-10. Resume Portal/MR, then PCVR, after the stable Quest release is dependable.
+1. After charging/cooling, run matched 72 Hz and 90 Hz traversal captures and
+   select the Quest default.
+2. Profile the remaining ~38–41 FPS world-render bottleneck independently of
+   the now-working display-rate control.
+3. Eliminate intermittent immersive loading stalls and repeat suspend/wake tests.
+4. Implement the clean-room controller ray pointer and gaze fallback.
+5. Create the formal Kanto in First Person Quest fork and isolate its costs.
+6. Validate sprite provider 0.1.4 in its dedicated task.
+7. Build the targeted Route 7/8 side-door prototype in its dedicated task.
+8. Track/rebase onto the next stable Dramaless release and its battle-art merge.
+9. Begin Gen 2 voxel renderer work after the stable Gen 1 Quest baseline holds.
+10. Resume Portal/MR, then PCVR, after the standalone release is dependable.
 
 ## How to use this file
 
