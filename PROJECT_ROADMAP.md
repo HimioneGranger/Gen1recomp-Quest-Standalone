@@ -13,7 +13,7 @@ prototype alone does not count as 100%.
 - **Current v0.1.79 integration:** 100% (promotable Quest baseline)
 - **Stable Dramaless + Kanto experience:** 73%
 - **Performance and lifecycle hardening:** 63%
-- **Gen 2 engine readiness:** 70%
+- **Gen 2 engine readiness:** 78%
 - **Gen 2 voxel/VR gameplay:** 10%
 - **Side Door Fix:** 35%
 - **Gen 2/HGSS sprite-provider work:** 86%
@@ -148,8 +148,8 @@ route on physical Quest hardware without a new blocker.
 - [x] Package the Gold manifest without ROM/generated data.
 - [x] Run initial `gen2check` audits on the active mod stack.
 - [x] Keep incompatible Gen 1-only mods skipped rather than falsely claiming support.
-- [ ] Import a legally obtained supported Gold ROM on Quest.
-- [ ] Validate launcher → Gold → flat gameplay on Quest.
+- [x] Import a legally obtained supported Gold ROM on Quest.
+- [x] Validate launcher → Gold → flat gameplay on Quest with mods disabled.
 - [ ] Verify saves, controls, battles, interiors and suspend/resume in Gold.
 - [ ] Acquire/use standalone LuaJIT and rerun complete member-coverage `gen2check` audits.
 - [ ] Design the Dramaless Gen 2 renderer port using public/shared Gen 2 seams.

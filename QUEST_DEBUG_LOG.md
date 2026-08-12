@@ -1752,6 +1752,22 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Combined with Dramaless Quest q6 and completed short/long lifecycle tests,
   this promotes v0.1.79 as the current known-good Quest baseline.
 
+## 2026-08-12 - Stock Gold import and flat Quest baseline
+
+- User supplied a legally obtained USA/Europe Pokémon Gold ROM in a local ZIP.
+  The archive SHA-256 is
+  `ACA99B47E5BF1E9BC7EA5F0BDE0A2F0FEB0E3345D27B3D1F7BCBD41C88826383`;
+  extracted 2 MiB ROM SHA-256 is
+  `FB0016D27B1E5374E1EC9FCAD60E6628D8646103B5313CA683417F52B97E7E4E`.
+- Copied the ROM only to external Quest storage under `/sdcard/baseroms/`.
+  It was not added to the APK, repository, build stage or documentation.
+- The v0.1.79 launcher detected and offered the ROM for import. The user
+  completed the import manually, disabled every mod, and confirmed Gold loads
+  and runs normally in flat mode.
+- This passes the stock Gold import/boot baseline. It does not validate Gold
+  voxel rendering, Dramaless compatibility, VR presentation, long gameplay,
+  battles, saves or lifecycle recovery yet.
+
 ## 2026-08-12 - v0.1.79 Pokédex battle-feed regression
 
 - User clarified that the battle UI and information remain visible and usable.
