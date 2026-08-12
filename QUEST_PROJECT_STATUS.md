@@ -1,6 +1,50 @@
 # Gen1Recomp Quest Standalone — Project Status
 
-Last updated: 2026-08-09
+Last updated: 2026-08-12
+
+## Current authoritative snapshot
+
+The current integration branch is `quest-gen2-beta-v0.1.79` at documentation
+commit `2b366f97`. The validated runtime baseline is the v0.1.79 ROM-free Quest
+APK plus Dramaless Quest `1.6.4-quest.6`; subsequent q10 work also physically
+validated selectable Quest compositor refresh rates. The older branch and
+commit descriptions later in this file are retained as historical milestones,
+not as the current working-tree state.
+
+The upstream-release gate is 60%. Four generic changes have been submitted
+independently against official development source:
+
+- [#1199](https://github.com/bryanthaboi/gen1recomp/pull/1199): launcher modal
+  focus routing (`1642113d`).
+- [#1200](https://github.com/bryanthaboi/gen1recomp/pull/1200): optional
+  `HostDisplay` lifecycle (`c2d9af69`).
+- [#1201](https://github.com/bryanthaboi/gen1recomp/pull/1201): updater
+  `payloadHost` compatibility (`0aab11b6`).
+- [#1202](https://github.com/bryanthaboi/gen1recomp/pull/1202): Android native
+  host lifecycle seam (`ee00728e`).
+
+PR 5 is in progress only on isolated branch `upstream-quest-openxr-backend` at
+`d2d2c428`. It will extract a Quest-only activity/flavor and OpenXR library
+from the prototype. It is not submitted, merged, or release-qualified yet.
+Live GitHub PR state could not be refreshed because the local GitHub CLI login
+expired; documentation deliberately does not infer review or merge results.
+
+Known active issues are:
+
+- PR 5 must remove Quest symbols from shared `liblove`/`GameActivity` and split
+  native transport from Dramaless/Kanto-specific policy.
+- Gold flat mode is validated, but Gold voxel/VR remains unimplemented.
+- The Pokédex battle information is usable, but its 3D battle view remains a
+  lower-medium presentation regression.
+- Sustained voxel performance remains workload-bound with occasional hitches;
+  long-session memory/thermal work and broad-map validation remain open.
+- Dynamic Cries remains an optional, unbundled test candidate; its upload was
+  deferred when ADB was disconnected.
+
+The integration worktree also contains unrelated, untracked portal/MR
+prototype files under `src/quest/dramaless/experimental/` and
+`tests/engine/quest_portal_mode_prototype_test.lua`. They are intentionally
+preserved and excluded from upstream extraction/documentation commits.
 
 Published repository:
 `https://github.com/HimioneGranger/Gen1recomp-Quest-Standalone`
@@ -20,9 +64,12 @@ verifies before generating private app data on the device.
 ## Repository layout and branches
 
 - Gen1Recomp checkout: `E:\Gen1QuestVR\gen1recomp`
-- Gen1Recomp branch: `quest-openxr`, based on upstream `dev`
-- Dramatic Shape checkout: `E:\Gen1QuestVR\DramaticShapeVoxelMod`
-- Dramatic Shape branch: `quest-openxr`, based on upstream `master`
+- Current integration branch: `quest-gen2-beta-v0.1.79`
+- Clean upstream extraction worktrees: `upstream-pr1-focus` through
+  `upstream-pr5-quest-backend`, each on its matching isolated topic branch.
+- Active approved Dramaless fork: `E:\Gen1QuestVR\Dramaless-Quest`
+- Approved Kanto fork: `E:\Gen1QuestVR\Kanto-First-Person-Quest`
+- Historical Dramatic Shape checkout: `E:\Gen1QuestVR\DramaticShapeVoxelMod`
 - Quest work is isolated from the upstream desktop and stock Android paths.
 
 The Dramatic Shape source remains a separate repository. The Quest APK carries
@@ -31,9 +78,9 @@ indexed `ChunkMesher.lua`, and current Quest policy candidates) so an already
 installed copy of the mod can use the Quest backend. It does not bundle the
 mod's assets or user configuration.
 
-For the user-owned standalone GitHub repository, the two independent histories
-are published as separate branches rather than combining upstream projects or
-vendoring one into the other:
+For the user-owned standalone GitHub repository, independent histories and
+approved mod forks remain separate rather than combining upstream projects or
+vendoring them into the engine:
 
 - `quest-openxr` — Gen1Recomp Quest application and documentation
 - `dramatic-shape-quest-openxr` — Dramatic Shape Quest backend

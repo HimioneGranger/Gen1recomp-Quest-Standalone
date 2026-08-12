@@ -1907,3 +1907,64 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   require physical measurement before recommending it.
 - Upload was attempted unchanged, but no ADB device was connected. Retry after
   the charged Quest reconnects; do not add this payload to the APK or Git.
+
+## 2026-08-12 - Upstream engine/API extraction, PRs 1-4
+
+- Re-audited the integration branch against official `dev` at `c3136bf8`
+  (the `v0.1.80` source head used for extraction). The monolithic Quest diff
+  remains unsuitable for upstream because it mixes generic engine seams,
+  Android/OpenXR code, launcher policy, and mod-specific rendering changes.
+- Submitted four isolated, ROM-free upstream pull requests:
+  - [#1199](https://github.com/bryanthaboi/gen1recomp/pull/1199), commit
+    `1642113d`: route existing generic launcher focus through modal controls.
+  - [#1200](https://github.com/bryanthaboi/gen1recomp/pull/1200), commit
+    `c2d9af69`: optional `HostDisplay` lifecycle with a no-op vanilla backend.
+  - [#1201](https://github.com/bryanthaboi/gen1recomp/pull/1201), commit
+    `0aab11b6`: generic updater `payloadHost` compatibility contract.
+  - [#1202](https://github.com/bryanthaboi/gen1recomp/pull/1202), commit
+    `ee00728e`: protected Android host-library and lifecycle extension hooks.
+- PR 4 preserves SDL's required native-library invariant: `liblove.so` remains
+  the final/main shared object, while an optional flavor may insert libraries
+  after LÖVE's dependencies and before `liblove`.
+- Stock `assembleEmbedNoRecordDebug` passed from source in 7m40s. The resulting
+  18,770,257-byte APK has SHA-256
+  `F523FABDDB04F3299FFBF324A0F43516324CC8520FF86F96364FB9EE0523C78D`.
+  Archive inspection found only `libc++_shared.so`, `libmpg123.so`,
+  `libopenal.so`, and `liblove.so` for ARM64, ARMv7, and debug x86_64. It
+  contains no Quest/OpenXR native payload.
+- The new Android host-extension contract test passed. The complete Windows
+  engine run remained at 157/160 suites. The failures are the established,
+  unrelated `build_zip_pipe_guard_bug774`, `quit_thread_shutdown`, and
+  `title_zone_seams` environment/baseline failures; no new suite failed.
+- Non-product issues encountered and resolved during verification:
+  - Git worktree creation and Gradle's external cache initially hit managed
+    filesystem permission errors; both succeeded after the explicitly scoped
+    approvals.
+  - The first static test searched for the substring `quest`, which also
+    matched ordinary words such as `request`; it was corrected to reject only
+    concrete `QuestActivity`/`QuestBridge` class references.
+  - Android compilation emitted the existing SDL/LÖVE/third-party deprecation
+    warnings but no new Java or native error.
+
+## 2026-08-12 - PR 5 Quest/OpenXR backend extraction started
+
+- Created isolated stacked branch `upstream-quest-openxr-backend` at
+  `d2d2c428`, based on Android seam `ee00728e` plus the `HostDisplay`
+  prerequisite. No PR 5 code has been submitted or promoted yet.
+- Audit found three boundaries that must be corrected before submission:
+  - the prototype compiles `questxr_bridge.c` directly into shared `liblove`,
+    so stock Android is not physically isolated from Quest symbols;
+  - shared `GameActivity` declares/calls Quest JNI methods, even when runtime
+    bootstrap metadata is disabled;
+  - `src/quest/PanelBridge.lua` combines native panel/input transport with
+    Dramaless conductor installation, mesher patches, and streaming policy.
+- Planned correction: a Quest-only Android/LÖVE flavor, activity subclass, and
+  separate `libquestxr.so`; a small engine-facing host adapter; and no
+  Dramaless, Kanto, ROM, save, loading-policy, or commercial-asset content in
+  the backend PR.
+- PR 5 remains gated on a ROM-free ARM64 build, stock-APK comparison, and the
+  physical Quest launcher/stereo/6DoF/recenter/input/suspend/handoff matrix.
+- GitHub CLI authentication expired while checking live PR review state
+  (`HTTP 401`). Local commits and submitted PR URLs are verified, but current
+  merge/review/check status must be refreshed after `gh auth login` rather than
+  guessed in project documentation.
