@@ -7,10 +7,8 @@
 
   <application>
     <activity android:name="org.love2d.android.QuestGameActivity">
-      <meta-data android:name="org.gen1recomp.QUEST_XR_BOOTSTRAP"
-          android:value="true" />
-      <!-- Validation flavor: enter Meta immersive mode immediately after the
-           panel flavor has imported a ROM/mod and persisted VR=ON. -->
+      <!-- The Quest-only Activity starts the bootstrap through its generic
+           Android host hook; stock GameActivity never sees this category. -->
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="com.oculus.intent.category.VR" />

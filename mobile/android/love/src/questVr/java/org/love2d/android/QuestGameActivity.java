@@ -6,6 +6,7 @@ import android.os.Bundle;
 public class QuestGameActivity extends GameActivity {
     private static native void nativeQuestXrSetActivity(QuestGameActivity activity);
     private static native void nativeQuestXrStartBootstrap();
+    private static native void nativeQuestXrDestroy();
 
     @Override
     protected String[] getHostLibraries() {
@@ -16,5 +17,10 @@ public class QuestGameActivity extends GameActivity {
     protected void onHostCreateAfterSDL(Bundle savedInstanceState) {
         nativeQuestXrSetActivity(this);
         nativeQuestXrStartBootstrap();
+    }
+
+    @Override
+    protected void onHostDestroy() {
+        nativeQuestXrDestroy();
     }
 }

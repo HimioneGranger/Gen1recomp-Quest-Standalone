@@ -10,6 +10,7 @@ local Provider = require("src.host.android.QuestOpenXRDisplay")
 
 local captures = {}
 local native = {
+  questxr_poll_input = function() return 0 end,
   questxr_capture_panel_gl = function(width, height)
     captures[#captures + 1] = { width, height }
   end,
@@ -30,6 +31,18 @@ eq(captures[1][1], 1832, "native capture receives pixel width")
 eq(captures[1][2], 1920, "native capture receives pixel height")
 backend:endFrame("game", {})
 eq(#captures, 1, "elapsed capture budget resets after a capture")
+
+local pressed, released = {}, {}
+local oldPressed, oldReleased = love.keypressed, love.keyreleased
+love.keypressed = function(key) pressed[#pressed + 1] = key end
+love.keyreleased = function(key) released[#released + 1] = key end
+native.questxr_poll_input = function() return 1 + 16 + 32 end
+backend:update(0)
+eq(table.concat(pressed, ","), "up,return,escape",
+  "native input bits become generic engine key presses")
+eq(table.concat(released, ","), "up,return,escape",
+  "edge input completes each synthetic key tap")
+love.keypressed, love.keyreleased = oldPressed, oldReleased
 
 love.graphics.getPixelDimensions = oldPixelDimensions
 

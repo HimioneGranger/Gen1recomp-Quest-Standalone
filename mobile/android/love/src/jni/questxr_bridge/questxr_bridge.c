@@ -24,6 +24,7 @@ static JavaVM *questxr_vm;
 static jobject questxr_activity;
 static pthread_t questxr_bootstrap_thread;
 static int questxr_bootstrap_started;
+static int questxr_bootstrap_joinable;
 static volatile int questxr_bootstrap_shutdown_requested;
 static volatile int questxr_bootstrap_stopped = 1;
 static pthread_mutex_t questxr_panel_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -817,6 +818,10 @@ JNIEXPORT void JNICALL
 Java_org_love2d_android_QuestGameActivity_nativeQuestXrSetActivity(
     JNIEnv *env, jclass clazz, jobject activity) {
     (void) clazz;
+    if (questxr_bootstrap_joinable && !questxr_bootstrap_started) {
+        pthread_join(questxr_bootstrap_thread, NULL);
+        questxr_bootstrap_joinable = 0;
+    }
     if ((*env)->GetJavaVM(env, &questxr_vm) != JNI_OK) {
         questxr_vm = NULL;
         return;
@@ -843,8 +848,25 @@ Java_org_love2d_android_QuestGameActivity_nativeQuestXrStartBootstrap(
         XR_LOG("native bootstrap failed: pthread_create");
         return;
     }
-    pthread_detach(questxr_bootstrap_thread);
+    questxr_bootstrap_joinable = 1;
     XR_LOG("native bootstrap thread started");
+}
+
+JNIEXPORT void JNICALL
+Java_org_love2d_android_QuestGameActivity_nativeQuestXrDestroy(
+    JNIEnv *env, jclass clazz) {
+    (void) clazz;
+    questxr_bootstrap_shutdown_requested = 1;
+    if (questxr_bootstrap_joinable) {
+        pthread_join(questxr_bootstrap_thread, NULL);
+        questxr_bootstrap_joinable = 0;
+    }
+    if (questxr_activity != NULL) {
+        (*env)->DeleteGlobalRef(env, questxr_activity);
+        questxr_activity = NULL;
+    }
+    questxr_vm = NULL;
+    XR_LOG("Android OpenXR context bridge released");
 }
 
 QUESTXR_EXPORT void *questxr_get_application_vm(void) {

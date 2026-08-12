@@ -19,6 +19,10 @@ local questActivity = read(
   "mobile/android/love/src/questVr/java/org/love2d/android/QuestGameActivity.java")
 local loveMake = read("mobile/android/love/src/jni/love/Android.mk")
 local questMake = read("mobile/android/love/src/jni/questxr_bridge/Android.mk")
+local questNative = read(
+  "mobile/android/love/src/jni/questxr_bridge/questxr_bridge.c")
+local questManifest = read(
+  "mobile/android/app/src/questVr/AndroidManifest.xml")
 
 check(app:find("questVrImplementation", 1, true),
   "OpenXR loader dependency is scoped to questVr")
@@ -32,11 +36,21 @@ check(not activity:find("Quest", 1, true) and not activity:find("OpenXR", 1, tru
   "shared GameActivity has no Quest/OpenXR references")
 check(questActivity:find('return new String[] { "questxr" };', 1, true),
   "Quest activity opts into its separate native library")
+check(questActivity:find("protected void onHostDestroy()", 1, true) and
+      questActivity:find("nativeQuestXrDestroy();", 1, true),
+  "Quest activity releases the native host from the generic destroy hook")
 check(not loveMake:find("questxr", 1, true),
   "liblove does not compile or include the Quest bridge")
 check(questMake:find("ifeq ($(QUEST_XR),1)", 1, true),
   "Quest native module is guarded by the flavor build argument")
 check(questMake:find("LOCAL_MODULE := questxr", 1, true),
   "Quest bridge builds as a separate shared library")
+check(not questNative:find("Java_org_love2d_android_GameActivity", 1, true),
+  "native bridge exports no JNI entry point for stock GameActivity")
+check(questNative:find("pthread_join(questxr_bootstrap_thread", 1, true) and
+      not questNative:find("pthread_detach", 1, true),
+  "destroy can join the bootstrap before releasing Android context")
+check(not questManifest:find("QUEST_XR_BOOTSTRAP", 1, true),
+  "Quest manifest has no obsolete metadata gate")
 
 print("quest_android_flavor_isolation_test: ok")
