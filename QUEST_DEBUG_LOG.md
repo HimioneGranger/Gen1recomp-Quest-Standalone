@@ -1491,3 +1491,27 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Result: the preparation matched the released beta as intended. Quest keeps
   upstream's launcher and Gold implementation, adding only its platform input,
   panel capture, lifecycle, and XR handoff behavior.
+
+## 2026-08-11 - v0.1.78 physical Quest regression
+
+- The installed Quest APK matched the current beta candidate byte-for-byte:
+  SHA-256 `899339B1101158007DED6D8B359135CB92FF8134813857A3E369AFDFF3BCFF29`
+  (58,594,191 bytes). The pre-test installed APK was pulled to the local
+  rollback-artifact directory before testing.
+- Launcher, loader, Yellow handoff and Dramaless voxel entry all passed.
+- User physically confirmed stereo/6DoF, recenter, Touch controls, menu/Pokédex,
+  building transition and general traversal. Log events independently showed
+  Start, A and B state changes.
+- A 15-second headset sleep/wake cycle returned directly to voxel gameplay in
+  the same process (`pid 20798`), with no crash, ANR, OOM or low-memory event.
+- Initial/warmed voxel samples remained slow: averages around 35–40 ms/frame,
+  median about 33–35 ms, with periodic 78–125 ms spikes. Memory was about
+  2.03–2.06 GB total PSS with 775–783 MB graphics and 243 MB logged textures.
+  Temperature rose from 42 C to 47 C during the run.
+- Menu/Pokédex presentation reached about 13.4–13.6 ms/frame with only 51–55
+  draw calls versus roughly 700+ in voxel scenes. This demonstrates that the
+  OpenXR transport can meet the 72 Hz budget and strongly implicates voxel
+  world draw/streaming load as the primary performance blocker.
+- Resume returned to voxel, but its steady frame time returned to roughly
+  36–38 ms and logged texture allocation rose to 278 MB. Continue with
+  rendering/streaming profiling before declaring release-quality performance.
