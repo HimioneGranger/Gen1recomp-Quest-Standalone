@@ -2741,3 +2741,18 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   stage: `MAP battle is obstructed/wrong; expected ENVIRONMENT; reproduced
   COUNT times; screenshot taken. Apply a reviewed per-arena override only; do
   not change the global battle camera.`
+
+### q7 Route 12 physical acceptance
+
+- After importing q7 and repeating the Route 12 battle on Quest 3, the user
+  reports that the correction worked perfectly. The battle now uses the
+  intended water environment and the obstructed/wrong camera scene is gone.
+- Preserve the exact physically tested artifact: 16,285,379 bytes, SHA-256
+  `9A67A4190C646EE37692A6FA6C600B7D0E26099052D7C8C4E5E538C7E1F61D68`,
+  source commit `1352b4c`. The same commit is now tagged
+  `kanto-quest-1.60.0-q7-route12-accepted` and pushed to the approved Kanto
+  Quest fork.
+- This accepts the localized Route 12 water-stage/camera correction. It does
+  not claim a second Route 12 repetition, a fresh q7 Route 8 control, the clean
+  REMOVE PATCH test or the isolated Kanto performance benchmark. q6 remains a
+  preserved rollback while those broader gates remain open.
