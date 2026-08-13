@@ -11,8 +11,14 @@ prototype alone does not count as 100%.
 
 - **Standalone Quest VR core:** 90%
 - **Current v0.1.79 integration:** 100% (promotable Quest baseline)
-- **Stable Dramaless + Kanto experience:** 80%
-- **Dramaless q18 streaming milestone:** 90% (q17 route passed; q18 trace proof pending)
+- **Stable Dramaless + Kanto experience:** 78% (Dramaless q3 core is accepted;
+  Kanto q3 now passes its complete 2.0 apply/rollback/package/importer-format
+  gate and awaits physical Quest validation)
+- **Dramaless 2.0 Quest migration:** 96% (q3 passed the complete core physical
+  matrix and is the accepted comparison baseline; retained transition continuity
+  and Kanto compatibility work are tracked separately)
+- **Battle Art 1.8.6 transition/precache integration:** 10% (scope,
+  provenance and maintainer guidance recorded; source audit pending)
 - **Performance and lifecycle hardening:** 70%
 - **Gen 2 engine readiness:** 90%
 - **Gen 2 voxel/VR gameplay:** 10%
@@ -125,7 +131,7 @@ route on physical Quest hardware without a new blocker.
 - [x] Physically import `1.6.4-quest.1` and verify Yellow reaches the voxel world.
 - [ ] Add automatic upstream comparison notes for each new Dramaless release.
 
-## Priority 3 — Dramaless VR maintenance (82%)
+## Priority 3 — Dramaless VR maintenance and 2.0 acceptance (88%)
 
 - [x] Port OpenXR session creation to standalone Android/Quest.
 - [x] Render stereoscopic Quest frames with head tracking and 6DoF.
@@ -153,12 +159,111 @@ route on physical Quest hardware without a new blocker.
   72 Hz, immersive startup and Saffron/Lavender reversal all passed.
 - [x] Diagnose q17's missing records as a mod-sandbox logger visibility defect
   and build q18 with an explicit native VRXR trace sink.
-- [ ] Import q18 and prove `VRSTREAM`/`MESHJOB2` on one physical transition.
-- [ ] Track `battle-art-merge` / `1.6.5.PRE` without using it as stable yet.
-- [ ] Adapt VR capture to new battle-art, voxel-precache, mesh and loading systems.
+- [x] Preserve q18 at rollback tag `quest-vr-q18` and immutable ZIP SHA-256
+  `1EE7E4F1556ECF618E7EDDACB0CFDD18B55B54B71ECC790286BF15A6A114ACB9`.
+- [x] Merge the Quest adapter onto official Dramaless 2.0 in isolated branch
+  `quest-vr-2.0` without changing launcher or APK source.
+- [x] Pass the 2.0 Lua, Mod API 2 manifest, Quest input/loading/streaming,
+  battle-provider, packaging and deterministic-archive gates.
+- [x] Commit/tag candidate `00c4d4c` / `quest-vr-2.0-q1-candidate` and copy
+  `DRAMALESS_SHAPE-2.0.0-quest.1.zip` to Quest Downloads.
+- [x] Complete the q1 first physical probe: launcher/loading/OpenXR/audio
+  passed; reject it after `Mat4.fromQuat` disabled the voxel pipeline and
+  produced a black immersive frame.
+- [x] Restore q18's three pure OpenXR pose helpers (`fromQuat`, `transpose`,
+  `fovProjection`) in q2, add numerical tests, commit `811f7e1`, package
+  deterministically and verify the ZIP in Quest Downloads.
+- [x] Complete the q2 first visual probe: voxel rendering returned, but reject
+  q2 because `Voxel3D` discarded OpenXR's per-eye matrices and produced a
+  severely misaligned/disorienting stereo view.
+- [x] Restore q18's narrow raw-matrix camera branch in q3, add a regression
+  contract, commit/tag `1b3ac8c` / `quest-vr-2.0-q3-candidate`, package it
+  deterministically and verify the exact ZIP hash in Quest Downloads.
+- [x] Complete q3 physical acceptance: aligned stereo voxel, controls,
+  recenter, controller wake, Pokedex, battle, transition, clean Quit and cold
+  relaunch.
+- [x] Prove preserved `VRSTREAM`/`MESHJOB2` diagnostics on the q3 physical
+  transition instead of spending a separate release cycle on q18.
 - [ ] Make Quest integration seams patchable without copying whole upstream files.
 - [ ] Add automated checks for expected Dramaless source versions/functions.
 - [ ] Perform the complete physical regression matrix after every update.
+
+## Priority 3A — Restore Kanto First Person on Dramaless 2.0 (78%)
+
+This begins immediately after q3's clean-Quit/cold-launch gate and precedes
+Battle Art tuning. Kanto is part of the intended first-person experience; its
+walls, ceilings, backdrops, doors and related presentation must function before
+performance work measures the combined stack.
+
+- [x] Confirm the scope is the entire Kanto patch, not only background art:
+  q3 currently has no Kanto walls or ceilings either.
+- [x] Identify the deliberate refusal in Kanto 1.60.0's strict `TESTED` table;
+  Dramaless `2.0.0-quest.3` reduces to the unlisted base `2.0.0` and returns
+  before writing any patch payload.
+- [x] Compare every guarded Kanto splice anchor against Dramaless 2.0 q3 in the
+  approved Kanto Quest fork; do not simply whitelist the version.
+- [x] Replace or adapt only the smallest incompatible seams, add automated
+  no-write/failure/rollback tests, and preserve Kanto's safe refusal behavior.
+- [x] Reject `1.60.0-quest.2` at the physical import gate: the Quest importer
+  could not mount its PowerShell-written flat-root ZIP even though host ZIP and
+  desktop PhysicsFS validation passed. Do not retry q2.
+- [x] Repackage unchanged audited source as `1.60.0-quest.3` under one
+  `ds_fp_ceiling/` root with deterministic 7-Zip metadata, ROM/save/cache
+  guards, and a focused in-memory PhysicsFS manifest test. Archive SHA-256 is
+  `A14BE932462D7237266A3D843B6127CD31643547B47E7CC5A31F620A4F477F57`.
+- [ ] Physically prove
+  walls, ceilings, outdoor backdrops, doors, stereo, controls, Pokedex, battle,
+  transitions and clean rollback on Quest.
+
+## Priority 3B — Battle Art 1.8.6 transition and precache integration (10%)
+
+This starts after the Dramaless 2.0 q3 physical gate and Kanto 2.0 compatibility
+restoration. It remains ahead
+of new visual polish, Gen 2 voxel work, Portal/MR and PCVR because it directly
+targets the current release blocker: route/town transition hitching and pop-in.
+It does not outrank restoring the required first-person stack correctly.
+
+- [x] Record absol89's approval/coordination and guidance as implementation
+  provenance; retain upstream credits and license notices.
+- [x] Select Battle Art `1.8.6` commit `0649420` as the only source baseline;
+  reject older `1.8.0`/`1.8.4` code as implementation input.
+- [ ] Audit the active Quest branches, dirty files, current Dramaless 2.0
+  cache/streaming code and existing Battle Art workspace before editing.
+- [ ] Fetch/verify exact commit `0649420` and record its full commit identity.
+- [ ] Identify the exact statement at `VoxelScene.lua` line 499 in that commit,
+  its ownership/lifecycle effect, and why absol89 found that commenting it out
+  reduced transition hitch time.
+- [ ] Compare it against Quest `VoxelScene`, `ChunkMesher`, `TerrainAtlas`,
+  destination preload, neighbor history, invalidation and bounded retention.
+- [x] Capture the first q3 physical continuity symptom and its source boundary:
+  Route 8's urgent full mesh took about 2.9 seconds after re-entry, while
+  neighboring authored figures bypass both the neighbor-terrain readiness and
+  render-distance gates. This is a transition/render-visibility mismatch, not
+  an OpenXR regression.
+- [ ] Implement the smallest safe transition change first, with cold/missing
+  destination fallback and no loss of terrain continuity; ensure actors are
+  not exposed where their supporting neighbor terrain is unavailable.
+- [ ] Port only useful current Battle Art precaching behavior and rewrite it
+  for Gen1Recomp Mod API 2/current I/O API; do not restore unrestricted legacy
+  filesystem access.
+- [ ] Keep RAM/GPU caches bounded and destination-aware; never retain the whole
+  world permanently or package ROM-derived cache data/private artwork.
+- [ ] Keep StadiumBattleFX 2.0 as importer/battle host and lifecycle owner;
+  Battle Art exposes only modular arena/art providers through its API.
+- [ ] Add focused transition, destination-precache, invalidation, retention,
+  cold fallback, I/O compliance, package-safety and vanilla/non-VR tests.
+- [ ] Run Lua syntax, relevant automated tests, Mod API 2 checks, package audit
+  and two-build deterministic archive validation.
+- [ ] Build a clearly named headset candidate while keeping q18 and 2.0 q1 as
+  rollbacks; compare the same route against the accepted q1 baseline.
+- [ ] Record transition hitch/pop-in, FPS and frame time, PSS/graphics memory,
+  stability and the memory/pop-in tradeoff. Claim improvement only from device
+  evidence.
+
+Completion condition: exact upstream provenance and line behavior are
+documented, the smallest safe current-API implementation passes desktop/
+non-VR/package tests, Stadium ownership remains modular, and a matched Quest 3
+run proves the result without replacing the rollback build prematurely.
 
 ## Priority 4 — Reliability, loading and performance (70%)
 
@@ -195,12 +300,18 @@ route on physical Quest hardware without a new blocker.
   temperature, battery drain and visual comfort; choose the Quest default.
 - [ ] Investigate why the current heavy Route 8/mod-stack workload delivers
   roughly 38–41 application FPS even with the compositor correctly at 72 Hz.
+- [x] Select Dramaless 2.0 `R.DIST: MEDIUM` (`32`) as the provisional Quest 3
+  visual/performance sweet spot from the user's q3 traversal.
+- [ ] Repeat a matched `FULL` (`-1`, internally 128) versus `MEDIUM` (`32`)
+  traversal after Kanto 2.0 compatibility is restored; the first observation
+  changed settings mid-run and crossed maps, so it is not a clean A/B result.
 
-Current checkpoint: q17 passed a charged cold physical route, but its observer
-could not see the engine's function-valued logger inside the mod sandbox. q18
-routes the same records through the already-working native VRXR trace channel,
-passed contracts/syntax/deterministic packaging, and is in Quest Downloads.
-Import q18, cold-load it, and cross one map boundary while logs are retained.
+Current checkpoint: Dramaless 2.0 q3 restores direct OpenXR per-eye matrix
+composition, passed all automated/package gates and passed the complete physical
+core matrix. Android recorded its final test exit as `EXIT_SELF`/status `0`, and
+a new process cold-loaded q3 back into voxel. q3 is now the accepted core
+comparison baseline; q18 remains the immutable emergency rollback while Kanto
+2.0 compatibility is restored.
 
 ## Priority 5 — Quest controls and launcher polish (92%)
 
@@ -257,6 +368,11 @@ Import q18, cold-load it, and cross one map boundary while logs are retained.
 
 ## Priority 8 — Kanto in First Person Quest fork (68%)
 
+Release-follow-up rank: immediate Priority 3A after the Dramaless q3 core gate.
+Physical testing confirmed the strict refusal removes the entire Kanto
+presentation—not only backgrounds—so it must precede Battle Art performance
+tuning. General Kanto enhancements below remain Priority 8.
+
 - [x] Run Kanto First Person successfully with Dramaless on Quest.
 - [x] Obtain explicit creator permission for a Quest fork and optimization.
 - [x] Identify first/third-person as the intended primary experience.
@@ -266,6 +382,13 @@ Import q18, cold-load it, and cross one map boundary while logs are retained.
   provenance commit because its Git tag still identifies 1.57.2 internally.
 - [x] Add ROM/save/cache/credential packaging guards and a reproducible
   `1.60.0-quest.1` package script.
+- [x] Diagnose missing Dramaless 2.0 backgrounds/ceilings: Kanto 1.60.0's
+  strict tested-version gate sees base version `2.0.0`, does not list it, and
+  intentionally performs no patch writes. This is not a hidden 2.0 setting.
+- [x] Validate Kanto's guarded patch anchors against Dramaless 2.0 q3 in the
+  approved Kanto Quest fork, extend the tested-version contract only after its
+  tests pass. q2 now awaits physical backdrops/ceilings validation without
+  altering q3.
 - [ ] Rebase current Quest compatibility changes onto that fork.
 - [ ] Fix Dramaless third-person mode in ordinary opaque VR.
 - [ ] Add optional visible/hidden/automatic trainer presentation.
@@ -323,7 +446,9 @@ Import q18, cold-load it, and cross one map boundary while logs are retained.
 - [ ] Decide whether Dramatic Sky Ride remains disabled/deferred.
 - [ ] Revisit HGSS Sprites compatibility after provider validation.
 - [ ] Test Wilds/Wild Skies after the next stable Dramaless merge.
-- [ ] Maintain a machine-readable known-good mod/version matrix.
+- [x] Maintain a machine-readable known-good mod/version matrix in
+  `../mod-update-status.json`, with the human checklist in
+  `../MOD_UPDATE_CHECKLIST.md`.
 - [ ] Explore an existing MMO/co-op mod for Quest after core reliability is stable.
 - [ ] Revisit overworld-spawn optimization fork idea later.
 - [ ] Revisit Stadium Model Viewer/Pokédex presentation later.
@@ -414,7 +539,7 @@ maintaining.
   paths.
 - [x] Establish the q16 Quest 3 visual baseline: full resolution, low shadows.
 
-## Active checkpoint — q18 transition profiler (90%)
+## Active checkpoint — Dramaless 2.0 q3 physical acceptance (100%)
 
 - [x] Move the four-vertex/six-index terrain sink into the approved Dramaless
   fork instead of relying on an older engine-side adapter.
@@ -430,40 +555,85 @@ maintaining.
   battery and thermal evidence without claiming an idle-confounded comparison.
 - [x] Fix the sandboxed observer transport in deterministic q18 and copy it to
   Quest Downloads.
-- [ ] Import/cold-load q18 and prove `VRSTREAM`/`MESHJOB2` across one boundary.
-- [ ] Identify the dominant mesh phase from the corrected records.
-- [ ] Implement only the evidence-backed optimization, then rerun the route.
+- [x] Freeze q18 as the rollback tag/artifact rather than overwriting it.
+- [x] Merge official Dramaless 2.0 and the q18 Quest line in isolated commit
+  `00c4d4c`; no launcher/APK source changed.
+- [x] Pass automated tests and reproducibly package/stage 2.0 q1 on Quest.
+- [x] Confirm q1 launcher and colored loading handoff worked; OpenXR started,
+  audio continued, but the voxel pipeline disabled on missing pose math.
+- [x] Diagnose the exact log failure and stage q2 with all `VRRig` matrix
+  dependencies present and covered by a numerical test.
+- [x] Import q2; confirm the launcher/loading/OpenXR handoff reaches voxel.
+- [x] Reject q2 after its first voxel view proved badly misaligned between the
+  eyes; retain the screenshot and do not ask the user to walk in that build.
+- [x] Stage q3 with direct OpenXR `projection * view` per eye and no changes to
+  the launcher, APK, controllers, streaming, flat camera, or battle camera.
+- [x] Import q3; confirm the launcher remains stable, upright and clickable.
+- [x] Confirm q3 cold-loads as fresh PID `15300` and Yellow enters comfortably
+  aligned immersive stereo voxel VR at full 1680x1760 resolution per eye.
+- [x] Confirm q3 controls/head tracking and verify Quest recenter keeps the
+  world level, centered and stereo-aligned.
+- [x] Pass q3 controller sleep/wake: controls resume, voxel remains active and
+  the loading-screen freeze does not recur.
+- [x] Confirm q3 Pokedex contextual capture turns on for menu/dialogue and is
+  acceptably centered.
+- [x] Confirm the formerly zoomed/misaligned Pokedex battle feed is correctly
+  framed under Dramaless 2.0 q3; close the lingering sizing defect.
+- [x] Pass q3 battle regression: view/UI present, controls remain functional
+  during and after battle, and exploration stereo restores normally.
+- [ ] Polish the localized wonky Route 8 world battle-camera angle/placement
+  after core acceptance; non-blocking and separate from the now-fixed Pokedex
+  battle feed.
+- [x] Confirm one route/town transition and one building entry/exit without a
+  loading freeze, input loss or stereo regression.
+- [x] Confirm clean Quit and cold relaunch: PID `15300` exited itself with status
+  `0`; fresh PID `20179` loaded q3, completed the launcher-to-gameplay OpenXR
+  handoff and reached voxel on Route 8.
+- [x] Pass route/town transition lifecycle on q3: no loading freeze, input or
+  stereo loss. Retain visible actors through missing/distance-culled terrain as
+  the medium-high Battle Art/streaming continuity defect above.
+- [x] Pass q3 building entry/exit independently; the retained continuity issue
+  is outdoor terrain/actor presentation rather than general warp lifecycle.
+- [x] Retain logs and prove `VRSTREAM`/`MESHJOB2` across the transition.
+- [x] Promote q3 as the core comparison baseline; retain q18 as the immutable
+  emergency rollback because no launch, input, lifecycle or stereo regression
+  appears.
 
 ## Waiting on outside events or user hardware
 
-- [ ] Quest connected, awake and USB debugging authorized for the short q18
-  import/cold-load/one-transition trace proof.
-- [ ] Next stable Dramaless release/tag identified before rebasing the stable fork.
-- [ ] `battle-art-merge` declared stable or explicitly selected for an experimental build.
+- [x] User completed q3 clean Quit/cold relaunch; Android exit history and the
+  fresh q3 process confirm the complete physical core matrix passed.
+- [x] Battle Art source/guidance target selected: version `1.8.6`, commit
+  `0649420`, with permission to reuse useful current precaching behavior.
 - [ ] Dramaless public fork destination created/approved; the Kanto Quest fork
   already exists.
 
 ## Suggested execution order
 
-1. Import and cold-load q18, then prove its native structured trace on one map
-   transition.
-2. Use the q18 phase evidence to identify the dominant mesh cost; repeat the
-   full Saffron/Lavender route only if the short trace is insufficient.
-3. Run Full/Off next as the requested shadow comparison, after Full/Low is
-   valid, and keep the visual/performance tradeoff only if it earns its cost.
-4. Implement and retest the smallest evidence-backed streaming optimization.
-5. Finish the clean PR 5 source audit, full vanilla regression matrix and
+1. Restore Kanto First Person's complete guarded patch on Dramaless 2.0 q3 in
+   the approved Kanto Quest fork and physically validate the combined stack.
+2. Audit exact Battle Art 1.8.6 commit `0649420`, explain `VoxelScene.lua`
+   line 499, and compare its current precacher with the q3 bounded streamer.
+3. Implement/test the smallest safe transition change, then only the useful
+   current-API precaching pieces; keep StadiumBattleFX 2.0 modular.
+4. Run a matched physical transition benchmark and retain q18 until device
+   evidence proves hitch/pop-in improvement without unacceptable memory cost.
+5. Use the q3/Battle Art trace evidence to identify any remaining dominant
+   mesh cost; repeat the full Saffron/Lavender route only if needed.
+6. Run Full/Off as the remaining shadow comparison only after transition work;
+   keep it only if the measured gain earns the visual loss.
+7. Finish the clean PR 5 source audit, full vanilla regression matrix and
    upstream submission without moving mod-specific code into the engine.
-6. Eliminate intermittent immersive loading stalls and continue lifecycle soak.
-7. Rebase current Quest compatibility changes into the formal Kanto fork and
+8. Eliminate intermittent immersive loading stalls and continue lifecycle soak.
+9. Rebase current Quest compatibility changes into the formal Kanto fork and
    profile its costs independently.
-8. Add gaze fallback/drag scrolling to the already-working ray pointer only
+10. Add gaze fallback/drag scrolling to the already-working ray pointer only
    after core performance and release gates.
-9. Validate sprite provider 0.1.4 and the Route 7/8 side-door prototype in
+12. Validate sprite provider 0.1.4 and the Route 7/8 side-door prototype in
    their dedicated tasks.
-10. Track the next stable Dramaless/battle-art release, then begin Gen 2 voxel
+13. Track later Dramaless/Battle Art releases, then begin Gen 2 voxel
    renderer work after the Gen 1 baseline holds.
-11. Resume Portal/MR, then PCVR; evaluate Quest 2 only after PCVR release.
+14. Resume Portal/MR, then PCVR; evaluate Quest 2 only after PCVR release.
 
 ## How to use this file
 

@@ -2292,3 +2292,294 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `1EE7E4F1556ECF618E7EDDACB0CFDD18B55B54B71ECC790286BF15A6A114ACB9`.
   It is copied to Quest Downloads; import, cold-load signature proof, and a
   short map transition remain.
+
+## 2026-08-13 - Protected Dramaless 2.0 q1 migration and Battle Art priority
+
+- The Quest Dramaless fork preserved q18 at tag `quest-vr-q18`, then merged
+  official Dramaless 2.0 and the q18 Quest line on isolated branch
+  `quest-vr-2.0`. No Gen1Recomp launcher or APK source was changed.
+- Migration commit `00c4d4c` is tagged `quest-vr-2.0-q1-candidate`.
+  `DRAMALESS_SHAPE-2.0.0-quest.1.zip` passed LuaJIT compilation, Mod API 2
+  manifest validation, focused Quest input/loading/streaming contracts,
+  Dramaless battle-provider tests, ROM-free package inspection and two-build
+  deterministic archive validation.
+- q1 artifact SHA-256:
+  `862E30767D51940234E83B7D119AA641EFF844D767080FEAF3CA030F3B547537`.
+  ADB verified the same hash in Quest Downloads beside the q18 rollback ZIP.
+- Physical promotion remains pending. The user is loading the launcher for the
+  q1 test; required gates include the launcher/pointer, loading handoff, stereo
+  voxel world, controls, recenter, wake, Pokedex, battle, transition, clean
+  Quit and cold relaunch.
+- Next priority after that clean baseline is Battle Art 1.8.6 at exact commit
+  `0649420`, following absol89's direct guidance. The first investigation is
+  the exact `VoxelScene.lua` line 499 he disabled to reduce transition hitches,
+  followed by a comparison of his current precacher with q1's bounded Quest
+  streaming and cache lifecycle.
+- Older Battle Art 1.8.0/1.8.4 precaching and legacy unrestricted I/O are not
+  implementation baselines. Any useful behavior must be adapted to Mod API 2
+  and the current I/O API, remain bounded/destination-aware and preserve cold
+  fallback.
+- StadiumBattleFX 2.0 remains importer, battle host and lifecycle owner.
+  Battle Art remains a modular arena/art provider; no Stadium implementation
+  is to be absorbed into it.
+- Performance claims require a matched physical q1-versus-candidate route with
+  transition hitch/pop-in, FPS/frame time, PSS/graphics memory and stability
+  evidence. q1 and q18 remain rollback artifacts until that proof passes.
+
+## 2026-08-13 - Dramaless 2.0 q1 black screen and q2 pose-math fix
+
+- Physical q1 result: the existing launcher and colored loading screen worked.
+  Yellow audio continued after the handoff, but immersive presentation was
+  black.
+- Device evidence showed successful OpenXR GLES session creation, two
+  1680x1760 eye swapchains, the 72 Hz request and then the exact disabling
+  error: `VRRig.lua:229: attempt to call field 'fromQuat' (a nil value)`.
+  There was no process crash, ANR, OOM or launcher failure.
+- Root cause: official Dramaless 2.0 reduced its non-VR `Mat4.lua` and removed
+  `fromQuat`, `transpose` and `fovProjection`; the preserved Quest `VRRig`
+  requires all three for headset pose and asymmetric eye projection.
+- q2 restores only those three pure helpers from the validated q18 lineage.
+  Ordinary desktop/Android voxel cameras, launcher, APK, OpenXR transport,
+  controller mapping and streaming policy are unchanged.
+- A new headless numerical test covers identity/rotated quaternions, transpose
+  inversion and OpenXR FOV projection. Every `Mat4` call made by `VRRig` now
+  resolves. The complete local Dramaless suite and focused Quest contracts
+  passed.
+- q2 commit/tag: `811f7e1` / `quest-vr-2.0-q2-candidate`.
+- `DRAMALESS_SHAPE-2.0.0-quest.2.zip` was reproducible across two builds,
+  contained 103 runtime entries and no ROM/save/APK/generated data. Host and
+  Quest Downloads hashes match:
+  `21F3F6D56308D6B0A576EAEC9AB37C36ECAE0759925D33F9138CAB3F4222F78F`.
+- q1 is rejected as a visual candidate. q2 awaits physical import/retest; q18
+  remains the known-good rollback.
+
+## 2026-08-13 - Dramaless 2.0 q2 stereo rejection and q3 per-eye fix
+
+- Physical q2 reached the voxel world with audio, proving the q1 pose-math
+  failure was fixed, but the in-headset view was badly misaligned and
+  disorienting. The user stopped the visual test before walking.
+- The retained left-eye mirror screenshot is
+  `E:\Gen1QuestVR\quest-screenshots\dramaless-2.0-q2-misaligned-20260813-125533.jpg`.
+  A single-eye mirror could not show binocular disagreement by itself, so the
+  user's headset report was treated as the physical stereo authority.
+- Exact source comparison found the second migration omission in
+  `lib/Voxel3D.lua`: q2 accepted `VRRig.eyeCamera` objects but ignored their
+  `view` and `proj` fields. Both eyes were rebuilt through Dramaless 2.0's
+  symmetric monitor-style `Mat4.perspective` plus `lookAt`, losing OpenXR's
+  asymmetric per-eye lens offsets and tracked view orientation.
+- q3 restores only q18's direct camera-matrix branch:
+  `Y-flip * OpenXR projection * OpenXR view`. Non-VR orbit cameras and ordinary
+  placed/battle cameras do not provide both raw matrices and remain on the
+  upstream 2.0 path. No launcher, APK, controller, lifecycle, streaming,
+  Pokedex, or ROM/save code changed.
+- The focused OpenXR matrix contract, both Quest Python contracts, LuaJIT
+  compilation, complete local Dramaless suite, Mod API 2 validation and package
+  safety checks passed. Two independent 103-entry package builds were
+  byte-identical.
+- q3 commit/tag: `1b3ac8c` / `quest-vr-2.0-q3-candidate`.
+- `DRAMALESS_SHAPE-2.0.0-quest.3.zip` host and Quest Downloads SHA-256:
+  `B5A1855E5EECD433E064F92526388BF17D37E161B9BD2CB105108391C74C5252`.
+- q2 is rejected as a stereo candidate. q3 awaits a stationary comfort/alignment
+  probe before movement or the rest of the physical regression matrix. q18
+  remains the known-good rollback and has not been overwritten.
+
+### q3 first probe invalidated by stale q2 process
+
+- After importing q3, controls responded and the user reported improved
+  vertical alignment but persistent discomfort. The newest left-eye mirror was
+  retained as
+  `E:\Gen1QuestVR\quest-screenshots\dramaless-2.0-q3-partial-alignment-20260813-130451.jpg`
+  (SHA-256
+  `30E8F3740DC3D45194205445A0B292D7EF512EE6F0DB6BF8305C644B6562FB03`).
+- Device inspection invalidated this as a q3 result: the application was still
+  PID `12001`, created for q2 at 12:55. Importing q3 and resuming the OpenXR
+  session at 13:04 did not cold-reload the already-loaded Lua camera module.
+  The apparent vertical change can therefore be attributed to session
+  resume/recenter, not to q3's matrix correction.
+- The stale process was force-stopped and confirmed absent. No projection code
+  was changed in response to invalid evidence. The next launch must create a
+  new PID before the stationary q3 alignment probe is counted.
+- The following relaunch did create fresh PID `14405`, but its runtime log
+  explicitly reported `loaded mod DRAMALESS_SHAPE 2.0.0-quest.2`: q3 had not
+  actually been selected in the importer. The user's “cross-eyed” report is
+  therefore additional q2 evidence, not a q3 failure. PID `14405` was stopped;
+  q3 remains untested and no q4 was created.
+
+### q3 valid stereo probe passed
+
+- The user imported q3 and cold-launched fresh PID `15300`. Device logs confirm
+  both `session-start version=2.0.0-quest.3` and
+  `loaded mod DRAMALESS_SHAPE 2.0.0-quest.3`; the first valid q3 run therefore
+  cannot be confused with either earlier q2 session.
+- OpenXR startup completed and rendered each eye at full 1680x1760 resolution.
+  The user confirmed the previously cross-eyed/disorienting view is fixed.
+- This physically validates q3's direct OpenXR per-eye matrix correction.
+  Projection code is frozen for the remaining q3 regression. Controls,
+  recenter, controller wake, Pokedex, battle, transition, clean Quit and cold
+  relaunch remain to be checked before q3 promotion.
+- In the same valid q3 session, movement/buttons and head tracking passed.
+  Quest recenter also passed: the world remained level, centered and
+  stereo-aligned afterward. Controller wake is the next lifecycle gate.
+- q3 controller sleep/wake passed after both controllers were left idle for
+  roughly 30 seconds: input resumed, voxel rendering stayed active and the
+  historical stuck-loading-screen failure did not recur.
+- q3 Pokedex regression passed: contextual menu/dialogue capture appears and
+  the user reports it is centered. Any further Pokedex sizing refinement stays
+  on the previously agreed low-priority polish list.
+- q3 battle regression passed: the battle feed and information were visible,
+  controls worked through the battle, and returning to exploration preserved
+  the fixed stereo view. The Route 8 battle scene has a wonky camera
+  angle/placement, but the user reports it is minor. Ranked low-priority local
+  scene polish rather than a q3 promotion blocker.
+- Follow-up clarification: q3 also fixes the longstanding Pokedex battle-feed
+  zoom/framing defect. The handheld battle image is now correctly presented;
+  the only observed battle visual issue is the separate Route 8 world-camera
+  placement noted above. Pokedex sizing is closed rather than deferred.
+
+### q3 transition lifecycle passed; terrain/actor continuity defect retained
+
+- Route/town travel completed without a stuck loading screen, input loss or
+  stereo regression. The user could, however, see characters through terrain
+  that had not appeared, describing it as likely tied to render distance.
+- Device evidence confirms a real cold/readiness interval. On Route 8 re-entry,
+  `VRSTREAM map.entered` reported no old pending job, then the urgent full
+  Route 8 mesh completed 2,909.12 ms later. Neighbor body builds followed.
+  Other observed destination full builds included Route 12 at 5,897.40 ms.
+- Checked Dramaless 2.0 source identifies the visibility mismatch. Neighbor
+  terrain in `VoxelScene.drawScene` is conditional on render distance and a
+  ready `nbMesh`; the neighboring authored-figure loop in `drawCast` calls
+  `eachFigure` for every neighbor unconditionally. Regular posed characters
+  have a distance check, but neither cast path is coupled to the exact terrain
+  mesh that can occlude/support it.
+- Classified medium-high visual continuity, not a q3 OpenXR or lifecycle
+  blocker. It is now an explicit acceptance case for the Battle Art 1.8.6
+  transition/precache work: retain bounded caches and cold fallback, but do not
+  expose actors where supporting neighbor terrain is unavailable. Do not hide
+  the symptom with whole-world retention or bundle derived map data.
+- A subsequent entry to and exit from a small building passed with voxel,
+  controls and stereo intact. This clears general indoor warp lifecycle and
+  further isolates the retained defect to outdoor terrain/actor continuity.
+
+### Dramaless 2.0 missing Kanto backgrounds triaged
+
+- During q3 regression the user reported that Kanto in First Person's authored
+  backgrounds were absent. This does not affect stereo, movement or save
+  correctness, but it reduces the intended first-person presentation.
+- Device logs and checked Kanto 1.60.0 source identify the exact safe refusal:
+  `ds_fp_ceiling` recognizes `DRAMALESS_SHAPE 2.0.0-quest.3`, reduces the
+  suffix to base version `2.0.0`, finds no matching entry in its strict
+  `TESTED` table, and prints `Doing NOTHING -- no files touched` before
+  returning. The gate currently lists older bases through 1.8.2.
+- This is not evidence of a new Dramaless setting and is not a q3 OpenXR
+  regression. The Kanto patch deliberately avoids splicing an unknown renderer
+  layout. Keep the live q3 candidate unchanged.
+- Ranked medium: after q3's core physical gate and the already-prioritized
+  Battle Art transition work, but before low-priority Pokedex sizing polish.
+  The approved Kanto Quest fork should validate Dramaless 2.0 anchors, then add
+  `2.0.0` to its tested contract only with automated and headset evidence.
+- Further physical inspection confirmed the full scope: Kanto contributes no
+  walls or ceilings either. Its early version-gate return disables the entire
+  patch payload, not only outdoor background art. This invalidates the earlier
+  medium ranking.
+- Revised priority: finish q3's clean-Quit/cold-launch core gate, then restore
+  Kanto 2.0 compatibility before Battle Art performance work. Do not merely add
+  `2.0.0` to `TESTED`; audit every guarded splice against q3, preserve safe
+  refusal/rollback, and physically validate the complete combined stack.
+
+### q3 clean Quit, cold relaunch and core promotion passed
+
+- Android's process-exit history records the valid q3 process, PID `15300`,
+  exiting at `2026-08-13 13:49:35.511` with reason `EXIT_SELF`, status `0`.
+  This is an app-requested clean exit, not a crash, ANR, low-memory kill or ADB
+  force-stop.
+- A true cold relaunch created fresh PID `20179`. Its runtime identified both
+  `session-start version=2.0.0-quest.3` and
+  `loaded mod DRAMALESS_SHAPE 2.0.0-quest.3`, then loaded Saffron City and
+  transitioned into Route 8 voxel gameplay with Quest button events active.
+- The fresh launcher-to-gameplay ownership handoff cleanly completed
+  `xrEndSession`, `xrDestroySession` and `xrDestroyInstance`, then reported
+  `OpenXR startup complete` for gameplay. No fatal exception, ANR or process
+  death signature accompanied the relaunch.
+- q3 therefore passes the complete core physical matrix: stable launcher,
+  loading handoff, aligned stereoscopic voxel rendering, 6DoF/head tracking,
+  controls, recenter, controller sleep/wake, Pokedex, battle, route and building
+  transitions, clean Quit and cold relaunch. Promote commit `1b3ac8c` and ZIP
+  SHA-256 `B5A1855E5EECD433E064F92526388BF17D37E161B9BD2CB105108391C74C5252`
+  as the accepted Dramaless 2.0 core comparison baseline. Retain q18 unchanged
+  as the emergency rollback.
+- This promotion does not close the separately tracked defects: Kanto 1.60.0
+  intentionally applies no walls/ceilings/backdrops to Dramaless 2.0, outdoor
+  actors can appear before supporting neighbor terrain, and the heavy active
+  mod stack remains below the 72 Hz application target in demanding scenes.
+
+### q3 render-distance observation: Medium selected provisionally
+
+- During the normal q3 performance traversal, the user changed render distance
+  mid-run and reported `MEDIUM` as the best current balance of visibility and
+  smoothness. Checked Dramaless 2.0 source maps `MEDIUM` to `32`; `FULL` stores
+  `-1` and is expanded internally to `128`.
+- Device logs captured the live option changes (`-1` followed by `32`) and
+  continued voxel/map activity. The headset report is accepted as the
+  provisional Quest 3 baseline because comfort and visible pop-in matter, not
+  only a single FPS value.
+- Do not present this run as a controlled performance claim: the setting was
+  changed mid-traversal, maps and workload changed, and Kanto's full patch was
+  disabled by its 2.0 guard. Repeat the same route at Full and Medium after
+  Kanto compatibility is restored, comparing frame time, FPS, PSS/graphics
+  memory, pop-in and terrain/actor continuity.
+
+## 2026-08-13 - Kanto First Person q2 adapts to Dramaless 2.0 q3
+
+- Audited the approved `Kanto-First-Person-Quest` fork on clean branch
+  `quest-vr` against accepted Dramaless q3 commit `1b3ac8c`. The first-person
+  eye/head, settings, Structures, ChunkMesher, shadow and payload-API anchors
+  remain valid exact matches.
+- Two 2.0 seams required narrow changes. `VoxelScene.lua` now wraps neighbour
+  terrain in a render-distance guard; Kanto q2 matches the complete guarded
+  block so horizon/sky remain before terrain and ceiling/flora remain after
+  every admitted neighbour. Native battle rendering moved from
+  `BattleScene.lua` to `VoxelBattleScene.lua`; the optional flora hook now
+  supports that provider while StadiumBattleFX remains the separate battle
+  host/importer.
+- The live in-memory patch contract uncovered and fixed two rollback defects:
+  Windows CRLF-normalized sources were being backed up instead of raw source
+  bytes, and the ledger could consume VoxelScene's backup before the grouped
+  main/FirstPerson restore used it as its gate. All base-owned sources now get
+  raw pristine backups before their first write, and the core files restore
+  atomically before the ledger processes other engine patches.
+- Automated coverage now executes the real Lua patcher against q3 and proves
+  fresh apply, second-boot idempotence, exact REMOVE PATCH rollback, and
+  unknown-version no-write refusal. A separate static contract verifies anchor
+  cardinality, draw ordering, payload APIs and the 2.0 battle provider; every
+  shipped Lua source compiles under the bundled LÖVE/LuaJIT runtime.
+- `KANTO_FIRST_PERSON-1.60.0-quest.2.zip` passed ROM/save/cache/APK guards and
+  two consecutive builds were byte-identical. Final size: 16,280,881 bytes.
+  SHA-256:
+  `2278EB8973C21810FB516D18D62039BB961F3493408B7C9ED6670EBB7B22AB33`.
+- Physical installation remains deliberately pending. Required proof is walls,
+  ceilings, horizon/backdrops, doors, aligned stereo, controls, Pokedex,
+  native-card battle, route/building transitions, and a final rollback test.
+
+### q2 physical importer rejection and q3 package-format correction
+
+- The physical Quest importer rejected the byte-matching staged q2 artifact
+  with `that zip could not be opened`. Host `zipfile.testzip()` and the desktop
+  LÖVE/PhysicsFS in-memory mount both passed, so this was not treated as source
+  corruption or a reason to remove the still-working installed Kanto version.
+- Comparison with the known-working official Kanto archive pulled from the
+  headset identified the importer-facing difference: q2 used a PowerShell
+  flat-root ZIP, while the working package used a single `ds_fp_ceiling/`
+  directory. The official reference archive SHA-256 is
+  `B54B28271918AAAB9A11CED66247898E51CFF5E5F03D3530FF3B81BB3B25AF29`.
+- q3 keeps the exact audited q2 Lua adaptation and changes only its manifest
+  version and archive construction. It uses 7-Zip with fixed source timestamps,
+  preserves `ds_fp_ceiling/manifest.json`, and omits the unstable explicit root
+  directory record whose NTFS access-time field changed between builds.
+- Full validation passed again: Dramaless 2.0 anchors/order/API/rollback,
+  LuaJIT syntax, live apply/idempotence/byte-exact rollback/unknown-version
+  refusal, ROM/save/cache/APK guards, two byte-identical packages, and a focused
+  LÖVE/PhysicsFS in-memory mount that read the Kanto manifest. Final q3 size is
+  16,083,540 bytes; SHA-256 is
+  `A14BE932462D7237266A3D843B6127CD31643547B47E7CC5A31F620A4F477F57`.
+- q3 now awaits the physical importer and visual regression matrix. q2 remains
+  rejected and must not be selected again.
