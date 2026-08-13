@@ -427,3 +427,6 @@ activity-destroy callbacks, and zero `FORTIFY`, destroyed-mutex, fatal-signal,
 ANR, or app-process-death events. Quest's shell then stopped the temporary SDL
 surface after each relaunch while retaining the immersive activity/OpenXR
 ownership; final headset-eye and controller-response confirmation is pending.
+The user then confirmed that the voxel world remained visible and controller
+input responded. The three-cycle soak therefore passed process, activity,
+audio, immersive-display, and controller recovery.

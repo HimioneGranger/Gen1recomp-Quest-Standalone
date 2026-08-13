@@ -2106,4 +2106,9 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   Android surface. This matches its OpenXR handoff behavior rather than an
   activity teardown: `dumpsys activity` continued to identify the same
   `QuestGameActivity` record and process. Final in-headset voxel visibility and
-  controller response remain the acceptance check for the three-cycle soak.
+  controller response were the acceptance check for the three-cycle soak.
+- User-confirmed final pass: voxel rendering remained visible and controller
+  input responded after the third cycle. Together with the earlier 60+ second
+  cycle, the current `f9e8088b`/q14 candidate has four successful
+  background/resume recoveries and no reproduction of the historical
+  destroyed-mutex `AudioTrack` abort.
