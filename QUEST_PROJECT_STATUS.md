@@ -6,7 +6,7 @@ Last updated: 2026-08-13
 
 The current integration branch is `quest-gen2-beta-v0.1.79`. The validated
 runtime baseline is the ROM-free PR 5 Quest backend at engine commit
-`b7fba361` plus Dramaless Quest `1.6.4-quest.15` at `b05b2f24`. It physically
+`b7fba361` plus Dramaless Quest `1.6.4-quest.16` at `d51b41b`. It physically
 passes the anchored launcher and pointer, colored save-aware loading card,
 automatic launcher-to-gameplay OpenXR handoff, immersive voxel rendering,
 controller input, lifecycle recovery, clean exit/cold relaunch, and restored
@@ -42,8 +42,12 @@ Known active issues are:
 - Gold flat mode is validated, but Gold voxel/VR remains unimplemented.
 - The Pokedex feed is restored in q15. Its battle-view framing remains a
   lower-medium presentation regression.
-- Sustained voxel performance remains workload-bound with occasional hitches;
-  long-session memory/thermal work and broad-map validation remain open.
+- q16 makes the existing `RES` setting affect immersive eye rendering. The
+  accepted Quest 3 performance default is `RES: FULL`, `SHADOWS: LOW`; half
+  resolution is retained only as an optional low-memory mode.
+- Sustained voxel performance remains workload-bound. Full/low reduces steady
+  application frame cost, but map-transition and streaming tail hitches remain;
+  long-session memory/thermal work and broad-map validation are open.
 - Dynamic Cries remains an optional, unbundled test candidate; its upload was
   deferred when ADB was disconnected.
 
@@ -148,6 +152,12 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 - The process no longer reproduces the earlier launcher memory kill.
 - The first-person Pokedex screen is rendering again through the generic q15
   completed-frame event. Its battle-view framing remains low priority.
+- Dramaless q16 physically honors immersive `RES` scaling. Half resolution
+  renders each 1680x1760 eye through an 840x880 intermediate and saves roughly
+  275 MB PSS, but the visible sharpness loss makes it an optional fallback.
+- `RES: FULL`, `SHADOWS: LOW` is the current user-accepted Quest 3 default. It
+  reduced average application frame time from about 27.63 to 23.85 ms without
+  lowering image sharpness.
 
 ## Open defects
 
@@ -282,8 +292,10 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Capture a controlled q15 route walk and compare capture-active versus
-   capture-idle GPU/app timing before changing the restored Pokedex path.
+1. Instrument map-transition and streaming queue latency on the accepted
+   `RES: FULL`, `SHADOWS: LOW` baseline, starting with the reproducible
+   Saffron -> Route 8 -> Lavender -> Route 8 route. Avoid reducing global view
+   distance or resolution before identifying the hitch source.
 2. Run PR 5's remaining long suspend/resume, controller-sleep,
    repeated-handoff, map-transition, and quit soak matrix; continue watching
    for the historical destroyed-mutex abort.

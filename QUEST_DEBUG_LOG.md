@@ -2179,13 +2179,45 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `DRAMALESS_SHAPE 1.6.4-quest.15` in PID `15729`; the user then confirmed
   **Pokedex screen is back**. No Pokedex-capture exception, GL error, fatal
   signal, ANR, or OOM appeared in the checked interval.
-- Performance remains separate: with the menu/Pokedex feed active, the live
-  q15 trace was typically about 30-33 FPS at a 72 Hz target, with a repeating
-  dip roughly every 7-8 seconds. The checked process reached about 2.26 GB PSS
-  and 52-53 C. This does not yet show that the notification itself caused the
-  reported choppiness; continue controlled capture-on/off and route-walk
-  profiling before changing the working capture path.
+- Performance remains separate. A subsequent controlled exterior walking
+  sample was taken while the contextual Pokedex feed was inactive and still
+  showed the repeating dips. The q15 sample averaged 28.63 FPS (30 median,
+  18 p10, 15 minimum), with 27.63 ms average application frame time and
+  approximately 2.285 GB PSS. This assigns the walking hitches to the stereo
+  world/streaming workload rather than continuous Pokedex capture.
 - Validated APK SHA-256:
   `8342334C3F6ED5D77A64E253FF86EB56355264D6B8CDC43ECEC296E88CBBB84E`.
 - Validated q15 ZIP SHA-256:
   `E899C0B36530AC69FCBC8D5469F57FCCD025E0DA082574D61C1A733280E856CC`.
+
+## 2026-08-13 - q16 immersive resolution and shadow comparison
+
+- Source inspection found that Dramaless's existing `RES` option affected the
+  flat renderer but was ignored by immersive VR: both VoxelScene eyes always
+  received the OpenXR runtime's full recommended dimensions.
+- Dramaless commit `d51b41b` / `1.6.4-quest.16` applies `Quality.scale()` to
+  only the two intermediate eye canvases. Swapchain dimensions, submitted
+  image rectangles, FOV, poses, and the existing GLES upscale remain
+  unchanged. `FULL` retains the validated rendering path.
+- Physical proof at `RES: 1/2`: device trace reported
+  `eye RES 1/2 render=840x880 swapchain=1680x1760`. The warm 30-second sample
+  averaged 30.07 FPS (32 median, 22 p10, 16 minimum), 25.53 ms application
+  frame time, and approximately 2.009 GB PSS. This saved about 275 MB versus
+  q15 full resolution, but the user found the loss of sharpness clearly
+  visible.
+- A controlled 94.6-second Saffron -> Route 8 -> Lavender -> Route 8 run then
+  used `RES: FULL`, `SHADOWS: LOW`. It averaged 28.59 FPS (30 median, 18 p10,
+  11 minimum), 23.85 ms application frame time, approximately 73% GPU load,
+  and 2.257 GB PSS. No capture, GL, fatal, ANR, or OOM signature occurred.
+- Compared with the earlier full/high q15 frame sample, full/low reduced
+  average application frame time from 27.63 to 23.85 ms (about 13.7%) without
+  reducing image sharpness. Whole-route FPS remained limited by transition
+  and streaming hitches rather than steady shadow cost.
+- User decision: prefer `RES: FULL` plus `SHADOWS: LOW` over the half-resolution
+  alternative. Treat that combination as the current Quest 3 performance
+  default. Keep `RES: 1/2` as an optional low-memory mode.
+- Next performance target: instrument and reduce map-transition/streaming tail
+  latency without shortening the accepted view distance or globally reducing
+  resolution.
+- Validated q16 ZIP SHA-256:
+  `87F194FD0A290F2D88076E8EBF42020D7113B7636C72DC7C4929324945E519CB`.
