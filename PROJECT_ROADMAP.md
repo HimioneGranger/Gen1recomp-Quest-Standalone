@@ -228,7 +228,14 @@ performance work measures the combined stack.
   provider, and build deterministic q5 with fresh-install and q4-migration
   contracts. SHA-256:
   `25C71C812F020AABA4F29004A0607E7209727D359B894B643C9D907F3A7F96C7`.
-- [ ] Physically validate q5 with two Route 8/nearby battles and prove Kanto
+- [x] Reject q5 physically: logs prove its flora-hook cleanup ran, but the
+  same Route 8 obstruction remained. The lifted host terrain—not the optional
+  support draw—is the blocker.
+- [x] Build deterministic q6 using Dramaless's existing per-arena wide camera
+  for Route 8 only, restore battle tree supports, and prove fresh apply,
+  q5 migration, idempotence and byte-exact rollback. SHA-256:
+  `1FF5532A6B642E7DB30655B760A496F1C5A641C93EEB6B576E4D4D357AE4F87A`.
+- [ ] Physically validate q6 with two Route 8/nearby battles and prove Kanto
   exploration, Pokédex capture, controls and stereo remain unchanged.
 - [ ] Complete a clean explicit REMOVE PATCH rollback on Quest.
 - [ ] Measure Dramaless + Kanto alone before attributing the current full-stack

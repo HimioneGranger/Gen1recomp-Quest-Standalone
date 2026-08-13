@@ -2652,3 +2652,33 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   battle or nearby-route control, and confirmation that exploration Kanto and
   the Pokédex remain intact. q4 remains recoverable until that comparison
   passes.
+
+### q5 rejected physically; q6 targets the authored Route 8 camera
+
+- q5 loaded correctly on the headset. Device logs explicitly report
+  `Dramaless 2.0 battle flora splice removed; native battle framing preserved`
+  before loading `ds_fp_ceiling 1.60.0-quest.5`. The user then reproduced the
+  same obstruction. q5 is therefore rejected: its patch executed as designed,
+  but its diagnosis was wrong.
+- The remaining geometry is part of the already-built host terrain. Kanto's
+  tree transformation raises round terrain stamps, while Dramaless's default
+  telephoto battle rig places its eye roughly five blocks from the arena. On
+  Route 8 that eye sits underneath the raised canopy. Dramaless already exposes
+  a per-arena `cam = "wide"` rig for exactly the case where the long-lens eye
+  intersects map geometry.
+- q6 changes only Route 8's existing authored arena entry from the default rig
+  to `cam = "wide"`. It does not alter global battle-camera constants, OpenXR
+  matrices, launcher, controller input, Pokédex capture, exploration cameras,
+  other maps, or Battle Art. q6 also restores q4's battle tree-support draw;
+  q5 proved that draw was not the obstruction, and leaving it removed made
+  lifted rounds float without trunks/stones during battles.
+- Automated contracts cover fresh q6 apply, exact q5-to-q6 maintenance-path
+  migration, singular battle-support and Route 8 markers after repeated boots,
+  byte-exact rollback of both `VoxelBattleScene.lua` and
+  `data/battle_arenas.lua`, unknown-version no-write refusal, all Lua syntax,
+  deterministic packaging, package-content guards and LÖVE/PhysicsFS mounting.
+  Final q6 size: 16,284,572 bytes; SHA-256:
+  `1FF5532A6B642E7DB30655B760A496F1C5A641C93EEB6B576E4D4D357AE4F87A`.
+- q6 is committed as `49bc42c` and tagged
+  `kanto-quest-1.60.0-q6-candidate`. Physical Route 8 comparison remains the
+  acceptance gate.
