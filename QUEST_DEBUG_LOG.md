@@ -2146,3 +2146,46 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Post-handoff scan: zero `FORTIFY`, destroyed-mutex, fatal-signal, ANR, OOM,
   or app-process-death signatures. This completes one clean Quit -> true cold
   launcher -> Yellow -> loading -> immersive voxel -> working-controls pass.
+
+## 2026-08-13 - PR 5 generic Pokedex frame-capture restoration
+
+- Regression: after migrating to the isolated PR 5 host backend, immersive
+  voxel rendering and controls worked but the physical Pokedex display stayed
+  dark. Dramaless still defined its existing `captureDexFrame` implementation;
+  the old Quest-patched engine callback after `Game:draw()` was no longer
+  invoked.
+- Engine fix: commit `b7fba361` emits the generic, observation-only
+  `render.frame_drawn` event after each completed Lua draw and before host
+  capture or ordinary `love.graphics.present()`. The default path has no
+  subscriber and remains a guarded no-op. Observers cannot replace or veto
+  vanilla presentation.
+- Mod fix: Dramaless commit `b05b2f24` / `1.6.4-quest.15` subscribes only to
+  completed `kind == "game"` frames and calls its existing Pokedex capture.
+  The legacy callback remains for compatibility with older Quest APKs.
+- Verification: the focused platform lifecycle test passed 14/14, the
+  Dramaless Quest input contract passed, and `VR.lua` passed syntax checking.
+  The broader engine run passed 160/164 suites; the four remaining failures
+  were existing Windows/static-harness cases unrelated to this event. The
+  broader modkit run passed 14/15; its remaining `gen2check.lua` failure was a
+  Windows child-LuaJIT invocation problem.
+- Packaging: the first q15 APK used a newly generated debug key and Android
+  safely rejected `adb install -r` with
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; the installed q14 app and data were not
+  altered. The APK was then signed with the matching existing debug keystore
+  (`C:\Users\I5 Gaming\.android\debug.keystore`, certificate SHA-256
+  `253a30fbc7131d0970800a800a5d77fc49cbc00c8b5e4e9e5dc259854b1c4075`)
+  and the in-place update succeeded with app data preserved.
+- Physical pass: device logs confirmed
+  `DRAMALESS_SHAPE 1.6.4-quest.15` in PID `15729`; the user then confirmed
+  **Pokedex screen is back**. No Pokedex-capture exception, GL error, fatal
+  signal, ANR, or OOM appeared in the checked interval.
+- Performance remains separate: with the menu/Pokedex feed active, the live
+  q15 trace was typically about 30-33 FPS at a 72 Hz target, with a repeating
+  dip roughly every 7-8 seconds. The checked process reached about 2.26 GB PSS
+  and 52-53 C. This does not yet show that the notification itself caused the
+  reported choppiness; continue controlled capture-on/off and route-walk
+  profiling before changing the working capture path.
+- Validated APK SHA-256:
+  `8342334C3F6ED5D77A64E253FF86EB56355264D6B8CDC43ECEC296E88CBBB84E`.
+- Validated q15 ZIP SHA-256:
+  `E899C0B36530AC69FCBC8D5469F57FCCD025E0DA082574D61C1A733280E856CC`.

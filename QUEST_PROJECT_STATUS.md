@@ -1,16 +1,18 @@
 # Gen1Recomp Quest Standalone — Project Status
 
-Last updated: 2026-08-12
+Last updated: 2026-08-13
 
 ## Current authoritative snapshot
 
-The current integration branch is `quest-gen2-beta-v0.1.79`; the latest prior
-documentation reconciliation is `fb67a16b`. The validated runtime baseline is
-the v0.1.79 ROM-free Quest
-APK plus Dramaless Quest `1.6.4-quest.6`; subsequent q10 work also physically
-validated selectable Quest compositor refresh rates. The older branch and
-commit descriptions later in this file are retained as historical milestones,
-not as the current working-tree state.
+The current integration branch is `quest-gen2-beta-v0.1.79`. The validated
+runtime baseline is the ROM-free PR 5 Quest backend at engine commit
+`b7fba361` plus Dramaless Quest `1.6.4-quest.15` at `b05b2f24`. It physically
+passes the anchored launcher and pointer, colored save-aware loading card,
+automatic launcher-to-gameplay OpenXR handoff, immersive voxel rendering,
+controller input, lifecycle recovery, clean exit/cold relaunch, and restored
+Pokedex frame capture. Older branch and commit descriptions later in this
+file are retained as historical milestones, not as the current working-tree
+state.
 
 The upstream-release gate is approximately 75%. Four generic changes have been submitted
 independently against official development source:
@@ -24,21 +26,21 @@ independently against official development source:
 - [#1202](https://github.com/bryanthaboi/gen1recomp/pull/1202): Android native
   host lifecycle seam (`ee00728e`).
 
-PR 5 is a locally verified work-in-progress candidate on isolated branch
-`upstream-quest-openxr-backend` at `4e16cd77`. It extracts the Quest activity,
-flavor, native OpenXR library, and generic display transport from the
-prototype while keeping stock Android physically isolated. It is not
-submitted, merged, device-validated, or release-qualified yet.
+PR 5 is a device-verified work-in-progress candidate on isolated branch
+`upstream-quest-openxr-backend` at `b7fba361`. It extracts the Quest activity,
+flavor, native OpenXR library, generic display transport, and observation-only
+completed-frame event from the prototype while keeping stock Android
+physically isolated. It is not submitted, merged, or release-qualified yet.
 Live GitHub PR state could not be refreshed because the local GitHub CLI login
 expired; documentation deliberately does not infer review or merge results.
 
 Known active issues are:
 
-- PR 5 still requires a physical Quest matrix: cold launcher, stable room
-  anchor/recenter, Touch navigation/selection, Yellow handoff, stereo/6DoF,
-  controller wake, suspend/resume, and clean exit/relaunch.
+- PR 5 has passed its primary Quest 3 physical matrix. It still requires longer
+  repeated suspend/resume, controller-sleep, map-transition, handoff, and quit
+  soak before release qualification.
 - Gold flat mode is validated, but Gold voxel/VR remains unimplemented.
-- The Pokédex battle information is usable, but its 3D battle view remains a
+- The Pokedex feed is restored in q15. Its battle-view framing remains a
   lower-medium presentation regression.
 - Sustained voxel performance remains workload-bound with occasional hitches;
   long-session memory/thermal work and broad-map validation remain open.
@@ -95,13 +97,13 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 
 - Integration source and documentation are on `quest-gen2-beta-v0.1.79`.
 - PR 5 source is isolated in `E:\Gen1QuestVR\upstream-pr5-quest-backend` on
-  `upstream-quest-openxr-backend`; its worktree is clean at `f9e8088b`.
+  `upstream-quest-openxr-backend`; its source milestone is `b7fba361`.
 - The integration checkout retains unrelated untracked portal/MR prototype
   files. They remain intentionally excluded from these commits.
 - The PR 5 APK is installed and physically validated through launcher pointer,
   Yellow launch, save-aware q14 loading card, automatic OpenXR ownership
-  handoff, and immersive voxel entry. Its SHA-256 is
-  `7BE8565B7C7344D83954ACD79139FB8F1D37E65CD245F83F035AAEE928F6EF23`.
+  handoff, immersive voxel entry, and q15 Pokedex frame capture. Its SHA-256 is
+  `8342334C3F6ED5D77A64E253FF86EB56355264D6B8CDC43ECEC296E88CBBB84E`.
 
 ## Completed milestones
 
@@ -144,8 +146,8 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 - A/X, B/Y, triggers/Start, and left-stick movement are device-verified.
 - The launcher-to-gameplay OpenXR session handoff succeeds.
 - The process no longer reproduces the earlier launcher memory kill.
-- The first-person Pokédex screen is readable and its left-edge misalignment
-  has been physically verified fixed.
+- The first-person Pokedex screen is rendering again through the generic q15
+  completed-frame event. Its battle-view framing remains low priority.
 
 ## Open defects
 
@@ -280,15 +282,18 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Run PR 5's remaining suspend/resume, controller-sleep, repeated-handoff,
-   map-transition, and quit soak matrix; prioritize the prior destroyed-mutex
-   quit abort.
-2. Repeat the clean stock-versus-Quest audit at `f9e8088b`, then decide whether
+1. Capture a controlled q15 route walk and compare capture-active versus
+   capture-idle GPU/app timing before changing the restored Pokedex path.
+2. Run PR 5's remaining long suspend/resume, controller-sleep,
+   repeated-handoff, map-transition, and quit soak matrix; continue watching
+   for the historical destroyed-mutex abort.
+3. Repeat the clean stock-versus-Quest audit at `b7fba361`, then decide whether
    the backend branch is ready to submit upstream.
-3. Device-test `QUEST_MEMORY_CANDIDATE_TEST.md`, including seamless crossings,
-   a warm Tower/interior return, Pokédex/battle resize transitions, and final
+4. Device-test `QUEST_MEMORY_CANDIDATE_TEST.md`, including seamless crossings,
+   a warm Tower/interior return, Pokedex/battle resize transitions, and final
    memory/thermal capture.
-4. Profile and fix intermittent startup and slow initial Yellow/voxel loading.
-5. Fix remaining SDL/OpenAL suspend/resume lifecycle crashes.
-6. Continue battle-view, distance/LOD, stereo-alignment, long-session, and
+5. Profile and fix intermittent startup and slow initial Yellow/voxel loading.
+6. Continue SDL/OpenAL lifecycle soak; do not patch the old crash without a
+   current-build reproduction.
+7. Continue battle-view, distance/LOD, stereo-alignment, long-session, and
    broad-map validation after the upstream backend gate.

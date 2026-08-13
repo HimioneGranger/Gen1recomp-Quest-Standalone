@@ -465,3 +465,44 @@ launcher session released at `23:26:06.898`, gameplay OpenXR startup completed
 at `23:26:06.966`, and the gameplay session reached `FOCUSED` at
 `23:26:07.059`. The ownership swap took about 194 ms from request to FOCUSED,
 with no fatal, mutex, ANR, OOM, or process-death signature.
+
+## 2026-08-13 q15 Pokedex frame-event build
+
+The q15 engine payload was packed from PR 5 commit `b7fba361`. On Windows the
+payload packer required UTF-8 mode because the Yellow manifest contains UTF-8
+text:
+
+```powershell
+$env:PYTHONUTF8='1'
+# Run the existing PR 5 Quest payload-packaging command.
+```
+
+The Android build used JDK 17 at `E:\Gen1QuestVR\jdk-17.0.20+8`, Android SDK
+API 34 and NDK `25.2.9519653` from
+`F:\CodexProjects\Gen1RecompQuest3-work\toolchain\android-sdk`, and Gradle task
+`:app:assembleQuestVrNoRecordDebug`. Gradle completed all 54 tasks successfully
+in 39 seconds. Inspection confirmed an ARM64-v8a-only APK containing
+`libquestxr.so`, `liblove.so`, the generic `render.frame_drawn` event in
+`game.love`, and 499 payload entries. It contained no ROM, generated ROM data,
+save, `data/generated`, or `assets/generated` entry.
+
+The first locally signed output used a fresh
+`E:\Gen1QuestVR\.android-user\debug.keystore`. Android rejected the in-place
+update with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, as expected for a different
+signing identity, and preserved the installed app and data. The installed q14
+APK was then pulled and verified at SHA-256
+`7BE8565B7C7344D83954ACD79139FB8F1D37E65CD245F83F035AAEE928F6EF23`.
+Its signing certificate SHA-256 was
+`253a30fbc7131d0970800a800a5d77fc49cbc00c8b5e4e9e5dc259854b1c4075`,
+matching `C:\Users\I5 Gaming\.android\debug.keystore`.
+
+Re-signing with that existing key produced
+`E:\Gen1QuestVR\dist\Gen1Recomp-Quest-PokedexFrameEvent-q15-signed.apk`,
+SHA-256
+`8342334C3F6ED5D77A64E253FF86EB56355264D6B8CDC43ECEC296E88CBBB84E`.
+`adb install -r` then succeeded and preserved app data. The paired imported mod
+was `E:\Gen1QuestVR\Dramaless-Quest\dist\DRAMALESS_SHAPE-1.6.4-quest.15.zip`,
+SHA-256
+`E899C0B36530AC69FCBC8D5469F57FCCD025E0DA082574D61C1A733280E856CC`.
+Quest logs confirmed q15 loaded in PID `15729`, and the user physically
+confirmed the Pokedex display was restored.
