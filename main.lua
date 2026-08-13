@@ -478,18 +478,21 @@ function love.draw()
   if editorMode then
     HostDisplay.beginFrame("editor", EditorApp)
     local result = EditorApp.draw()
+    PlatformHooks.frameDrawn("editor", EditorApp)
     HostDisplay.endFrame("editor", EditorApp)
     return result
   end
   if TouchEditor then
     HostDisplay.beginFrame("touch_editor", TouchEditor)
     local result = TouchEditor.draw()
+    PlatformHooks.frameDrawn("touch_editor", TouchEditor)
     HostDisplay.endFrame("touch_editor", TouchEditor)
     return result
   end
   if Importer then
     HostDisplay.beginFrame("launcher", Importer)
     local result = Importer:draw()
+    PlatformHooks.frameDrawn("launcher", Importer)
     HostDisplay.endFrame("launcher", Importer)
     return result
   end
@@ -497,6 +500,7 @@ function love.draw()
 
   HostDisplay.beginFrame("game", Game)
   Game:draw()
+  PlatformHooks.frameDrawn("game", Game)
   -- frame capture requested by a driver
   if Game.capturePath then
     local path = Game.capturePath

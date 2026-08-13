@@ -439,6 +439,17 @@ oldest queued event as `"action,x,y"` in submitted-frame coordinates, or `nil`.
 This is what lets a mod lay the two passes out as two stacked Game Boy screens,
 or push one onto a second screen, without the engine knowing the layout.
 
+`render.frame_drawn` is an observation-only event emitted after the active
+editor, touch editor, launcher, or game has submitted its complete Lua draw,
+but before an optional packaged host finalizes/captures it and before
+`love.graphics.present()` swaps the default framebuffer. Its payload is
+`{ kind, subject }`, where `kind` is `"editor"`, `"touch_editor"`,
+`"launcher"`, or `"game"`, and `subject` is the object whose draw method just
+ran. This is the safe point for a second-screen or accessibility mod to copy a
+finished composition. It is an event rather than a hook: observers cannot
+replace, veto, or reorder vanilla presentation, and with no subscriber it is a
+no-op.
+
 `screen.render_visible` receives `(next, state)` while the main screen is being
 composed. Return `false` to omit that state from drawing, opacity selection and
 palette-zone ownership. The state remains on the stack and keeps its normal

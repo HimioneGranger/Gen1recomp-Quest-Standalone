@@ -27,11 +27,16 @@ local FIXTURE = {
       if os.getenv("FIXTURE_VETO_QUIT") == "1" then return false end
       return nextFn()
     end)
+    mod.events:on("render.frame_drawn", function(frame)
+      _G.__fixturePlatformBridge.frames[#_G.__fixturePlatformBridge.frames + 1]
+        = frame
+    end)
     -- test-only knobs, read back through mod.storage-free globals since
     -- this fixture never leaves the process
     _G.__fixturePlatformBridge = {
       setPaused = function(v) paused = v end,
       extraPolls = function() return extraPolls end,
+      frames = {},
     }
   ]],
 }
@@ -60,6 +65,30 @@ do
 
   run.release()
   _G.__fixturePlatformBridge = nil
+end
+
+-- render.frame_drawn: observers receive the exact completed frame identity.
+-- They do not wrap, replace, or veto the draw path.
+do
+  local run = T.sdk.loadMods({ "mods/fix_platform_bridge" },
+    { fs = T.sdk.memfs(FIXTURE) })
+  T.eq(#run.errors, 0,
+    "the fixture mod loads clean (" .. tostring(run.errors[1]) .. ")")
+
+  local subject = { tag = "finished-game-frame" }
+  PlatformHooks.frameDrawn("game", subject)
+  T.eq(#__fixturePlatformBridge.frames, 1,
+    "one post-draw event is emitted for one completed frame")
+  T.eq(__fixturePlatformBridge.frames[1].kind, "game",
+    "post-draw event identifies the frame kind")
+  T.eq(__fixturePlatformBridge.frames[1].subject, subject,
+    "post-draw event carries the exact drawn subject")
+
+  run.release()
+  _G.__fixturePlatformBridge = nil
+  -- No live listener: the public call remains a safe vanilla no-op.
+  T.eq(PlatformHooks.frameDrawn("game", subject), nil,
+    "post-draw seam is inert without a subscriber")
 end
 
 -- core.quit_to_launcher: a subscriber can veto without the vanilla
