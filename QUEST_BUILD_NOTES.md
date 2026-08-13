@@ -371,3 +371,30 @@ copy is preserved at
 its size and SHA-256 were rechecked after copying. These are local debug builds,
 not release artifacts. Physical installation is pending because
 `adb devices -l` currently reports no connected headset.
+
+## 2026-08-12 physically validated PR 5 pointer/handoff APK
+
+The follow-up build at engine commit `f9e8088b` used the same JDK, SDK, NDK,
+Gradle home, ARM64-only `questVrNoRecordDebug` flavor, and canonical output
+path described above. The focused incremental command was:
+
+```powershell
+$env:JAVA_HOME='F:\CodexProjects\Gen1RecompQuest3-work\toolchain\jdk\jdk-17.0.20+8'
+$env:ANDROID_HOME='F:\CodexProjects\Gen1RecompQuest3-work\toolchain\android-sdk'
+$env:ANDROID_SDK_ROOT=$env:ANDROID_HOME
+$env:GRADLE_USER_HOME='F:\CodexProjects\Gen1RecompQuest3-work\toolchain\.gradle'
+Set-Location E:\Gen1QuestVR\upstream-pr5-quest-backend\mobile\android
+.\gradlew.bat :app:assembleQuestVrNoRecordDebug
+```
+
+Gradle completed 54 tasks successfully in 27 seconds. The APK SHA-256 is
+`7BE8565B7C7344D83954ACD79139FB8F1D37E65CD245F83F035AAEE928F6EF23`.
+It was installed with `adb install -r`, preserving app data. The paired
+Dramaless q14 ZIP SHA-256 is
+`1588EFCBE4985AD220D26F70BFA01AFBD80A35BD82E92FFFDAA6E92809CACC67`.
+
+Quest 3 physical testing confirmed a live room-anchored launcher, controller
+ray selection, pointer removal at Yellow handoff, the restored save-aware
+loading card, clean launcher session release, automatic gameplay OpenXR
+startup, and a FOCUSED immersive voxel session. Longer lifecycle/quit soak is
+still required before a release build.

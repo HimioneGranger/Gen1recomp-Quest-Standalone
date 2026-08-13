@@ -2031,3 +2031,43 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - ADB starts successfully with the project-local Android home, but currently
   reports no connected device. Physical validation is the remaining gate; the
   branch must not be described as submitted or release-qualified before it.
+
+## 2026-08-12 - PR 5 physical pointer/loading/handoff milestone
+
+- Installed the evolving PR 5 `questVrNoRecordDebug` APK with `adb install -r`
+  on the Quest 3, preserving imported ROM data, saves, settings, and mods.
+- Replaced the unreliable launcher focus-image experiments with a native
+  right-Touch aim ray that drives the launcher's existing virtual-pointer and
+  button paths. The visible compositor target is a crisp small white circle;
+  the prior halo and duplicate software cursor are removed.
+- Moved panel capture to a generic optional LÖVE presented-frame observer. It
+  captures after batched draws finish and before SDL swaps, while the stock
+  Android observer remains null. Raw GLES texture, framebuffer, pack, active
+  texture, and scissor state are restored after capture.
+- A physical test exposed a visibility override: Lua correctly hid the pointer
+  on game frames, but native ray tracking re-enabled it whenever the controller
+  was aimed at the retained panel. The compositor now updates ray coordinates
+  only while Lua's launcher-only visibility flag is enabled.
+- The first loading-card retest showed no card because the launcher log proved
+  Dramaless `1.6.4-quest.13` was still installed; q14 had only been copied to
+  Downloads. After importing q14, logs confirmed
+  `loaded mod DRAMALESS_SHAPE 1.6.4-quest.14` and the colored GBC loading card
+  returned.
+- Route 8 physical timing: final save load at `22:56:51.439`; gameplay OpenXR
+  request at `22:57:21.838` (30.4 seconds); launcher session released at
+  `22:57:21.880`; gameplay startup completed at `22:57:21.956`; gameplay
+  reached FOCUSED at `22:57:22.905`.
+- User-confirmed pass: selector absent after Yellow starts, loading card
+  visible during mesh preparation, and automatic entry into immersive voxel
+  VR. This proves the earlier 30-second flat interval was the intentional
+  save-aware preload gate, not a stale loading-screen lock.
+- Engine milestone commit: `f9e8088b` on
+  `upstream-quest-openxr-backend`.
+- Dramaless milestone commit: `309f4df` on `quest-vr`.
+- Validated APK SHA-256:
+  `7BE8565B7C7344D83954ACD79139FB8F1D37E65CD245F83F035AAEE928F6EF23`.
+- Validated q14 ZIP SHA-256:
+  `1588EFCBE4985AD220D26F70BFA01AFBD80A35BD82E92FFFDAA6E92809CACC67`.
+- Remaining gate: long suspend/resume, controller-sleep, repeated handoff,
+  map-transition, and quit soak. An earlier destroyed-mutex quit abort remains
+  open and prevents release promotion.

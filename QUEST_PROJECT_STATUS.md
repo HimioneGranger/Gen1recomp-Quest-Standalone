@@ -95,12 +95,13 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 
 - Integration source and documentation are on `quest-gen2-beta-v0.1.79`.
 - PR 5 source is isolated in `E:\Gen1QuestVR\upstream-pr5-quest-backend` on
-  `upstream-quest-openxr-backend`; its worktree is clean at `4e16cd77`.
+  `upstream-quest-openxr-backend`; its worktree is clean at `f9e8088b`.
 - The integration checkout retains unrelated untracked portal/MR prototype
   files. They remain intentionally excluded from these commits.
-- The installed headset build remains the physically validated v0.1.79
-  baseline. The new PR 5 APK has passed local source, packaging, and binary
-  inspection but has not been installed because ADB currently sees no device.
+- The PR 5 APK is installed and physically validated through launcher pointer,
+  Yellow launch, save-aware q14 loading card, automatic OpenXR ownership
+  handoff, and immersive voxel entry. Its SHA-256 is
+  `7BE8565B7C7344D83954ACD79139FB8F1D37E65CD245F83F035AAEE928F6EF23`.
 
 ## Completed milestones
 
@@ -135,10 +136,10 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
   repositions it ahead, and yaw-only anchoring prevents permanent head tilt.
 - Touch controller events reach the existing launcher input handlers and can
   launch the imported Yellow ROM.
-- A thin green native OpenXR focus border was previously verified steady and
-  responsive. Normal launcher buttons are selectable and the border is aligned
-  with the displayed image. Experimental-mod confirmation dialogs still have
-  a separate Quest confirm-routing defect described below.
+- A right-Touch ray drives a crisp small white native selector. Normal launcher
+  buttons and mod-manager actions are selectable. The selector is explicitly
+  launcher-only and is physically verified absent from Yellow, the loading
+  card, and immersive gameplay.
 - Yellow displays its main menu and transitions into voxel gameplay.
 - A/X, B/Y, triggers/Start, and left-stick movement are device-verified.
 - The launcher-to-gameplay OpenXR session handoff succeeds.
@@ -158,8 +159,10 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
   relaunch usually recovers. This is the current highest-priority defect.
 - Sleep/background lifecycle has produced destroyed-mutex and AudioTrack abort
   logs and needs a deliberate suspend/resume fix.
-- Initial Yellow/mod/voxel loading is visibly slow and is awaiting a timed
-  device profile to separate asset, shader, and map-mesh work.
+- Initial Yellow/mod/voxel loading remains slow, but it is no longer ambiguous:
+  q14 displays real map/mesh progress on the colored GBC loading card. A Route
+  8 physical sample spent 30.4 seconds between final save load and OpenXR
+  startup request, then entered immersive VR automatically.
 - Quest video evidence shows a 2D-to-partial-to-complete voxel population
   sequence. Current Dramatic Shape already builds meshes cooperatively; the
   leading improvement candidate is a new persistent disk mesh cache.
@@ -258,10 +261,11 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Connect and authorize the Quest, install the clean PR 5 candidate, and run
-   its cold-launch/anchor/recenter/input/handoff/stereo/6DoF/wake/exit matrix.
-2. Fix any PR 5 device regression, repeat the clean stock-versus-Quest audit,
-   then decide whether the backend branch is ready to submit upstream.
+1. Run PR 5's remaining suspend/resume, controller-sleep, repeated-handoff,
+   map-transition, and quit soak matrix; prioritize the prior destroyed-mutex
+   quit abort.
+2. Repeat the clean stock-versus-Quest audit at `f9e8088b`, then decide whether
+   the backend branch is ready to submit upstream.
 3. Device-test `QUEST_MEMORY_CANDIDATE_TEST.md`, including seamless crossings,
    a warm Tower/interior return, Pokédex/battle resize transitions, and final
    memory/thermal capture.
