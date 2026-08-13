@@ -250,9 +250,14 @@ performance work measures the combined stack.
   stage and clear wide camera work perfectly. Preserve exact artifact SHA-256
   `9A67A4190C646EE37692A6FA6C600B7D0E26099052D7C8C4E5E538C7E1F61D68`
   under tag `kanto-quest-1.60.0-q7-route12-accepted`.
-- [ ] Complete the broader q7 regression: repeat Route 12, reconfirm Route 8
-  and one unaffected battle/map, then verify Kanto exploration, Pokédex,
-  controls and stereo remain unchanged. Retain q6 as a rollback meanwhile.
+- [x] Reconfirm under q7 that Route 8 remains correctly staged; the user
+  explicitly clarified that Route 8 was not broken by the Route 12 change.
+- [ ] Complete the broader q7 regression. An unaffected Route 5 battle kept
+  its correct world stage, stereo and gameplay, but the handheld Pokédex
+  retained a stale exploration frame instead of the battle feed. Reproduce
+  that capture defect once, repair it outside the arena overrides, then repeat
+  Route 12 and verify exploration/controls remain unchanged. Retain q6 as a
+  rollback meanwhile.
 - [ ] Complete a clean explicit REMOVE PATCH rollback on Quest.
 - [ ] Measure Dramaless + Kanto alone before attributing the current full-stack
   36-38 FPS / ~2.1 GB PSS / ~714 MB graphics sample to Kanto itself.

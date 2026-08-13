@@ -2757,6 +2757,34 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   REMOVE PATCH test or the isolated Kanto performance benchmark. q6 remains a
   preserved rollback while those broader gates remain open.
 
+### q7 Route 8 continuity and Route 5 Pokédex stale-frame defect
+
+- The user clarified that Route 8 remained correct under q7. This closes the
+  Route 8 continuity part of the broader q7 regression: q7's new Route 12
+  override did not regress q6's accepted Route 8 camera.
+- The next unaffected-map check was initially reported as Route 7, but live
+  device evidence identifies the actual encounter as Route 5. The log records
+  Wilds of Kanto starting `MEOWTH Lv7` at `18:42:06`, followed by
+  `voxel-arena-begin arena=dramaless:voxel-map:ROUTE_5 map=ROUTE_5` and
+  `standalone-voxel-2d-begin` at `18:42:09`.
+- The main Route 5 battle world is correctly staged and readable in both
+  captures. The physical Pokédex is present, but its screen shows a stale
+  pre-battle exploration view instead of the live battle feed. This is not a
+  Route 5 arena-camera obstruction and is outside q7's Route 8/Route 12 arena
+  metadata changes; keep it at the Dramaless Quest capture/lifetime boundary.
+- Evidence is preserved outside the public repository as
+  `E:/Gen1QuestVR/quest-screenshots/route7-pokedex-20260813-184220.jpg`
+  (SHA-256
+  `1A07A2193AA1F6717EFDB17F5DCB26FD8AE1056CD9A0CC8DED8EFB266E64EFA8`)
+  and `...-184227.jpg` (SHA-256
+  `0EF399AA3148048125FF027D7A4367577BF44606F29DB9D539FE484A551A387A`).
+  The historical filename preserves when it was pulled; the checked map is
+  Route 5. Screenshots and runtime-derived content remain outside Git/packages.
+- Reproduce one more Route 5 battle before changing capture code. If the
+  handheld remains stale after several battle frames, instrument successful
+  `copyFrontRegionToCanvas` updates and battle-state transitions rather than
+  applying another per-map camera override.
+
 ### Deferred Wild Skies / Yanma model-contract defect
 
 - During ordinary q7 exploration on Route 8, the user observed a flying Yanma
