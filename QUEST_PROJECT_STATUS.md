@@ -45,6 +45,9 @@ Known active issues are:
 - q16 makes the existing `RES` setting affect immersive eye rendering. The
   accepted Quest 3 performance default is `RES: FULL`, `SHADOWS: LOW`; half
   resolution is retained only as an optional low-memory mode.
+- q17 is packaged for physical validation. It makes the previously tested
+  indexed/lifetime adaptations self-contained in the approved Dramaless fork
+  and adds observation-only transition phase timing.
 - Sustained voxel performance remains workload-bound. Full/low reduces steady
   application frame cost, but map-transition and streaming tail hitches remain;
   long-session memory/thermal work and broad-map validation are open.
@@ -292,7 +295,8 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Instrument map-transition and streaming queue latency on the accepted
+1. Import and physically validate Dramaless q17, then instrument map-transition
+   and streaming queue latency on the accepted
    `RES: FULL`, `SHADOWS: LOW` baseline, starting with the reproducible
    Saffron -> Route 8 -> Lavender -> Route 8 route. Avoid reducing global view
    distance or resolution before identifying the hitch source.

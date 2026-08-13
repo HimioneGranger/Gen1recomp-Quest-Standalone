@@ -54,6 +54,7 @@ local FieldDefaults = require("src.world.FieldDefaults")
 local ModRuntime = require("src.mods.Runtime")
 local CanvasLifetime = require("src.quest.dramaless.CanvasLifetime")
 local StreamingPolicy = require("src.quest.dramaless.StreamingPolicy")
+local Quality = V.require("Quality")
 local FirstPerson = V.require("FirstPerson")
 local BattleCam = V.require("BattleCam")
 local VRRig = V.require("VRRig")
@@ -109,6 +110,7 @@ local mirrorCanvas = nil
 local dexCanvas = nil           -- physical-device presentation texture
 local dexSource = nil           -- completed flat UI captured after Game:draw
 local dexBattle = false         -- state captured into dexSource
+local lastEyeDivisor = nil      -- last RES rung applied to headset eye canvases
 local status = "off"
 
 -- Quest starts inside the native launcher session. Before asking that stable
@@ -217,6 +219,9 @@ local function ensureWarpPreloadHooks()
   end, 1000, "DRAMALESS_SHAPE")
   events:on("map.entered", function(payload)
     if not (rawget(_G, "QUEST_PANEL_ACTIVE") and payload) then return end
+    if type(ChunkMesher.traceState) == "function" then
+      ChunkMesher.traceState("map.entered", payload.mapId, payload.via)
+    end
     -- Keep one previous neighborhood for reversible walking connections.
     -- Physical Route 8 -> Lavender -> Route 8 profiling showed that dropping
     -- it canceled/rebuilt useful route bodies in both directions. Fly is
@@ -495,6 +500,7 @@ local function shutdown(reason)
   majorTravel.current, majorTravel.previous, majorTravel.target = nil, nil, nil
   bodyDropPending = {}
   requestedRefresh = nil
+  lastEyeDivisor = nil
   if ChunkMesher.setWarmLive then ChunkMesher.setWarmLive(nil) end
   if started then
     VRXR.stop()
@@ -734,17 +740,25 @@ local function renderWorld(views, ctl)
   end
 
   local eyes = {}
+  local eyeDivisor = Quality.scale()
   for i = 1, 2 do
     local v = views[i]
     eyes[i] = {
       camera = VRRig.eyeCamera(v.pose, v.fov, pivot, anchor, scale, mountYaw),
-      w = v.w, h = v.h,
+      w = math.max(1, math.floor(v.w / eyeDivisor + 0.5)),
+      h = math.max(1, math.floor(v.h / eyeDivisor + 0.5)),
       slot = i == 1 and "vrL" or "vrR",
       -- the battle seat is a placed shot, not the first-person rig: the
       -- cards keep their stage lean rather than yawing at this eye, and
       -- the player's own card stays visible in it
       adopt = not battle,
     }
+  end
+  if eyeDivisor ~= lastEyeDivisor then
+    lastEyeDivisor = eyeDivisor
+    VRXR.trace(("eye RES 1/%d render=%dx%d swapchain=%dx%d")
+      :format(eyeDivisor, eyes[1].w, eyes[1].h,
+        views[1].w, views[1].h))
   end
   eyes.cx, eyes.cy = pivot[1], pivot[3]
 

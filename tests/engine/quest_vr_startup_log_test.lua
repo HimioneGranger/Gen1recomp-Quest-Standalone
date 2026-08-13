@@ -10,6 +10,18 @@ local source = handle:read("*a")
 handle:close()
 
 T.check(loadstring(source) ~= nil, "Quest VR conductor compiles")
+T.check(source:find('local Quality = V.require("Quality")', 1, true) ~= nil,
+  "engine-carried conductor preserves Dramaless quality settings")
+T.check(source:find("local eyeDivisor = Quality.scale()", 1, true) ~= nil,
+  "engine-carried conductor applies RES to immersive eyes")
+T.check(source:find("math.floor(v.w / eyeDivisor + 0.5)", 1, true) ~= nil,
+  "immersive eye width uses the selected RES divisor")
+T.check(source:find("eye RES 1/%d render=%dx%d swapchain=%dx%d", 1, true) ~= nil,
+  "physical RES verification trace remains available after restart")
+T.check(source:find(
+    'ChunkMesher.traceState("map.entered", payload.mapId, payload.via)',
+    1, true) ~= nil,
+  "map entry snapshots the optional q17 mesh queue")
 
 local start = assert(source:find("if VRXR.start(qw, qh) then", 1, true))
 local finish = assert(source:find("else", start, true))

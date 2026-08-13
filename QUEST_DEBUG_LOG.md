@@ -2221,3 +2221,28 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   resolution.
 - Validated q16 ZIP SHA-256:
   `87F194FD0A290F2D88076E8EBF42020D7113B7636C72DC7C4929324945E519CB`.
+
+## 2026-08-13 - q17 self-contained mesher and transition diagnostics
+
+- Post-q16 ownership review found that the indexed terrain sink and bounded
+  lifetime helpers still lived in the older prototype host's source-guarded
+  adapter. q16's packaged `ChunkMesher.lua` retained the inherited six
+  complete vertices per quad. The clean PR 5 backend correctly carries no
+  mod-specific mesher patch, so a new mod import could no longer be assumed to
+  retain those earlier optimizations.
+- q17 moves the already-tested four-vertex/six-index FFI sink, warm/history
+  lifetime APIs, promoted-body release, and Route 2 request priority into the
+  approved Dramaless fork. Existing source markers make older prototype APKs
+  treat it as already adapted; the generic PR 5 backend loads it directly.
+- Added observation-only `MESHJOB2` timing. Queue wait and wall-clock build
+  duration are now distinct from actual `coroutine.resume` CPU time. Active
+  time is attributed to auxiliary meshes, geometry, terrain upload, water
+  upload, and commit, with maximum phase segment and budget-overrun evidence.
+- Added `VRSTREAM map.entered` snapshots and explicit cancellation/eviction
+  traces. Queue order, time budgets, view distance, rendered geometry, OpenXR
+  submission, and headless/table meshing are unchanged.
+- Both static Quest contracts passed. Packaging was deterministic across two
+  runs, contained 119 entries, and contained no ROM, save, generated-data, or
+  APK entry.
+- Candidate q17 ZIP SHA-256 (physical validation pending):
+  `E89261049BD577FBDC854A23DA82961287C40DA81B1119448C486F2A6F4B5599`.
