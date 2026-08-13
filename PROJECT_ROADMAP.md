@@ -12,9 +12,9 @@ prototype alone does not count as 100%.
 - **Standalone Quest VR core:** 90%
 - **Current v0.1.79 integration:** 100% (promotable Quest baseline)
 - **Stable Dramaless + Kanto experience:** 86% (Dramaless q3 core is accepted;
-  Kanto q6 physically clears Route 8's battle obstruction while preserving the
-  intended exploration presentation; broader regression, rollback and isolated
-  performance gates remain)
+  Kanto q6 physically clears Route 8; q7 automates the separately diagnosed
+  Route 12 water-stage correction but still awaits physical acceptance;
+  broader regression, rollback and isolated performance gates remain)
 - **Dramaless 2.0 Quest migration:** 96% (q3 passed the complete core physical
   matrix and is the accepted comparison baseline; retained transition continuity
   and Kanto compatibility work are tracked separately)
@@ -238,7 +238,18 @@ performance work measures the combined stack.
 - [x] Physically validate q6's Route 8 camera: the user reports the view is
   perfect, while logs prove the wide-camera patch and restored tree supports
   loaded before a successful Route 8 voxel-arena start.
-- [ ] Complete the broader q6 regression on a second battle/map and reconfirm
+- [x] Diagnose the distinct Route 12 defect from live device/source evidence:
+  the map reuses a land arena at `(0,73)` even for the water-heavy section south
+  of Lavender. Verify `(10,4)` is a complete 3x6 water arena using temporary,
+  unshipped map metadata from the user's authorized Yellow ROM.
+- [x] Build deterministic q7 with only the Route 12 water-stage/wide-camera
+  override added to accepted q6; prove fresh apply, q6 migration, idempotence,
+  byte-exact rollback and package safety. SHA-256:
+  `9A67A4190C646EE37692A6FA6C600B7D0E26099052D7C8C4E5E538C7E1F61D68`.
+- [ ] Physically validate q7 twice on Route 12: confirm water staging, clear
+  camera and stable battle/Pokedex behavior, then reconfirm Route 8 remains
+  fixed. Retain q6 as the accepted rollback until this passes.
+- [ ] Complete the broader q7 regression on another battle/map and reconfirm
   Kanto exploration, Pokédex capture, controls and stereo remain unchanged.
 - [ ] Complete a clean explicit REMOVE PATCH rollback on Quest.
 - [ ] Measure Dramaless + Kanto alone before attributing the current full-stack
@@ -610,9 +621,11 @@ maintaining.
   framed under Dramaless 2.0 q3; close the lingering sizing defect.
 - [x] Pass q3 battle regression: view/UI present, controls remain functional
   during and after battle, and exploration stereo restores normally.
-- [ ] Polish the localized wonky Route 8 world battle-camera angle/placement
-  after core acceptance; non-blocking and separate from the now-fixed Pokedex
-  battle feed.
+- [x] Fix the localized Route 8 world battle-camera obstruction with Kanto q6's
+  per-arena wide rig; physically accepted without changing the fixed Pokedex
+  battle feed or the global battle camera.
+- [ ] Physically validate q7's separate Route 12 water-stage correction and
+  retain the q6 Route 8 build as rollback until it passes.
 - [x] Confirm one route/town transition and one building entry/exit without a
   loading freeze, input loss or stereo regression.
 - [x] Confirm clean Quit and cold relaunch: PID `15300` exited itself with status

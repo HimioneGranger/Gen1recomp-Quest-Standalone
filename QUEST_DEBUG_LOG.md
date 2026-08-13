@@ -2700,3 +2700,44 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   reviewed allowlist only after evidence. Fully automatic selection is deferred
   because asynchronous terrain readiness could otherwise make the same map
   switch cameras unpredictably between battles.
+
+### Route 12 is a wrong-stage defect; Kanto q7 water candidate
+
+- The user reproduced an apparently similar battle defect immediately south of
+  Lavender, then supplied the decisive distinction: the battle should be over
+  water, but the entire scene is wrong. Live device logs identify the map and
+  provider exactly: `map.entered map=ROUTE_12` at player cell `(9,0)`, followed
+  by `voxel-arena-begin arena=dramaless:voxel-map:ROUTE_12 map=ROUTE_12` and
+  `standalone-voxel-2d-begin`. There is no Lua/OpenXR startup failure.
+- The two latest retrievable screenshots were the already accepted Route 8
+  comparison, not this Route 12 encounter. Diagnosis therefore relies on the
+  user's direct headset view, the exact live map/provider events and checked
+  source rather than mislabelling those older images.
+- Checked Dramaless 2.0 source shows the architectural cause: one authored
+  arena is reused for every battle on a map, and Route 12 is hard-coded to the
+  land clearing `{ x = 0, y = 73, shape = "wide" }`. A temporary detached
+  diagnostic worktree decoded only map/tileset metadata from the user's
+  already-authorized Yellow ROM. Route 12 is 20x108 cells with 917 water cells
+  and 178 valid 3x6 all-water arenas; `(10,4)` is a complete water arena beside
+  the Lavender entrance. Extracted ROM data is not tracked, packaged or copied
+  into the mod/APK.
+- q7 therefore does more than copy q6: Route 8 retains its physically accepted
+  camera-only override, while Route 12 changes from `(0,73)` to `(10,4)` and
+  uses Dramaless's existing `cam = "wide"` rig so the closer camera remains
+  inside the water area. No global battle camera, OpenXR matrix, launcher,
+  input, Pokedex, exploration camera, other map or Battle Art code changes.
+- ROM-free validation passes the Dramaless 2.0 source-anchor contract, all Lua
+  compilation, fresh apply, installed q6-to-q7 maintenance migration, repeated-
+  boot idempotence, byte-exact explicit removal, unknown-version no-write
+  refusal, forbidden-package-content guards, deterministic two-build packaging
+  and PhysicsFS archive mounting. Final q7 size: 16,285,379 bytes; SHA-256:
+  `9A67A4190C646EE37692A6FA6C600B7D0E26099052D7C8C4E5E538C7E1F61D68`.
+- q7 is committed as `1352b4c`, tagged
+  `kanto-quest-1.60.0-q7-candidate`, and pushed to the approved Kanto Quest
+  fork. q6/tag `kanto-quest-1.60.0-q6-route8-accepted` remains the accepted
+  rollback until q7 physically proves Route 12 water placement, Route 8
+  continuity, exploration, Pokedex, controls and stereo.
+- Future reports should distinguish camera obstruction from a wrong authored
+  stage: `MAP battle is obstructed/wrong; expected ENVIRONMENT; reproduced
+  COUNT times; screenshot taken. Apply a reviewed per-arena override only; do
+  not change the global battle camera.`
