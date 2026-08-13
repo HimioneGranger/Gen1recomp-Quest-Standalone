@@ -306,3 +306,68 @@ XR logic. Final APK SHA-256 is
 embedded `game.love` SHA-256 is
 `C44A77CE8F4F2FD948A5CF6445213D1A811A7FB12D1CD93C1785FC56DFB5412D`.
 Archive inspection found no `data/generated` or `assets/generated` entries.
+
+## 2026-08-12 clean PR 5 stock/Quest comparison
+
+The isolated upstream backend candidate was built from
+`E:\Gen1QuestVR\upstream-pr5-quest-backend` at `4e16cd77`. Before the final
+build, the Android variant API was used to replace rather than merge the Quest
+native ABI set; Gradle dry-run output then contained only ARM64 Quest native
+tasks.
+
+The canonical ROM-free payload was produced first with:
+
+```powershell
+$env:PYTHONUTF8='1'
+& 'C:\Program Files\Git\bin\bash.exe' scripts/build_android.sh --package-only
+```
+
+On this Windows host, temporary untracked Python and `zip` command wrappers
+were needed for Git Bash. The Python wrapper selected the installed interpreter
+instead of the disabled Windows Store shim, and the `zip` wrapper called the
+installed 7-Zip binary. Both were deleted after packaging.
+
+The final clean build used:
+
+```powershell
+$env:JAVA_HOME='F:\CodexProjects\Gen1RecompQuest3-work\toolchain\jdk\jdk-17.0.20+8'
+$env:ANDROID_SDK_ROOT='F:\CodexProjects\Gen1RecompQuest3-work\toolchain\android-sdk'
+$env:ANDROID_HOME=$env:ANDROID_SDK_ROOT
+$env:GRADLE_USER_HOME='F:\CodexProjects\Gen1RecompQuest3-work\toolchain\.gradle'
+Set-Location E:\Gen1QuestVR\upstream-pr5-quest-backend\mobile\android
+.\gradlew.bat --no-daemon clean assembleEmbedNoRecordDebug assembleQuestVrNoRecordDebug --console=plain
+```
+
+Result: `BUILD SUCCESSFUL in 11m 28s`, 119 tasks, with 118 executed and one
+up-to-date. The SDK metadata warning and vendored SDL/LÖVE compiler warnings
+were non-fatal; there was no Java, Lua, native compile, or link failure.
+
+| Property | Stock `embedNoRecordDebug` | Quest `questVrNoRecordDebug` |
+|---|---|---|
+| APK size | 22,984,342 bytes | 24,028,171 bytes |
+| APK SHA-256 | `F03F2708108540186CD53A9F1126953F0F020EF06F9CD26A30B0A80A428F7FFD` | `32B762518036DE87C283DA6AD1870CEF74C585B0972EBFB967C4E9B224AF88F0` |
+| minSdk / targetSdk | 16 / 34 | 24 / 34 |
+| Activity | stock `GameActivity` | flavor-only `QuestGameActivity` |
+| Native ABIs | ARM64, ARMv7, x86_64 | ARM64 only |
+| Quest libraries | none | `libopenxr_loader.so`, `libquestxr.so` |
+| Graphics path | stock SDL/EGL/GLES | SDL/EGL/GLES plus OpenXR GLES swapchains |
+
+Both archives contain the identical 4,278,077-byte `assets/game.love` with
+SHA-256
+`023D8BF58D09100E943160BAE8DDB16DB3CE3974053DB7D010AF7C1E0FF0B4CB`.
+Inspection found 499 payload entries, the required Yellow and Gold importer
+manifests, and zero generated data, ROM/save files, or bundled mods.
+
+The Quest manifest contains the OpenXR runtime-broker declarations, headtracking
+feature, and Oculus VR launcher category. Its native archive contains only
+ARM64 `libc++_shared`, LÖVE, mpg123, OpenAL, Khronos OpenXR loader, and
+`libquestxr`. ELF inspection verified `libquestxr.so` as AArch64 and confirmed
+that stock and Quest `liblove.so` export no Quest/OpenXR surface.
+
+The final local artifacts remain under each variant's canonical
+`mobile/android/app/build/outputs/apk/.../debug/` directory. An identical Quest
+copy is preserved at
+`E:\Gen1QuestVR\artifacts\upstream-pr5-4e16cd77\Gen1Recomp-Quest-PR5-4e16cd77-debug.apk`;
+its size and SHA-256 were rechecked after copying. These are local debug builds,
+not release artifacts. Physical installation is pending because
+`adb devices -l` currently reports no connected headset.

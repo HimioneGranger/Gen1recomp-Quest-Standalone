@@ -1968,3 +1968,66 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   (`HTTP 401`). Local commits and submitted PR URLs are verified, but current
   merge/review/check status must be refreshed after `gh auth login` rather than
   guessed in project documentation.
+
+## 2026-08-12 - PR 5 backend implementation and full local review
+
+- Completed the isolated implementation candidate on
+  `upstream-quest-openxr-backend` at `4e16cd77`. It now contains a Quest-only
+  Android flavor/activity, separate `libquestxr.so`, optional engine-facing
+  `HostDisplay` provider, fixed launcher panel transport, Touch input, and the
+  launcher-to-gameplay session handoff. No Dramaless/Kanto policy, ROM, save,
+  generated cache, or commercial asset is part of the candidate.
+- Stock Android remains a no-op consumer of the generic seams. Archive and ELF
+  inspection confirmed that neither stock `GameActivity` nor stock
+  `liblove.so` contains Quest/OpenXR references or dynamic symbols.
+- A clean build exposed an Android Gradle Plugin behavior missed by incremental
+  builds: product-flavor `abiFilters` merged with the default ABI set instead
+  of replacing it, so Quest native tasks were still being scheduled for ARMv7
+  and x86_64. The build was stopped before accepting that artifact. PR 5 now
+  uses the variant API to set the Quest external-native-build ABI set to only
+  `arm64-v8a`; a regression test and Gradle dry run verify the replacement.
+- A second source-level comparison against the proven integration backend found
+  missing generic lifecycle protections. The candidate now handles
+  `shouldRender == false`, requests session exit and completes the STOPPING
+  transition, applies room anchoring/recenter with yaw-only leveling, emits one
+  launcher navigation edge per left-stick flick, reserves the right stick for
+  gameplay camera use, and never calls process-wide `eglTerminate` on SDL's
+  shared display. Cross-thread lifecycle state now uses C11 atomics.
+- The canonical packager required three host-only accommodations: a temporary
+  wrapper to the real Python executable because Git Bash selected the disabled
+  Windows Store shim, `PYTHONUTF8=1` because the host Python defaulted to
+  CP1252, and a temporary `zip` wrapper backed by installed 7-Zip. These helpers
+  were removed after packaging and were never committed.
+
+### Verification results
+
+- Focused suites all passed: Android host extension; `HostDisplay` 23/23;
+  launcher modal focus 24/24; Quest display provider 9/9; Android flavor
+  isolation; and source whitespace validation.
+- Complete Windows engine run: 161/164 suites passed. The only failures remain
+  the established host/baseline cases `build_zip_pipe_guard_bug774`,
+  `quit_thread_shutdown`, and `title_zone_seams`; no PR 5 suite failed.
+- Clean command:
+  `gradlew.bat --no-daemon clean assembleEmbedNoRecordDebug assembleQuestVrNoRecordDebug --console=plain`.
+  It completed 119 tasks successfully in 11m28s using JDK 17.0.20+8,
+  Android SDK/API 34, NDK 25.2.9519653, and the repository Gradle wrapper.
+- Stock APK: 22,984,342 bytes, SHA-256
+  `F03F2708108540186CD53A9F1126953F0F020EF06F9CD26A30B0A80A428F7FFD`.
+  It contains ARM64, ARMv7, and x86_64 LÖVE dependencies and no Quest/OpenXR
+  archive entry.
+- Quest APK: 24,028,171 bytes, SHA-256
+  `32B762518036DE87C283DA6AD1870CEF74C585B0972EBFB967C4E9B224AF88F0`.
+  It contains only ARM64 native libraries, including `libopenxr_loader.so` and
+  `libquestxr.so`, launches `QuestGameActivity`, declares Quest head tracking,
+  and uses minSdk 24 / targetSdk 34.
+- Both APKs contain the identical 4,278,077-byte `assets/game.love`, SHA-256
+  `023D8BF58D09100E943160BAE8DDB16DB3CE3974053DB7D010AF7C1E0FF0B4CB`.
+  Its 499 entries include Yellow and Gold import manifests but zero generated
+  payloads, ROM/save files, or bundled mods.
+- `libquestxr.so` was verified as ELF64 AArch64. Its exports are limited to the
+  Quest activity lifecycle, panel capture/input/handoff surface, and status
+  getters; OpenXR functions are resolved from the runtime loader rather than
+  left as unresolved link dependencies.
+- ADB starts successfully with the project-local Android home, but currently
+  reports no connected device. Physical validation is the remaining gate; the
+  branch must not be described as submitted or release-qualified before it.

@@ -4,14 +4,15 @@ Last updated: 2026-08-12
 
 ## Current authoritative snapshot
 
-The current integration branch is `quest-gen2-beta-v0.1.79` at documentation
-commit `2b366f97`. The validated runtime baseline is the v0.1.79 ROM-free Quest
+The current integration branch is `quest-gen2-beta-v0.1.79`; the latest prior
+documentation reconciliation is `fb67a16b`. The validated runtime baseline is
+the v0.1.79 ROM-free Quest
 APK plus Dramaless Quest `1.6.4-quest.6`; subsequent q10 work also physically
 validated selectable Quest compositor refresh rates. The older branch and
 commit descriptions later in this file are retained as historical milestones,
 not as the current working-tree state.
 
-The upstream-release gate is 60%. Four generic changes have been submitted
+The upstream-release gate is approximately 75%. Four generic changes have been submitted
 independently against official development source:
 
 - [#1199](https://github.com/bryanthaboi/gen1recomp/pull/1199): launcher modal
@@ -23,16 +24,19 @@ independently against official development source:
 - [#1202](https://github.com/bryanthaboi/gen1recomp/pull/1202): Android native
   host lifecycle seam (`ee00728e`).
 
-PR 5 is in progress only on isolated branch `upstream-quest-openxr-backend` at
-`d2d2c428`. It will extract a Quest-only activity/flavor and OpenXR library
-from the prototype. It is not submitted, merged, or release-qualified yet.
+PR 5 is a locally verified work-in-progress candidate on isolated branch
+`upstream-quest-openxr-backend` at `4e16cd77`. It extracts the Quest activity,
+flavor, native OpenXR library, and generic display transport from the
+prototype while keeping stock Android physically isolated. It is not
+submitted, merged, device-validated, or release-qualified yet.
 Live GitHub PR state could not be refreshed because the local GitHub CLI login
 expired; documentation deliberately does not infer review or merge results.
 
 Known active issues are:
 
-- PR 5 must remove Quest symbols from shared `liblove`/`GameActivity` and split
-  native transport from Dramaless/Kanto-specific policy.
+- PR 5 still requires a physical Quest matrix: cold launcher, stable room
+  anchor/recenter, Touch navigation/selection, Yellow handoff, stereo/6DoF,
+  controller wake, suspend/resume, and clean exit/relaunch.
 - Gold flat mode is validated, but Gold voxel/VR remains unimplemented.
 - The Pokédex battle information is usable, but its 3D battle view remains a
   lower-medium presentation regression.
@@ -89,16 +93,14 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 
 ## Current working-tree state
 
-- Last pushed Gen1Recomp milestone: `89974f6`; last pushed Dramatic Shape
-  milestone: `901f739`.
-- Gen1Recomp currently has uncommitted documentation, launcher confirmation,
-  panel-bridge deployment, and atomic native panel/focus capture changes.
-- Dramatic Shape currently has uncommitted Quest-default Forest FX and targeted
-  Indigo Plateau/Route 23 policy candidates. The Indigo behavior has not been
-  exercised at Indigo Plateau and must not be described or committed as
-  device-verified.
-- The installed APK is a development test build containing those candidates.
-  No post-`89974f6`/`901f739` changes have been pushed.
+- Integration source and documentation are on `quest-gen2-beta-v0.1.79`.
+- PR 5 source is isolated in `E:\Gen1QuestVR\upstream-pr5-quest-backend` on
+  `upstream-quest-openxr-backend`; its worktree is clean at `4e16cd77`.
+- The integration checkout retains unrelated untracked portal/MR prototype
+  files. They remain intentionally excluded from these commits.
+- The installed headset build remains the physically validated v0.1.79
+  baseline. The new PR 5 APK has passed local source, packaging, and binary
+  inspection but has not been installed because ADB currently sees no device.
 
 ## Completed milestones
 
@@ -256,13 +258,14 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Device-test `QUEST_MEMORY_CANDIDATE_TEST.md`, including seamless crossings,
+1. Connect and authorize the Quest, install the clean PR 5 candidate, and run
+   its cold-launch/anchor/recenter/input/handoff/stereo/6DoF/wake/exit matrix.
+2. Fix any PR 5 device regression, repeat the clean stock-versus-Quest audit,
+   then decide whether the backend branch is ready to submit upstream.
+3. Device-test `QUEST_MEMORY_CANDIDATE_TEST.md`, including seamless crossings,
    a warm Tower/interior return, Pokédex/battle resize transitions, and final
    memory/thermal capture.
-2. Profile and fix intermittent startup and slow initial Yellow/voxel loading.
-3. Fix SDL/OpenAL suspend/resume lifecycle crashes.
-4. Determine whether missing distant buildings are culling, asset population,
-   shader failure, or a distance/LOD configuration issue.
-5. Run a controlled stereo alignment and long-session/thermal test.
-6. Commit only device-verified fixes as separate milestones and keep the debug
-   log current.
+4. Profile and fix intermittent startup and slow initial Yellow/voxel loading.
+5. Fix remaining SDL/OpenAL suspend/resume lifecycle crashes.
+6. Continue battle-view, distance/LOD, stereo-alignment, long-session, and
+   broad-map validation after the upstream backend gate.
