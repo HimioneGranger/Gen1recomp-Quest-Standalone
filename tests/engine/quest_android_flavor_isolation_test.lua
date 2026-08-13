@@ -18,9 +18,12 @@ local activity = read(
 local questActivity = read(
   "mobile/android/love/src/questVr/java/org/love2d/android/QuestGameActivity.java")
 local loveMake = read("mobile/android/love/src/jni/love/Android.mk")
+local loveGraphics = read(
+  "mobile/android/love/src/jni/love/src/modules/graphics/opengl/Graphics.cpp")
 local questMake = read("mobile/android/love/src/jni/questxr_bridge/Android.mk")
 local questNative = read(
   "mobile/android/love/src/jni/questxr_bridge/questxr_bridge.c")
+local questDisplay = read("src/host/android/QuestOpenXRDisplay.lua")
 local questManifest = read(
   "mobile/android/app/src/questVr/AndroidManifest.xml")
 
@@ -48,6 +51,10 @@ check(questActivity:find("protected void onHostDestroy()", 1, true) and
   "Quest activity releases the native host from the generic destroy hook")
 check(not loveMake:find("questxr", 1, true),
   "liblove does not compile or include the Quest bridge")
+check(loveGraphics:find("love_android_set_presented_frame_observer", 1, true) and
+      loveGraphics:find("androidPresentedFrameObserver = nullptr", 1, true) and
+      not loveGraphics:find("questxr", 1, true),
+  "stock Android presentation exposes a no-op generic optional host observer")
 check(questMake:find("ifeq ($(QUEST_XR),1)", 1, true),
   "Quest native module is guarded by the flavor build argument")
 check(questMake:find("LOCAL_MODULE := questxr", 1, true),
@@ -71,6 +78,38 @@ check(questNative:find("XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING", 1, t
   "launcher anchoring follows Quest recenter events")
 check(not questNative:find("eglTerminate(display)", 1, true),
   "Quest handoff does not terminate SDL/Love's process-wide EGL display")
+check(questNative:find("uniform vec4 focusRect", 1, true) and
+      questNative:find("vec4(0.15,1.0,0.30,1.0)", 1, true),
+  "Quest compositor draws the thin green launcher focus border")
+check(questNative:find("questxr_request_panel_capture", 1, true) and
+      questNative:find("love_android_host_presented_frame", 1, true) and
+      questNative:find("love_android_set_presented_frame_observer", 1, true) and
+      questNative:find('dlopen("liblove.so", RTLD_NOW)', 1, true),
+  "Quest panel pixels are captured only from the completed presented frame")
+check(questNative:find("GL_ACTIVE_TEXTURE", 1, true) and
+      questNative:find("GL_TEXTURE_BINDING_2D", 1, true) and
+      questNative:find("old_scissor", 1, true),
+  "Quest panel capture restores raw GL state hidden from LÖVE's state cache")
+check(questNative:find("questxr_poll_pointer_axes", 1, true) and
+      questNative:find("left_stick.isActive", 1, true),
+  "Quest launcher exposes continuous Touch stick axes to its virtual pointer")
+check(questNative:find('"/user/hand/right/input/aim/pose"', 1, true) and
+      questNative:find("xrCreateActionSpace", 1, true) and
+      questNative:find("questxr_poll_pointer_position", 1, true),
+  "Quest launcher projects the native Touch aim pose onto its room panel")
+check(questNative:find("uniform vec3 pointerState", 1, true) and
+      questNative:find("questxr_set_panel_pointer", 1, true) and
+      questNative:find("if (panel_pointer[2] > 0.5f && questxr_ray_pointer_active)", 1, true) and
+      questNative:find("vec2(textureSize(panel,0))", 1, true) and
+      questNative:find("smoothstep(3.5-aa,3.5+aa,r)", 1, true) and
+      not questNative:find("float shadow=", 1, true) and
+      not questNative:find("float ring=", 1, true),
+  "Quest compositor renders a crisp launcher-only selector without a halo or ring")
+check(questNative:find("questxr_get_application_vm", 1, true) and
+      questNative:find("questxr_get_application_context", 1, true),
+  "Quest gameplay backends can inherit the Android OpenXR loader context")
+check(questDisplay:find("_G.QUEST_PANEL_ACTIVE = true", 1, true),
+  "Quest display advertises the panel handoff capability to gameplay mods")
 check(not questManifest:find("QUEST_XR_BOOTSTRAP", 1, true),
   "Quest manifest has no obsolete metadata gate")
 

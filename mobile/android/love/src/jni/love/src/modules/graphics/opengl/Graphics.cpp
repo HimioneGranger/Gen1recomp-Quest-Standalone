@@ -43,6 +43,31 @@
 #include <cmath>
 #include <cstdio>
 
+#ifdef LOVE_ANDROID
+// Optional packaged Android hosts may observe the completed default
+// framebuffer after LÖVE has flushed every draw, but before SDL swaps it.
+// The default observer is null, so stock Android follows the exact same
+// presentation path. Optional packaged hosts register from their own library
+// on the render thread without making liblove depend on that host.
+typedef void (*LoveAndroidPresentedFrameObserver)(int, int);
+static LoveAndroidPresentedFrameObserver androidPresentedFrameObserver = nullptr;
+
+extern "C"
+#if defined(__GNUC__)
+__attribute__((visibility("default")))
+#endif
+void love_android_set_presented_frame_observer(LoveAndroidPresentedFrameObserver observer)
+{
+	androidPresentedFrameObserver = observer;
+}
+
+static void notifyAndroidHostPresentedFrame(int width, int height)
+{
+	if (androidPresentedFrameObserver != nullptr)
+		androidPresentedFrameObserver(width, height);
+}
+#endif
+
 #ifdef LOVE_IOS
 #include <SDL_syswm.h>
 #endif
@@ -907,6 +932,10 @@ void Graphics::present(void *screenshotCallbackData)
 	endPass();
 
 	gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, gl.getDefaultFBO());
+
+#ifdef LOVE_ANDROID
+	notifyAndroidHostPresentedFrame(getPixelWidth(), getPixelHeight());
+#endif
 
 	if (!pendingScreenshotCallbacks.empty())
 	{

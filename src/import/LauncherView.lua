@@ -2477,7 +2477,11 @@ local function loaderSpec(imp)
 end
 
 local function drawPadCursor(imp)
-  if not imp._padCursorActive then return end
+  -- A native host may composite the same virtual pointer after capturing the
+  -- launcher. In that mode baking this software arrow into the throttled
+  -- panel produces a delayed, flashing duplicate. The opt-in flag defaults
+  -- nil, so desktop, stock Android, NX, and handheld behavior is unchanged.
+  if not imp._padCursorActive or imp._hostPointerComposited then return end
   -- Pixel-snap on NX: subpixel polygon edges shimmer on the 720p Switch
   -- framebuffer when the stick advances by fractional pixels each frame.
   local x, y = imp._padCursor.x, imp._padCursor.y

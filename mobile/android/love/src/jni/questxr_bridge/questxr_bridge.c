@@ -33,15 +33,28 @@ static atomic_int questxr_bootstrap_stopped = 1;
 static pthread_mutex_t questxr_panel_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t questxr_input_mutex = PTHREAD_MUTEX_INITIALIZER;
 static uint32_t questxr_input_events;
+static float questxr_pointer_x;
+static float questxr_pointer_y;
+static float questxr_ray_pointer_x;
+static float questxr_ray_pointer_y;
+static int questxr_ray_pointer_active;
 static unsigned char *questxr_panel_rgba;
 static unsigned char *questxr_panel_spare;
 static uint64_t questxr_panel_generation;
+static float questxr_focus_rect[4] = {-1.0f, -1.0f, 0.0f, 0.0f};
+static float questxr_pending_focus_rect[4] = {-1.0f, -1.0f, 0.0f, 0.0f};
+static float questxr_panel_pointer[3] = {-1.0f, -1.0f, 0.0f};
+static int questxr_panel_capture_requested;
 static EGLContext questxr_capture_context = EGL_NO_CONTEXT;
 static GLuint questxr_capture_texture;
 static GLuint questxr_capture_fbo;
 typedef void (GL_APIENTRYP QuestxrBlitFramebufferProc)(
     GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum);
 static QuestxrBlitFramebufferProc questxr_gl_blit_framebuffer;
+typedef void (*QuestxrPresentedFrameObserver)(int, int);
+typedef void (*QuestxrSetPresentedFrameObserver)(QuestxrPresentedFrameObserver);
+static void *questxr_love_handle;
+static int questxr_present_observer_registered;
 
 enum {
     QUESTXR_INPUT_UP = 1u << 0,
@@ -57,6 +70,25 @@ static void questxr_queue_input(uint32_t events) {
     pthread_mutex_lock(&questxr_input_mutex);
     questxr_input_events |= events;
     pthread_mutex_unlock(&questxr_input_mutex);
+}
+
+static void questxr_set_pointer_axes(float x, float y) {
+    pthread_mutex_lock(&questxr_input_mutex);
+    questxr_pointer_x = x;
+    questxr_pointer_y = y;
+    pthread_mutex_unlock(&questxr_input_mutex);
+}
+
+static void questxr_set_ray_pointer(float x, float y, int active) {
+    pthread_mutex_lock(&questxr_input_mutex);
+    questxr_ray_pointer_x = x;
+    questxr_ray_pointer_y = y;
+    questxr_ray_pointer_active = active;
+    pthread_mutex_unlock(&questxr_input_mutex);
+}
+
+static float questxr_dot(XrVector3f a, XrVector3f b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
 #define XR_LOG(...) __android_log_print(ANDROID_LOG_INFO, "QuestXR", __VA_ARGS__)
@@ -136,6 +168,8 @@ static void *questxr_native_bootstrap(void *unused) {
     XrAction right_stick_action = XR_NULL_HANDLE;
     XrAction select_action = XR_NULL_HANDLE;
     XrAction back_action = XR_NULL_HANDLE;
+    XrAction pointer_pose_action = XR_NULL_HANDLE;
+    XrSpace pointer_space = XR_NULL_HANDLE;
     XrSwapchainImageOpenGLESKHR *quad_images = NULL;
     uint32_t quad_image_count = 0;
     GLuint quad_fbo = 0;
@@ -178,6 +212,8 @@ static void *questxr_native_bootstrap(void *unused) {
     PFN_xrSyncActions xrSyncActions = NULL;
     PFN_xrGetActionStateBoolean xrGetActionStateBoolean = NULL;
     PFN_xrGetActionStateVector2f xrGetActionStateVector2f = NULL;
+    PFN_xrGetActionStatePose xrGetActionStatePose = NULL;
+    PFN_xrCreateActionSpace xrCreateActionSpace = NULL;
     PFN_xrDestroyActionSet xrDestroyActionSet = NULL;
 
     if (!questxr_vm || !questxr_activity) XR_FAIL("Android context unavailable");
@@ -273,6 +309,8 @@ static void *questxr_native_bootstrap(void *unused) {
     XR_PROC(instance, xrSyncActions);
     XR_PROC(instance, xrGetActionStateBoolean);
     XR_PROC(instance, xrGetActionStateVector2f);
+    XR_PROC(instance, xrGetActionStatePose);
+    XR_PROC(instance, xrCreateActionSpace);
     XR_PROC(instance, xrDestroyActionSet);
 
     XrSystemGetInfo system_info = { XR_TYPE_SYSTEM_GET_INFO };
@@ -303,10 +341,12 @@ static void *questxr_native_bootstrap(void *unused) {
     CREATE_ACTION(right_stick_action, "right_stick", "Right stick", XR_ACTION_TYPE_VECTOR2F_INPUT);
     CREATE_ACTION(select_action, "select", "Select", XR_ACTION_TYPE_BOOLEAN_INPUT);
     CREATE_ACTION(back_action, "back", "Back", XR_ACTION_TYPE_BOOLEAN_INPUT);
+    CREATE_ACTION(pointer_pose_action, "pointer_pose", "Pointer pose",
+                  XR_ACTION_TYPE_POSE_INPUT);
 #undef CREATE_ACTION
     XrPath touch_profile = XR_NULL_PATH;
-    XrPath binding_paths[8] = {0};
-    const char *binding_names[8] = {
+    XrPath binding_paths[9] = {0};
+    const char *binding_names[9] = {
         "/user/hand/left/input/thumbstick",
         "/user/hand/right/input/thumbstick",
         "/user/hand/left/input/x/click",
@@ -315,11 +355,12 @@ static void *questxr_native_bootstrap(void *unused) {
         "/user/hand/right/input/trigger/value",
         "/user/hand/left/input/y/click",
         "/user/hand/right/input/b/click",
+        "/user/hand/right/input/aim/pose",
     };
     if (XR_FAILED(xrStringToPath(instance,
             "/interaction_profiles/oculus/touch_controller", &touch_profile)))
         XR_FAIL("xrStringToPath(touch profile)");
-    for (uint32_t i = 0; i < 8; i++) {
+    for (uint32_t i = 0; i < 9; i++) {
         if (XR_FAILED(xrStringToPath(instance, binding_names[i], &binding_paths[i])))
             XR_FAIL("xrStringToPath(binding)");
     }
@@ -332,6 +373,7 @@ static void *questxr_native_bootstrap(void *unused) {
         { select_action, binding_paths[5] },
         { back_action, binding_paths[6] },
         { back_action, binding_paths[7] },
+        { pointer_pose_action, binding_paths[8] },
     };
     XrInteractionProfileSuggestedBinding suggested = {
         XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING
@@ -360,6 +402,14 @@ static void *questxr_native_bootstrap(void *unused) {
     attach_info.actionSets = &action_set;
     if (XR_FAILED(xrAttachSessionActionSets(session, &attach_info)))
         XR_FAIL("xrAttachSessionActionSets");
+    XrActionSpaceCreateInfo pointer_space_info = {
+        XR_TYPE_ACTION_SPACE_CREATE_INFO
+    };
+    pointer_space_info.action = pointer_pose_action;
+    pointer_space_info.poseInActionSpace.orientation.w = 1.0f;
+    if (XR_FAILED(xrCreateActionSpace(session, &pointer_space_info,
+                                      &pointer_space)))
+        XR_FAIL("xrCreateActionSpace(pointer)");
     XR_LOG("Quest Touch launcher actions attached");
     XrReferenceSpaceCreateInfo space_info = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
     space_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
@@ -432,7 +482,24 @@ static void *questxr_native_bootstrap(void *unused) {
         "precision mediump float;\n"
         "in vec2 texcoord; layout(location=0) out vec4 color;\n"
         "uniform sampler2D panel;\n"
-        "void main(){ color=texture(panel,texcoord); }\n";
+        "uniform vec4 focusRect;\n"
+        "uniform vec3 pointerState;\n"
+        "void main(){\n"
+        " color=texture(panel,texcoord);\n"
+        " if(focusRect.x>=0.0){\n"
+        "  vec2 p=texcoord-focusRect.xy; vec2 s=focusRect.zw;\n"
+        "  float inside=step(0.0,p.x)*step(0.0,p.y)*step(p.x,s.x)*step(p.y,s.y);\n"
+        "  float edge=inside*(1.0-step(0.005,min(min(p.x,p.y),min(s.x-p.x,s.y-p.y))));\n"
+        "  color=mix(color,vec4(0.15,1.0,0.30,1.0),edge);\n"
+        " }\n"
+        " if(pointerState.z>0.5){\n"
+        "  vec2 d=(texcoord-pointerState.xy)*vec2(textureSize(panel,0));\n"
+        "  float r=length(d);\n"
+        "  float aa=max(fwidth(r),0.65);\n"
+        "  float dot=1.0-smoothstep(3.5-aa,3.5+aa,r);\n"
+        "  color=mix(color,vec4(1.0,1.0,1.0,1.0),dot);\n"
+        " }\n"
+        "}\n";
     GLuint vertex_shader = questxr_compile_shader(GL_VERTEX_SHADER, vertex_source);
     GLuint fragment_shader = questxr_compile_shader(GL_FRAGMENT_SHADER, fragment_source);
     if (!vertex_shader || !fragment_shader) XR_FAIL("panel shaders");
@@ -542,6 +609,7 @@ static void *questxr_native_bootstrap(void *unused) {
         XrActionsSyncInfo sync_info = { XR_TYPE_ACTIONS_SYNC_INFO };
         sync_info.countActiveActionSets = 1;
         sync_info.activeActionSets = &active_action_set;
+        int pointer_pose_active = 0;
         if (XR_SUCCEEDED(xrSyncActions(session, &sync_info))) {
             uint32_t input_events = 0;
             XrActionStateGetInfo state_info = { XR_TYPE_ACTION_STATE_GET_INFO };
@@ -551,9 +619,17 @@ static void *questxr_native_bootstrap(void *unused) {
             xrGetActionStateVector2f(session, &state_info, &left_stick);
             state_info.action = right_stick_action;
             xrGetActionStateVector2f(session, &state_info, &right_stick);
+            XrActionStatePose pointer_pose_state = {
+                XR_TYPE_ACTION_STATE_POSE
+            };
+            state_info.action = pointer_pose_action;
+            if (XR_SUCCEEDED(xrGetActionStatePose(
+                    session, &state_info, &pointer_pose_state)))
+                pointer_pose_active = pointer_pose_state.isActive;
             static bool stick_emitted = false;
-            float x = left_stick.currentState.x;
-            float y = left_stick.currentState.y;
+            float x = left_stick.isActive ? left_stick.currentState.x : 0.0f;
+            float y = left_stick.isActive ? left_stick.currentState.y : 0.0f;
+            questxr_set_pointer_axes(x, y);
             float magnitude2 = x * x + y * y;
             int new_direction = 0;
             // The right stick belongs to VR camera controls. Launcher
@@ -618,6 +694,72 @@ static void *questxr_native_bootstrap(void *unused) {
                 XR_LOG("launcher panel anchored in local space");
             }
         }
+        XrPosef submitted_panel_pose = panel_pose;
+        if (panel_anchored) {
+            // Quest's compositor intermittently drops LOCAL-space quad layers.
+            // Express the fixed local anchor in VIEW coordinates each frame so
+            // presentation stays on its stable path without following the head.
+            XrSpaceLocation local_in_view = { XR_TYPE_SPACE_LOCATION };
+            if (XR_SUCCEEDED(xrLocateSpace(space, view_space,
+                                           frame.predictedDisplayTime,
+                                           &local_in_view)) &&
+                    (local_in_view.locationFlags &
+                     XR_SPACE_LOCATION_POSITION_VALID_BIT) &&
+                    (local_in_view.locationFlags &
+                     XR_SPACE_LOCATION_ORIENTATION_VALID_BIT)) {
+                submitted_panel_pose = questxr_compose_poses(
+                    local_in_view.pose, panel_pose);
+            }
+        }
+        // Match Quest's native pointing model: cast the right Touch aim pose
+        // onto the actual room-anchored launcher quad. The normalized hit is
+        // shared with Lua for hit testing and with the compositor for the
+        // visible target, so the two can never disagree.
+        int ray_active = 0;
+        float ray_u = 0.0f, ray_v = 0.0f;
+        if (pointer_pose_active && pointer_space != XR_NULL_HANDLE) {
+            XrSpaceLocation aim = { XR_TYPE_SPACE_LOCATION };
+            if (XR_SUCCEEDED(xrLocateSpace(pointer_space, view_space,
+                                           frame.predictedDisplayTime, &aim)) &&
+                    (aim.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) &&
+                    (aim.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT)) {
+                XrVector3f direction = questxr_rotate_vector(
+                    aim.pose.orientation, (XrVector3f) {0.0f, 0.0f, -1.0f});
+                XrVector3f normal = questxr_rotate_vector(
+                    submitted_panel_pose.orientation,
+                    (XrVector3f) {0.0f, 0.0f, 1.0f});
+                XrVector3f to_panel = {
+                    submitted_panel_pose.position.x - aim.pose.position.x,
+                    submitted_panel_pose.position.y - aim.pose.position.y,
+                    submitted_panel_pose.position.z - aim.pose.position.z,
+                };
+                float denominator = questxr_dot(direction, normal);
+                if (fabsf(denominator) > 0.0001f) {
+                    float distance = questxr_dot(to_panel, normal) / denominator;
+                    if (distance > 0.0f) {
+                        XrVector3f hit_delta = {
+                            aim.pose.position.x + direction.x * distance -
+                                submitted_panel_pose.position.x,
+                            aim.pose.position.y + direction.y * distance -
+                                submitted_panel_pose.position.y,
+                            aim.pose.position.z + direction.z * distance -
+                                submitted_panel_pose.position.z,
+                        };
+                        XrVector3f right = questxr_rotate_vector(
+                            submitted_panel_pose.orientation,
+                            (XrVector3f) {1.0f, 0.0f, 0.0f});
+                        XrVector3f up = questxr_rotate_vector(
+                            submitted_panel_pose.orientation,
+                            (XrVector3f) {0.0f, 1.0f, 0.0f});
+                        ray_u = questxr_dot(hit_delta, right) / 1.55f + 0.5f;
+                        ray_v = questxr_dot(hit_delta, up) / 1.1625f + 0.5f;
+                        ray_active = ray_u >= 0.0f && ray_u <= 1.0f &&
+                                     ray_v >= 0.0f && ray_v <= 1.0f;
+                    }
+                }
+            }
+        }
+        questxr_set_ray_pointer(ray_u, ray_v, ray_active);
         if (submitted_frames == 0) XR_LOG("native first frame begun");
         uint32_t image_index = 0;
         XrSwapchainImageAcquireInfo acquire = {
@@ -640,8 +782,12 @@ static void *questxr_native_bootstrap(void *unused) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                                GL_TEXTURE_2D, quad_images[image_index].image, 0);
         glViewport(0, 0, 1024, 768);
+        float focus_rect[4];
+        float panel_pointer[3];
         pthread_mutex_lock(&questxr_panel_mutex);
         uint64_t panel_generation = questxr_panel_generation;
+        memcpy(focus_rect, questxr_focus_rect, sizeof(focus_rect));
+        memcpy(panel_pointer, questxr_panel_pointer, sizeof(panel_pointer));
         if (questxr_panel_rgba && uploaded_panel_generation != panel_generation) {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, panel_texture);
@@ -650,8 +796,23 @@ static void *questxr_native_bootstrap(void *unused) {
             uploaded_panel_generation = panel_generation;
         }
         pthread_mutex_unlock(&questxr_panel_mutex);
+        pthread_mutex_lock(&questxr_input_mutex);
+        // Lua owns whether this frame is launcher UI or gameplay. Keep the
+        // native ray's high-rate coordinates only while Lua has explicitly
+        // enabled the panel pointer; otherwise a tracked controller would
+        // resurrect the launcher selector over Yellow and the preload card.
+        if (panel_pointer[2] > 0.5f && questxr_ray_pointer_active) {
+            panel_pointer[0] = questxr_ray_pointer_x;
+            panel_pointer[1] = questxr_ray_pointer_y;
+            panel_pointer[2] = 1.0f;
+        }
+        pthread_mutex_unlock(&questxr_input_mutex);
         if (uploaded_panel_generation) {
             glUseProgram(panel_program);
+            glUniform4fv(glGetUniformLocation(panel_program, "focusRect"),
+                         1, focus_rect);
+            glUniform3fv(glGetUniformLocation(panel_program, "pointerState"),
+                         1, panel_pointer);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, panel_texture);
             glBindBuffer(GL_ARRAY_BUFFER, panel_vbo);
@@ -681,23 +842,6 @@ static void *questxr_native_bootstrap(void *unused) {
             break;
         }
 
-        XrPosef submitted_panel_pose = panel_pose;
-        if (panel_anchored) {
-            // Quest's compositor intermittently drops LOCAL-space quad layers.
-            // Express the fixed local anchor in VIEW coordinates each frame so
-            // presentation stays on its stable path without following the head.
-            XrSpaceLocation local_in_view = { XR_TYPE_SPACE_LOCATION };
-            if (XR_SUCCEEDED(xrLocateSpace(space, view_space,
-                                           frame.predictedDisplayTime,
-                                           &local_in_view)) &&
-                    (local_in_view.locationFlags &
-                     XR_SPACE_LOCATION_POSITION_VALID_BIT) &&
-                    (local_in_view.locationFlags &
-                     XR_SPACE_LOCATION_ORIENTATION_VALID_BIT)) {
-                submitted_panel_pose = questxr_compose_poses(
-                    local_in_view.pose, panel_pose);
-            }
-        }
         XrCompositionLayerQuad layer = { XR_TYPE_COMPOSITION_LAYER_QUAD };
         layer.space = view_space;
         layer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
@@ -737,6 +881,8 @@ done:
     if (quad_images) free(quad_images);
     if (quad_swapchain != XR_NULL_HANDLE && xrDestroySwapchain)
         xrDestroySwapchain(quad_swapchain);
+    if (pointer_space != XR_NULL_HANDLE && xrDestroySpace)
+        xrDestroySpace(pointer_space);
     if (view_space != XR_NULL_HANDLE && xrDestroySpace) xrDestroySpace(view_space);
     if (space != XR_NULL_HANDLE && xrDestroySpace) xrDestroySpace(space);
     if (session != XR_NULL_HANDLE && xrDestroySession) xrDestroySession(session);
@@ -752,6 +898,8 @@ done:
         // eglTerminate here can invalidate gameplay during launcher handoff.
     }
     if (attached) (*questxr_vm)->DetachCurrentThread(questxr_vm);
+    questxr_set_pointer_axes(0.0f, 0.0f);
+    questxr_set_ray_pointer(0.0f, 0.0f, 0);
     questxr_bootstrap_stopped = 1;
     questxr_bootstrap_started = 0;
     XR_LOG("native bootstrap stopped");
@@ -779,10 +927,97 @@ QUESTXR_EXPORT int questxr_launcher_stopped(void) {
     return questxr_bootstrap_stopped;
 }
 
+QUESTXR_EXPORT void questxr_poll_pointer_axes(float *x, float *y) {
+    pthread_mutex_lock(&questxr_input_mutex);
+    if (x) *x = questxr_pointer_x;
+    if (y) *y = questxr_pointer_y;
+    pthread_mutex_unlock(&questxr_input_mutex);
+}
+
+QUESTXR_EXPORT void questxr_poll_pointer_position(float *x, float *y,
+                                                  int *active) {
+    pthread_mutex_lock(&questxr_input_mutex);
+    if (x) *x = questxr_ray_pointer_x;
+    if (y) *y = questxr_ray_pointer_y;
+    if (active) *active = questxr_ray_pointer_active;
+    pthread_mutex_unlock(&questxr_input_mutex);
+}
+
+// The virtual pointer is compositor metadata, not part of the captured LÖVE
+// pixels. Updating it independently lets Touch movement stay smooth even
+// while the relatively expensive launcher framebuffer capture is throttled.
+QUESTXR_EXPORT void questxr_set_panel_pointer(float x, float y, int visible) {
+    static int visible_logged;
+    pthread_mutex_lock(&questxr_panel_mutex);
+    questxr_panel_pointer[0] = x;
+    questxr_panel_pointer[1] = y;
+    questxr_panel_pointer[2] = visible ? 1.0f : 0.0f;
+    pthread_mutex_unlock(&questxr_panel_mutex);
+    if (visible && !visible_logged) {
+        visible_logged = 1;
+        XR_LOG("compositor launcher pointer visible at %.3f,%.3f", x, y);
+    }
+}
+
+QUESTXR_EXPORT void love_android_host_presented_frame(int width, int height);
+
+// libquestxr is intentionally isolated from liblove. Register through
+// liblove's generic optional host API after Lua is running, which also avoids
+// relying on RTLD_DEFAULT visibility between Android shared libraries.
+static void questxr_register_present_observer(void) {
+    if (questxr_present_observer_registered) return;
+    if (!questxr_love_handle) {
+        questxr_love_handle = dlopen("liblove.so", RTLD_NOW);
+    }
+    if (!questxr_love_handle) {
+        static int load_failure_logged;
+        if (!load_failure_logged) {
+            load_failure_logged = 1;
+            XR_LOG("panel observer registration waiting for liblove: %s", dlerror());
+        }
+        return;
+    }
+    dlerror();
+    QuestxrSetPresentedFrameObserver setter =
+        (QuestxrSetPresentedFrameObserver) dlsym(
+            questxr_love_handle, "love_android_set_presented_frame_observer");
+    const char *error = dlerror();
+    if (error || !setter) {
+        static int symbol_failure_logged;
+        if (!symbol_failure_logged) {
+            symbol_failure_logged = 1;
+            XR_LOG("panel observer registration unavailable: %s",
+                   error ? error : "missing setter");
+        }
+        return;
+    }
+    setter(love_android_host_presented_frame);
+    questxr_present_observer_registered = 1;
+    XR_LOG("post-present panel observer registered");
+}
+
+// Queue metadata during the engine's generic endFrame callback. The pixels
+// cannot be read there because LÖVE still owns unflushed batched draws.
+QUESTXR_EXPORT void questxr_request_panel_capture(float focus_x, float focus_y,
+                                                  float focus_width,
+                                                  float focus_height) {
+    questxr_register_present_observer();
+    pthread_mutex_lock(&questxr_panel_mutex);
+    questxr_pending_focus_rect[0] = focus_x;
+    questxr_pending_focus_rect[1] = focus_y;
+    questxr_pending_focus_rect[2] = focus_width;
+    questxr_pending_focus_rect[3] = focus_height;
+    questxr_panel_capture_requested = 1;
+    pthread_mutex_unlock(&questxr_panel_mutex);
+}
+
 // Scale LÖVE's completed back buffer on its own GLES context and read only the
 // 1024x768 panel. Two fixed buffers avoid full-resolution screenshots and
 // allocation churn on the Quest's memory-constrained foreground process.
-QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
+QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height,
+                                             float focus_x, float focus_y,
+                                             float focus_width,
+                                             float focus_height) {
     if (width <= 0 || height <= 0 || !questxr_bootstrap_started) return;
     EGLContext current_context = eglGetCurrentContext();
     if (current_context == EGL_NO_CONTEXT) return;
@@ -795,13 +1030,29 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
         questxr_capture_texture = 0;
         questxr_capture_fbo = 0;
     }
+    GLint old_read = 0, old_draw = 0, old_pack = 4;
+    GLboolean old_scissor = glIsEnabled(GL_SCISSOR_TEST);
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &old_read);
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &old_draw);
+    glGetIntegerv(GL_PACK_ALIGNMENT, &old_pack);
     if (!questxr_capture_texture) {
+        // Raw GL calls share LÖVE's render context, whose state cache cannot
+        // see changes made here. Restore every binding exactly or LÖVE may
+        // skip a later bind it believes is redundant and keep drawing with
+        // this capture texture, freezing the launcher pixels after frame one.
+        GLint old_active_texture = GL_TEXTURE0;
+        GLint old_texture_2d = 0;
+        glGetIntegerv(GL_ACTIVE_TEXTURE, &old_active_texture);
+        glActiveTexture(GL_TEXTURE0);
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &old_texture_2d);
         if (!questxr_gl_blit_framebuffer) {
             questxr_gl_blit_framebuffer = (QuestxrBlitFramebufferProc)
                 eglGetProcAddress("glBlitFramebuffer");
         }
         if (!questxr_gl_blit_framebuffer) {
             XR_LOG("panel capture glBlitFramebuffer unavailable");
+            glBindTexture(GL_TEXTURE_2D, (GLuint) old_texture_2d);
+            glActiveTexture((GLenum) old_active_texture);
             return;
         }
         glGenTextures(1, &questxr_capture_texture);
@@ -818,18 +1069,20 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
             XR_LOG("panel capture framebuffer incomplete");
             questxr_capture_texture = 0;
             questxr_capture_fbo = 0;
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint) old_read);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint) old_draw);
+            glBindTexture(GL_TEXTURE_2D, (GLuint) old_texture_2d);
+            glActiveTexture((GLenum) old_active_texture);
             return;
         }
+        glBindTexture(GL_TEXTURE_2D, (GLuint) old_texture_2d);
+        glActiveTexture((GLenum) old_active_texture);
         XR_LOG("native fixed-buffer panel capture ready");
     }
 
-    GLint old_read = 0, old_draw = 0, old_pack = 4;
-    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &old_read);
-    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &old_draw);
-    glGetIntegerv(GL_PACK_ALIGNMENT, &old_pack);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, questxr_capture_fbo);
+    if (old_scissor) glDisable(GL_SCISSOR_TEST);
     questxr_gl_blit_framebuffer(0, 0, width, height, 0, 0, 1024, 768,
                                 GL_COLOR_BUFFER_BIT, GL_LINEAR);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, questxr_capture_fbo);
@@ -839,6 +1092,7 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
     glPixelStorei(GL_PACK_ALIGNMENT, old_pack);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint) old_read);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint) old_draw);
+    if (old_scissor) glEnable(GL_SCISSOR_TEST);
 
     // SDL's Android back buffer can briefly be empty between surface/present
     // transitions. Never replace a valid VR panel with one of those frames.
@@ -867,8 +1121,36 @@ QUESTXR_EXPORT void questxr_capture_panel_gl(int width, int height) {
     unsigned char *old_front = questxr_panel_rgba;
     questxr_panel_rgba = questxr_panel_spare;
     questxr_panel_spare = old_front;
+    questxr_focus_rect[0] = focus_x;
+    questxr_focus_rect[1] = focus_y;
+    questxr_focus_rect[2] = focus_width;
+    questxr_focus_rect[3] = focus_height;
     questxr_panel_generation++;
     pthread_mutex_unlock(&questxr_panel_mutex);
+}
+
+// Generic optional Android-host presentation observer. libquestxr registers
+// this callback only in the Quest flavor. At this point Graphics::present has
+// flushed/endPass'd and rebound the completed default framebuffer, while SDL
+// has not swapped it away yet.
+QUESTXR_EXPORT void love_android_host_presented_frame(int width, int height) {
+    static int observer_logged;
+    float focus[4];
+    pthread_mutex_lock(&questxr_panel_mutex);
+    int requested = questxr_panel_capture_requested;
+    if (requested) {
+        memcpy(focus, questxr_pending_focus_rect, sizeof(focus));
+        questxr_panel_capture_requested = 0;
+    }
+    pthread_mutex_unlock(&questxr_panel_mutex);
+    if (requested) {
+        if (!observer_logged) {
+            observer_logged = 1;
+            XR_LOG("post-present panel capture active");
+        }
+        questxr_capture_panel_gl(width, height,
+                                 focus[0], focus[1], focus[2], focus[3]);
+    }
 }
 
 JNIEXPORT void JNICALL

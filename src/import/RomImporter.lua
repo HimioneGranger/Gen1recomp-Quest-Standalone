@@ -2666,7 +2666,11 @@ function RomImporter:_openSettings()
   local ok, model = pcall(function()
     return require("src.import.LauncherSettings").open(hooks, version)
   end)
-  if ok and model then self._settings = model end
+  if ok and model then
+    self._settings = model
+  else
+    print("launcher settings open failed: " .. tostring(model))
+  end
 end
 
 -- Quit from the launcher's own X.  It goes through love.event.quit so main.lua's
