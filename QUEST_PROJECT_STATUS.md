@@ -295,7 +295,9 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Import and physically validate Dramaless q17, then instrument map-transition
+1. Clean-restart and physically validate the already-copied Dramaless q17,
+   requiring a `VRSTREAM`/`MESHJOB2` signature before movement. The first hot
+   attempt retained q16 and is explicitly rejected. Then instrument transition
    and streaming queue latency on the accepted
    `RES: FULL`, `SHADOWS: LOW` baseline, starting with the reproducible
    Saffron -> Route 8 -> Lavender -> Route 8 route. Avoid reducing global view

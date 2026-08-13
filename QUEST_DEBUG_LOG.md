@@ -2246,3 +2246,20 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   APK entry.
 - Candidate q17 ZIP SHA-256 (physical validation pending):
   `E89261049BD577FBDC854A23DA82961287C40DA81B1119448C486F2A6F4B5599`.
+
+## 2026-08-13 - q17 first activation attempt rejected
+
+- The q17 ZIP was present in `/sdcard/Download`, but the first physical route
+  did not execute q17. The running engine logger was healthy and emitted
+  ordinary map transitions, while every mandatory q17 `VRSTREAM` and
+  `MESHJOB2` signature was absent. This isolates the result to a stale/hot
+  q16 mod instance rather than a broken diagnostics logger.
+- The headset log buffer rotated out the delayed Saffron start. The retained
+  47-second Route 8 -> Lavender -> Route 8 interval averaged 25.02 FPS (23
+  median, 14 p10, 5 minimum), 22.64 ms application frame time, 46.66 ms
+  CPU+GPU time, and 59.6% GPU utilization. PSS rose from about 1.761 GB to
+  1.968 GB over the retained traversal and measured 1.995 GB afterward.
+- Do not treat those numbers as a q17 comparison. Battery reached 7% and the
+  trace reported 47-48 C, adding another confound. Charge the headset, fully
+  quit/restart the application, verify the q17 signature before walking, then
+  repeat the same route at `RES: FULL`, `SHADOWS: LOW`.
