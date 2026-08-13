@@ -1,6 +1,6 @@
 # Upstream Quest Contribution Roadmap
 
-Last audited: 2026-08-12  
+Last audited: 2026-08-13
 Comparison base: official `v0.1.79` (`04490c9b`)  
 Integration branch at audit: `quest-gen2-beta-v0.1.79`
 
@@ -141,6 +141,15 @@ Acceptance:
 
 ### PR 5 — Optional Quest/OpenXR Android backend
 
+Status: **isolated and physically smoke-tested; not yet submitted upstream**.
+The clean branch is `upstream-quest-openxr-backend` at `3b618679`. It has
+passed stable launcher-panel presentation, room anchoring/recenter, Touch ray
+pointer activation, live-frame handoff, Yellow -> immersive voxel startup,
+gameplay controls, a true cold launcher handoff, short and 10+ minute resume
+checks, and the generic completed-frame Pokédex restoration. It still needs a
+final clean-source/stock-behavior audit, the complete regression matrix below,
+and upstream-ready documentation before submission.
+
 Current evidence lives in the `quest`/`questVr` Gradle flavors, their manifests,
 `questxr_bridge.c`, Khronos headers and the loader dependency. Submit only after
 PRs 2 and 4 establish accepted host seams. Prefer the official Khronos loader
@@ -201,7 +210,8 @@ version/hash, APK hash, device/runtime version and observed result.
 
 ## Immediate next action
 
-Prepare PR 5 as a separate optional Quest/OpenXR Android backend consuming the
-generic seams from PRs 2 and 4. Keep the stock `embed` flavor byte-clean of XR
-metadata/libraries, build the ROM-free ARM64 Quest flavor, then run the physical
-headset lifecycle and controller regression matrix before requesting review.
+Audit the isolated PR 5 branch against its clean upstream base, rerun the full
+ROM-free engine and stock Android matrix, inspect the stock `embed` package for
+XR metadata/libraries, and finish the remaining physical lifecycle checks.
+Then prepare the upstream description and request review without including any
+Dramaless, Kanto, ROM, save, cache or commercial-asset content.
