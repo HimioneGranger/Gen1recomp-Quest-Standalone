@@ -12,7 +12,7 @@ prototype alone does not count as 100%.
 - **Standalone Quest VR core:** 90%
 - **Current v0.1.79 integration:** 100% (promotable Quest baseline)
 - **Stable Dramaless + Kanto experience:** 80%
-- **Dramaless q17 streaming milestone:** 80% (built; clean headset pass pending)
+- **Dramaless q18 streaming milestone:** 90% (q17 route passed; q18 trace proof pending)
 - **Performance and lifecycle hardening:** 70%
 - **Gen 2 engine readiness:** 90%
 - **Gen 2 voxel/VR gameplay:** 10%
@@ -149,8 +149,11 @@ route on physical Quest hardware without a new blocker.
   baseline; keep `RES: 1/2` only as an optional low-memory profile.
 - [x] Build deterministic `1.6.4-quest.17` with self-contained indexed meshing,
   bounded route history and observation-only transition diagnostics.
-- [ ] Cold-load and physically validate q17. The first attempted route retained
-  q16, emitted no q17 signature, and is explicitly rejected as evidence.
+- [x] Cold-load and physically validate q17: version, Full eye dimensions,
+  72 Hz, immersive startup and Saffron/Lavender reversal all passed.
+- [x] Diagnose q17's missing records as a mod-sandbox logger visibility defect
+  and build q18 with an explicit native VRXR trace sink.
+- [ ] Import q18 and prove `VRSTREAM`/`MESHJOB2` on one physical transition.
 - [ ] Track `battle-art-merge` / `1.6.5.PRE` without using it as stable yet.
 - [ ] Adapt VR capture to new battle-art, voxel-precache, mesh and loading systems.
 - [ ] Make Quest integration seams patchable without copying whole upstream files.
@@ -177,10 +180,10 @@ route on physical Quest hardware without a new blocker.
   the sharper Quest 3 baseline while targeting CPU mesh/draw work.
 - [x] Instrument q17 mesh jobs with queue wait, coroutine-active time, phase
   timing, budget overruns, cancellation and real map-entry queue snapshots.
-- [ ] Validate that q17 is actually active before timing. Require
-  `DRAMALESS_SHAPE 1.6.4-quest.17` plus `VRSTREAM`/`MESHJOB2` in device logs.
-- [ ] Repeat Saffron -> Route 8 -> Lavender -> Route 8 at Full/Low after a
-  charged, cold app start and use q17 phase data to choose the next code change.
+- [x] Validate that q17 is active: device logs proved its installed/loaded
+  version, Full eye dimensions, 72 Hz and requested physical traversal.
+- [ ] Prove q18's corrected `VRSTREAM`/`MESHJOB2` transport on one transition,
+  then repeat the benchmark only if the short trace lacks enough phase data.
 - [ ] After the valid q17 Full/Low run, test Full/Off as the next matched shadow
   comparison; adopt it only if the visual loss is acceptable and measurable.
 - [ ] Reduce thermal slowdown during long mod-heavy sessions.
@@ -193,12 +196,11 @@ route on physical Quest hardware without a new blocker.
 - [ ] Investigate why the current heavy Route 8/mod-stack workload delivers
   roughly 38–41 application FPS even with the compositor correctly at 72 Hz.
 
-Current checkpoint: q17 is copied to Quest Downloads, but its first physical
-route retained the older q16 instance. The app is now force-stopped and the
-headset was USB-charging from 8%. Resume at 30-40% battery, cold-launch, prove
-the q17 signature before walking, and retain logs before the small buffer
-rotates. The rejected partial route reached 47-48 C and must not be used as a
-q17 comparison.
+Current checkpoint: q17 passed a charged cold physical route, but its observer
+could not see the engine's function-valued logger inside the mod sandbox. q18
+routes the same records through the already-working native VRXR trace channel,
+passed contracts/syntax/deterministic packaging, and is in Quest Downloads.
+Import q18, cold-load it, and cross one map boundary while logs are retained.
 
 ## Priority 5 — Quest controls and launcher polish (92%)
 
@@ -412,7 +414,7 @@ maintaining.
   paths.
 - [x] Establish the q16 Quest 3 visual baseline: full resolution, low shadows.
 
-## Active checkpoint — q17 transition profiler (80%)
+## Active checkpoint — q18 transition profiler (90%)
 
 - [x] Move the four-vertex/six-index terrain sink into the approved Dramaless
   fork instead of relying on an older engine-side adapter.
@@ -422,15 +424,20 @@ maintaining.
 - [x] Copy `DRAMALESS_SHAPE-1.6.4-quest.17.zip` to Quest Downloads.
 - [x] Detect and document that the first headset attempt retained q16; do not
   count its 25.02 FPS partial sample as q17 evidence.
-- [ ] Charge the headset to at least 30-40% and cold-launch the app.
-- [ ] Confirm q17 version and `VRSTREAM`/`MESHJOB2` signatures before walking.
-- [ ] Complete the matched Full/Low traversal and identify the dominant phase.
+- [x] Charge the headset and cold-launch q17.
+- [x] Confirm q17 version, Full eye dimensions, 72 Hz and immersive traversal.
+- [x] Complete the matched Full/Low traversal; preserve its frame, memory,
+  battery and thermal evidence without claiming an idle-confounded comparison.
+- [x] Fix the sandboxed observer transport in deterministic q18 and copy it to
+  Quest Downloads.
+- [ ] Import/cold-load q18 and prove `VRSTREAM`/`MESHJOB2` across one boundary.
+- [ ] Identify the dominant mesh phase from the corrected records.
 - [ ] Implement only the evidence-backed optimization, then rerun the route.
 
 ## Waiting on outside events or user hardware
 
-- [ ] Quest charged to at least 30-40%, cooled, connected, awake and USB
-  debugging authorized for the clean q17 Full/Low traversal.
+- [ ] Quest connected, awake and USB debugging authorized for the short q18
+  import/cold-load/one-transition trace proof.
 - [ ] Next stable Dramaless release/tag identified before rebasing the stable fork.
 - [ ] `battle-art-merge` declared stable or explicitly selected for an experimental build.
 - [ ] Dramaless public fork destination created/approved; the Kanto Quest fork
@@ -438,10 +445,11 @@ maintaining.
 
 ## Suggested execution order
 
-1. After charging/cooling, cold-load q17 and prove its diagnostic signature.
-2. Run the matched Full/Low Saffron -> Route 8 -> Lavender -> Route 8 capture;
-   preserve the log before buffer rotation and identify the dominant mesh phase.
-3. Run Full/Off next as the requested shadow comparison, after q17 Full/Low is
+1. Import and cold-load q18, then prove its native structured trace on one map
+   transition.
+2. Use the q18 phase evidence to identify the dominant mesh cost; repeat the
+   full Saffron/Lavender route only if the short trace is insufficient.
+3. Run Full/Off next as the requested shadow comparison, after Full/Low is
    valid, and keep the visual/performance tradeoff only if it earns its cost.
 4. Implement and retest the smallest evidence-backed streaming optimization.
 5. Finish the clean PR 5 source audit, full vanilla regression matrix and

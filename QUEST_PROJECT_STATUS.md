@@ -295,10 +295,12 @@ It is intentionally ignored by Git. Exact build and install commands are in
 
 ## Immediate next steps
 
-1. Clean-restart and physically validate the already-copied Dramaless q17,
-   requiring a `VRSTREAM`/`MESHJOB2` signature before movement. The first hot
-   attempt retained q16 and is explicitly rejected. Then instrument transition
-   and streaming queue latency on the accepted
+1. Import and cold-load the already-copied Dramaless q18, then require its
+   `VRSTREAM`/`MESHJOB2` native-log signature on one short map transition.
+   q17's renderer, Full eye resolution, 72 Hz startup and full route passed,
+   but its function-valued engine log global was hidden by the mod sandbox;
+   q18 changes only that observer transport. Then instrument transition and
+   streaming queue latency on the accepted
    `RES: FULL`, `SHADOWS: LOW` baseline, starting with the reproducible
    Saffron -> Route 8 -> Lavender -> Route 8 route. Avoid reducing global view
    distance or resolution before identifying the hitch source.

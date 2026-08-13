@@ -2263,3 +2263,32 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   trace reported 47-48 C, adding another confound. Charge the headset, fully
   quit/restart the application, verify the q17 signature before walking, then
   repeat the same route at `RES: FULL`, `SHADOWS: LOW`.
+
+## 2026-08-13 - q17 cold physical pass and q18 trace transport fix
+
+- A true cold launch identified `DRAMALESS_SHAPE 1.6.4-quest.17` in PID 480,
+  entered Saffron, started gameplay OpenXR normally, requested 72 Hz, and
+  proved `RES: FULL` as 1680x1760 render and swapchain dimensions per eye.
+- The physical Saffron -> Route 8 -> gate -> Route 8 -> Lavender -> Route 8
+  traversal completed. Across the 192-sample marker window: 32.72 FPS average,
+  35 median, 20 p10, 8 minimum, 22.86 ms average / 27.36 ms p95 app time,
+  45.74 ms average / 59.42 ms p95 CPU+GPU time, and 80.3% average GPU load.
+  PSS measured 1.964 GB afterward. Battery changed 93% -> 90%; temperature
+  changed 40 C -> 44 C.
+- The user was held at Saffron during preflight, so the 105-second interval to
+  first Route 8 contains idle time. Keep this as q17 physical/quality evidence,
+  not a strict whole-route improvement claim against q16.
+- All five normal `map:` events appeared, but q17 emitted no `VRSTREAM` or
+  `MESHJOB2`. Root cause: the engine's function-valued logger global is hidden
+  by the mod sandbox. q17 rendering was active; only its observer transport
+  failed.
+- Dramaless commit `a4feab4` / q18 adds an explicit ChunkMesher trace sink
+  supplied by VR.lua through VRXR's existing native Quest logger. No renderer,
+  scheduling, lifetime, loading, XR, or gameplay policy changed.
+- q18 passed both focused Python contracts and LuaJIT syntax checks. Two builds
+  produced the identical SHA-256 below; the 119-entry ZIP contains no ROM,
+  save, APK, generated-data directory, or other forbidden game/user payload.
+- q18 ZIP SHA-256:
+  `1EE7E4F1556ECF618E7EDDACB0CFDD18B55B54B71ECC790286BF15A6A114ACB9`.
+  It is copied to Quest Downloads; import, cold-load signature proof, and a
+  short map transition remain.
