@@ -41,6 +41,27 @@ The validated debug APK SHA-256 was
 It was built as `questVrNoRecordDebug` and installed with `adb install -r`,
 preserving app data.
 
+## Generic completed-frame observer validation - 2026-08-13
+
+Commit `b7fba361` adds the observation-only `render.frame_drawn` event after a
+completed Lua draw and before host capture or ordinary presentation. The event
+does not alter the frame, block presentation, or contain Quest/OpenXR policy;
+with no subscribers it is a guarded no-op for vanilla and stock Android.
+
+Dramaless Shape `1.6.4-quest.15` used this seam to restore its existing Pokedex
+capture after the isolated backend removed the former Quest-specific global
+callback from `main.lua`. On Quest 3, device logs confirmed q15 loaded in PID
+`15729`, and the user physically confirmed that the Pokedex screen was
+rendering again. No capture exception, GL error, fatal signal, ANR, or OOM was
+observed in the validation interval.
+
+The paired APK SHA-256 was
+`8342334C3F6ED5D77A64E253FF86EB56355264D6B8CDC43ECEC296E88CBBB84E`.
+The paired Dramaless q15 ZIP SHA-256 was
+`E899C0B36530AC69FCBC8D5469F57FCCD025E0DA082574D61C1A733280E856CC`.
+Sustained voxel frame rate remains a separate workload/performance issue and
+is not classified as resolved by this presentation-seam test.
+
 ## Remaining validation
 
 - Long suspend/resume and controller-sleep soak.
