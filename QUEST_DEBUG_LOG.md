@@ -2094,5 +2094,16 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Result: the historical crash is **not reproduced on the current build by one
   controlled cycle**. Keep it in lifecycle soak coverage rather than marking
   it fixed. Android's normal screenshot command produced a zero-byte capture
-  for the immersive layer, so headset-eye confirmation of the returned visual
-  state is still pending.
+  for the immersive layer; the user supplied the missing headset-eye check and
+  confirmed the app returned to the voxel world. The first current-build cycle
+  therefore passed process, audio, activity, and immersive-visual recovery.
+- Immediately followed with three automated 10-second Quest Home/resume
+  cycles. PID `8995` survived every background and resumed checkpoint. The
+  bounded log contained three SDL pause callbacks, three resume callbacks,
+  zero activity destruction, and zero fatal/audio/mutex/ANR/process-death
+  signatures.
+- After each relaunch, Horizon OS briefly recreated and then stopped the SDL
+  Android surface. This matches its OpenXR handoff behavior rather than an
+  activity teardown: `dumpsys activity` continued to identify the same
+  `QuestGameActivity` record and process. Final in-headset voxel visibility and
+  controller response remain the acceptance check for the three-cycle soak.

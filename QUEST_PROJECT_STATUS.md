@@ -161,10 +161,13 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
   `AudioTrack` thread while Android finished it behind Quest Home. Source audit
   found no matching mutex destruction in the current Quest bridge, and a first
   controlled current-build cycle kept the same PID alive for more than 60
-  seconds with no `FORTIFY`, `SIGABRT`, or process death. Treat this as an
-  unreproduced historical release risk pending repeated/long lifecycle and
-  clean-quit soak, not as a proven current defect or a reason for a speculative
-  audio rewrite.
+  seconds with no `FORTIFY`, `SIGABRT`, or process death, and the user confirmed
+  that it returned to immersive voxel VR. Treat this as an unreproduced
+  historical release risk pending repeated/long lifecycle and clean-quit soak,
+  not as a proven current defect or a reason for a speculative audio rewrite.
+  Three further automated 10-second Home/resume cycles also retained the same
+  process with no activity destruction or fatal signature; their final visual
+  and controller acceptance check is pending.
 - Initial Yellow/mod/voxel loading remains slow, but it is no longer ambiguous:
   q14 displays real map/mesh progress on the colored GBC loading card. A Route
   8 physical sample spent 30.4 seconds between final save load and OpenXR

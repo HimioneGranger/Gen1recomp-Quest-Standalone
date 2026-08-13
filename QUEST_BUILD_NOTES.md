@@ -415,5 +415,15 @@ the `AudioTrack` thread aborted at `02:45:11.194`. The current source does not
 destroy an audio mutex in the Quest bridge; final host cleanup joins the
 QuestXR bootstrap thread before releasing its Android references. Longer and
 repeated lifecycle/quit soak remains required. The Android screenshot API
-returned an empty capture for the immersive layer, so visual recovery from
-this probe still requires a headset-eye confirmation.
+returned an empty capture for the immersive layer, but the user then confirmed
+in-headset that the resumed app was back in the immersive voxel world. The
+single-cycle background/resume probe therefore passed both process safety and
+visual recovery.
+
+A follow-up automated soak ran three additional Quest Home/resume cycles with
+10 seconds backgrounded per cycle. Every checkpoint retained PID `8995`.
+Logcat recorded exactly three SDL pause and three resume callbacks, zero
+activity-destroy callbacks, and zero `FORTIFY`, destroyed-mutex, fatal-signal,
+ANR, or app-process-death events. Quest's shell then stopped the temporary SDL
+surface after each relaunch while retaining the immersive activity/OpenXR
+ownership; final headset-eye and controller-response confirmation is pending.
