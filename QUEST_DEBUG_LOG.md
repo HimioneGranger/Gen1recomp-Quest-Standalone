@@ -2682,3 +2682,21 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - q6 is committed as `49bc42c` and tagged
   `kanto-quest-1.60.0-q6-candidate`. Physical Route 8 comparison remains the
   acceptance gate.
+
+### q6 Route 8 physical acceptance
+
+- The user reports the corrected Route 8 battle view is perfect. Device logs
+  independently confirm q6 managed Dramaless `2.0.0-quest.3`, restored the
+  battle tree-support splice, applied `Route 8 battle camera widened to clear
+  Kanto's lifted terrain`, loaded `ds_fp_ceiling 1.60.0-quest.6`, and entered
+  the Route 8 voxel arena without a Lua/OpenXR error.
+- Preserve the exact tested artifact (SHA-256
+  `1FF5532A6B642E7DB30655B760A496F1C5A641C93EEB6B576E4D4D357AE4F87A`)
+  as the Route 8-accepted q6 build. This accepts the localized camera fix; it
+  does not yet claim the remaining full Kanto rollback/performance matrix.
+- For another obstructed battle, record the map name/id, reproduce it twice,
+  take one screenshot, and request: `Apply the q6 per-arena wide-camera
+  override to MAP_ID; do not change the global battle camera.` Add maps to a
+  reviewed allowlist only after evidence. Fully automatic selection is deferred
+  because asynchronous terrain readiness could otherwise make the same map
+  switch cameras unpredictably between battles.

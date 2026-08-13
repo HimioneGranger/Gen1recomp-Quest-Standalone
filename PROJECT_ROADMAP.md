@@ -11,10 +11,10 @@ prototype alone does not count as 100%.
 
 - **Standalone Quest VR core:** 90%
 - **Current v0.1.79 integration:** 100% (promotable Quest baseline)
-- **Stable Dramaless + Kanto experience:** 85% (Dramaless q3 core is accepted;
-  Kanto q4 restores its intended exploration presentation; q5's narrowly
-  tested Route 8 battle-occlusion fix awaits physical validation, followed by
-  rollback and isolated performance gates)
+- **Stable Dramaless + Kanto experience:** 86% (Dramaless q3 core is accepted;
+  Kanto q6 physically clears Route 8's battle obstruction while preserving the
+  intended exploration presentation; broader regression, rollback and isolated
+  performance gates remain)
 - **Dramaless 2.0 Quest migration:** 96% (q3 passed the complete core physical
   matrix and is the accepted comparison baseline; retained transition continuity
   and Kanto compatibility work are tracked separately)
@@ -189,7 +189,7 @@ route on physical Quest hardware without a new blocker.
 - [ ] Add automated checks for expected Dramaless source versions/functions.
 - [ ] Perform the complete physical regression matrix after every update.
 
-## Priority 3A — Restore Kanto First Person on Dramaless 2.0 (90%)
+## Priority 3A — Restore Kanto First Person on Dramaless 2.0 (91%)
 
 This begins immediately after q3's clean-Quit/cold-launch gate and precedes
 Battle Art tuning. Kanto is part of the intended first-person experience; its
@@ -235,8 +235,11 @@ performance work measures the combined stack.
   for Route 8 only, restore battle tree supports, and prove fresh apply,
   q5 migration, idempotence and byte-exact rollback. SHA-256:
   `1FF5532A6B642E7DB30655B760A496F1C5A641C93EEB6B576E4D4D357AE4F87A`.
-- [ ] Physically validate q6 with two Route 8/nearby battles and prove Kanto
-  exploration, Pokédex capture, controls and stereo remain unchanged.
+- [x] Physically validate q6's Route 8 camera: the user reports the view is
+  perfect, while logs prove the wide-camera patch and restored tree supports
+  loaded before a successful Route 8 voxel-arena start.
+- [ ] Complete the broader q6 regression on a second battle/map and reconfirm
+  Kanto exploration, Pokédex capture, controls and stereo remain unchanged.
 - [ ] Complete a clean explicit REMOVE PATCH rollback on Quest.
 - [ ] Measure Dramaless + Kanto alone before attributing the current full-stack
   36-38 FPS / ~2.1 GB PSS / ~714 MB graphics sample to Kanto itself.
