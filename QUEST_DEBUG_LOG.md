@@ -2615,3 +2615,40 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   sampled roughly 36-38 FPS at a 72 Hz target, around 2.1 GB PSS and 714 MB
   graphics allocation, with high GPU utilization. Retest Dramaless + Kanto
   alone before assigning cost or selecting optimization changes.
+
+### Route 8 battle occlusion reproduced; Kanto q5 correction prepared
+
+- After Kanto q4 restored the exploration presentation, the user reported that
+  Route 8's battle view became materially worse. Two consecutive captures at
+  `17:21:59` and `17:22:09` reproduce the same defect from different head
+  positions: a very large brown/gray world prop covers the upper and right
+  portions of the arena. The captures are preserved as
+  `quest-screenshots/route8-battle-q4-first-20260813-172159.jpg` and
+  `quest-screenshots/route8-battle-q4-second-20260813-172209.jpg`.
+- Runtime logs show ordinary Dramaless `voxel-arena-begin` /
+  `standalone-voxel-2d-begin` battle startup and no Lua/OpenXR failure. This,
+  plus the stable head-relative shape of the obstruction, isolates the defect
+  to battle-scene geometry rather than stereo alignment, controls, launcher,
+  Pokédex capture, or battle state.
+- Checked q4 source identified the only new battle-world injection: Kanto's
+  inherited `__ds_btl_props` hook calls `Flora.battleProps(host, neighbors)`
+  immediately after Dramaless 2.0's native terrain draw. That adds tall-tree,
+  stone, hood, and neighboring-map props to the dedicated battle provider and
+  can place nearby geometry across the Route 8 camera.
+- `KANTO_FIRST_PERSON-1.60.0-quest.5.zip` removes only this optional hook for
+  Dramaless 2.0. A fresh q5 leaves `VoxelBattleScene.lua` untouched; upgrading
+  q4 strips the exact marked block while retaining q4's pristine backup for
+  explicit REMOVE PATCH rollback. Exploration flora, walls, ceilings,
+  backdrops, doors, launcher/OpenXR transport, controls and Pokédex behavior are
+  unchanged. Older tested BattleScene providers retain their existing hook.
+- q5 passes Dramaless 2.0 anchors/order/API checks, all shipped Lua syntax,
+  fresh apply, q4 migration, second-boot idempotence, byte-exact explicit
+  rollback, unknown-version no-write refusal, package-content guards,
+  deterministic two-build validation and LÖVE/PhysicsFS archive mounting.
+  Final size: 16,284,080 bytes; SHA-256:
+  `25C71C812F020AABA4F29004A0607E7209727D359B894B643C9D907F3A7F96C7`.
+- q5 is an automated-test candidate, not yet the accepted physical build. The
+  next gate is replacement import, cold launch, one Route 8 battle, a second
+  battle or nearby-route control, and confirmation that exploration Kanto and
+  the Pokédex remain intact. q4 remains recoverable until that comparison
+  passes.

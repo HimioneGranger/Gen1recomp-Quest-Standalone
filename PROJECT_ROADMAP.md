@@ -11,9 +11,10 @@ prototype alone does not count as 100%.
 
 - **Standalone Quest VR core:** 90%
 - **Current v0.1.79 integration:** 100% (promotable Quest baseline)
-- **Stable Dramaless + Kanto experience:** 84% (Dramaless q3 core is accepted;
-  Kanto q4 installs, patches 2.0 and restores its intended presentation on
-  Quest; battle/Pokedex/route and isolated performance gates remain)
+- **Stable Dramaless + Kanto experience:** 85% (Dramaless q3 core is accepted;
+  Kanto q4 restores its intended exploration presentation; q5's narrowly
+  tested Route 8 battle-occlusion fix awaits physical validation, followed by
+  rollback and isolated performance gates)
 - **Dramaless 2.0 Quest migration:** 96% (q3 passed the complete core physical
   matrix and is the accepted comparison baseline; retained transition continuity
   and Kanto compatibility work are tracked separately)
@@ -188,7 +189,7 @@ route on physical Quest hardware without a new blocker.
 - [ ] Add automated checks for expected Dramaless source versions/functions.
 - [ ] Perform the complete physical regression matrix after every update.
 
-## Priority 3A — Restore Kanto First Person on Dramaless 2.0 (86%)
+## Priority 3A — Restore Kanto First Person on Dramaless 2.0 (90%)
 
 This begins immediately after q3's clean-Quit/cold-launch gate and precedes
 Battle Art tuning. Kanto is part of the intended first-person experience; its
@@ -220,9 +221,16 @@ performance work measures the combined stack.
 - [x] Physically confirm Kanto's intended presentation is restored and pass a
   Saffron City -> Silph Co. interior -> Saffron City round trip without a Lua
   error or lifecycle failure.
-- [ ] Physically prove
-  a route transition, Pokedex/dialogue capture, battle, and clean rollback on
-  Quest.
+- [x] Physically prove a route transition and correctly centered
+  Pokedex/dialogue capture under q4.
+- [x] Reproduce q4's Route 8 battle occlusion in two captures, isolate it to
+  the optional Kanto flora injection in Dramaless 2.0's dedicated battle
+  provider, and build deterministic q5 with fresh-install and q4-migration
+  contracts. SHA-256:
+  `25C71C812F020AABA4F29004A0607E7209727D359B894B643C9D907F3A7F96C7`.
+- [ ] Physically validate q5 with two Route 8/nearby battles and prove Kanto
+  exploration, Pokédex capture, controls and stereo remain unchanged.
+- [ ] Complete a clean explicit REMOVE PATCH rollback on Quest.
 - [ ] Measure Dramaless + Kanto alone before attributing the current full-stack
   36-38 FPS / ~2.1 GB PSS / ~714 MB graphics sample to Kanto itself.
 
