@@ -2785,6 +2785,22 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `copyFrontRegionToCanvas` updates and battle-state transitions rather than
   applying another per-map camera override.
 
+#### Route 5 follow-up and q7 promotion
+
+- In the focused follow-up, the user selected `FIGHT` so the move menu forced
+  a new battle UI composition. The Pokédex updated correctly. This proves the
+  capture texture is live and rules out a persistent broken feed, invalid
+  framebuffer, per-map crop, and q7 arena-camera regression.
+- Retain the initial stale exploration frame as low-priority Dramaless Quest
+  capture timing polish: battle entry may expose the previous UI frame until
+  the first subsequent UI change. Do not add a Route 5 arena override for it.
+- Route 8 continuity, corrected Route 12 water staging and the unaffected
+  Route 5 battle now form a sufficient physical arena regression for q7.
+  Promote exact source commit `1352b4c` / SHA-256
+  `9A67A4190C646EE37692A6FA6C600B7D0E26099052D7C8C4E5E538C7E1F61D68`
+  as the known-good Kanto Quest package. Keep q6 only as an archival Route 8
+  rollback while explicit removal and isolated-performance gates remain open.
+
 ### Deferred Wild Skies / Yanma model-contract defect
 
 - During ordinary q7 exploration on Route 8, the user observed a flying Yanma

@@ -11,10 +11,9 @@ prototype alone does not count as 100%.
 
 - **Standalone Quest VR core:** 90%
 - **Current v0.1.79 integration:** 100% (promotable Quest baseline)
-- **Stable Dramaless + Kanto experience:** 88% (Dramaless q3 core is accepted;
-  Kanto q6 physically clears Route 8 and q7 physically fixes Route 12's wrong
-  land stage/camera; broader regression, rollback and isolated performance
-  gates remain)
+- **Stable Dramaless + Kanto experience:** 92% (Dramaless q3 core and Kanto q7
+  are accepted; Route 8, Route 12 and an unaffected Route 5 battle passed.
+  Rollback, isolated performance and minor first-battle-frame polish remain)
 - **Dramaless 2.0 Quest migration:** 96% (q3 passed the complete core physical
   matrix and is the accepted comparison baseline; retained transition continuity
   and Kanto compatibility work are tracked separately)
@@ -189,7 +188,7 @@ route on physical Quest hardware without a new blocker.
 - [ ] Add automated checks for expected Dramaless source versions/functions.
 - [ ] Perform the complete physical regression matrix after every update.
 
-## Priority 3A — Restore Kanto First Person on Dramaless 2.0 (93%)
+## Priority 3A — Restore Kanto First Person on Dramaless 2.0 (96%)
 
 This begins immediately after q3's clean-Quit/cold-launch gate and precedes
 Battle Art tuning. Kanto is part of the intended first-person experience; its
@@ -252,12 +251,12 @@ performance work measures the combined stack.
   under tag `kanto-quest-1.60.0-q7-route12-accepted`.
 - [x] Reconfirm under q7 that Route 8 remains correctly staged; the user
   explicitly clarified that Route 8 was not broken by the Route 12 change.
-- [ ] Complete the broader q7 regression. An unaffected Route 5 battle kept
-  its correct world stage, stereo and gameplay, but the handheld Pokédex
-  retained a stale exploration frame instead of the battle feed. Reproduce
-  that capture defect once, repair it outside the arena overrides, then repeat
-  Route 12 and verify exploration/controls remain unchanged. Retain q6 as a
-  rollback meanwhile.
+- [x] Complete the broader q7 arena regression. An unaffected Route 5 battle
+  kept its correct world stage, stereo and gameplay; its handheld Pokédex
+  initially retained one exploration frame but refreshed to the live battle
+  UI on the next menu change. Classify that as separate low-priority capture
+  timing polish, promote q7 as known-good, and retain q6 as an archival
+  rollback.
 - [ ] Complete a clean explicit REMOVE PATCH rollback on Quest.
 - [ ] Measure Dramaless + Kanto alone before attributing the current full-stack
   36-38 FPS / ~2.1 GB PSS / ~714 MB graphics sample to Kanto itself.
@@ -393,6 +392,9 @@ comparison baseline; q18 remains the immutable emergency rollback while Kanto
 - [ ] Improve battle framing, which has repeatedly appeared too zoomed.
 - [ ] Remove remaining black side bars/bezels without losing capture.
 - [ ] Ensure battle mirror/feed activates consistently.
+- [ ] Low priority: eliminate the occasional stale exploration frame held at
+  battle entry. Route 5 physical testing proved the feed refreshes correctly
+  on the next UI change, so this does not block Kanto q7 acceptance.
 - [ ] Measure whether mirroring causes a meaningful performance cost.
 - [ ] Low priority: final pixel-perfect centering and sizing.
 
@@ -639,8 +641,10 @@ maintaining.
   battle feed or the global battle camera.
 - [x] Physically validate q7's separate Route 12 water-stage correction; the
   user reports the corrected environment/camera works perfectly.
-- [ ] Reconfirm Route 8 and one unaffected battle under q7; retain the q6 Route
-  8 build as rollback until the broader regression passes.
+- [x] Reconfirm Route 8 and an unaffected Route 5 battle under q7. The main
+  battle view, stereo and gameplay passed; the Pokédex's initial stale frame
+  refreshed on the next UI change. Promote q7 and retain q6 as an archival
+  Route 8 rollback.
 - [x] Confirm one route/town transition and one building entry/exit without a
   loading freeze, input loss or stereo regression.
 - [x] Confirm clean Quit and cold relaunch: PID `15300` exited itself with status
