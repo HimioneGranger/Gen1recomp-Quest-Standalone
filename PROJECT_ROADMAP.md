@@ -11,9 +11,9 @@ prototype alone does not count as 100%.
 
 - **Standalone Quest VR core:** 90%
 - **Current v0.1.79 integration:** 100% (promotable Quest baseline)
-- **Stable Dramaless + Kanto experience:** 78% (Dramaless q3 core is accepted;
-  Kanto q3 now passes its complete 2.0 apply/rollback/package/importer-format
-  gate and awaits physical Quest validation)
+- **Stable Dramaless + Kanto experience:** 84% (Dramaless q3 core is accepted;
+  Kanto q4 installs, patches 2.0 and restores its intended presentation on
+  Quest; battle/Pokedex/route and isolated performance gates remain)
 - **Dramaless 2.0 Quest migration:** 96% (q3 passed the complete core physical
   matrix and is the accepted comparison baseline; retained transition continuity
   and Kanto compatibility work are tracked separately)
@@ -188,7 +188,7 @@ route on physical Quest hardware without a new blocker.
 - [ ] Add automated checks for expected Dramaless source versions/functions.
 - [ ] Perform the complete physical regression matrix after every update.
 
-## Priority 3A — Restore Kanto First Person on Dramaless 2.0 (78%)
+## Priority 3A — Restore Kanto First Person on Dramaless 2.0 (86%)
 
 This begins immediately after q3's clean-Quit/cold-launch gate and precedes
 Battle Art tuning. Kanto is part of the intended first-person experience; its
@@ -211,9 +211,20 @@ performance work measures the combined stack.
   `ds_fp_ceiling/` root with deterministic 7-Zip metadata, ROM/save/cache
   guards, and a focused in-memory PhysicsFS manifest test. Archive SHA-256 is
   `A14BE932462D7237266A3D843B6127CD31643547B47E7CC5A31F620A4F477F57`.
+- [x] Reject q3 after the physical Quest importer still could not mount its
+  Windows/FAT-origin ZIP; prove the untouched official Unix-origin archive
+  reaches manifest validation on the same APK.
+- [x] Package deterministic Unix-origin `1.60.0-quest.4`, SHA-256
+  `C7C0D75912B6BC9AC96A15C0BDCEF785E49C37CC6CE81D73FD6ECB898C9C385D`;
+  prove Android can mount it, install it, and load its `2.0.0` patch.
+- [x] Physically confirm Kanto's intended presentation is restored and pass a
+  Saffron City -> Silph Co. interior -> Saffron City round trip without a Lua
+  error or lifecycle failure.
 - [ ] Physically prove
-  walls, ceilings, outdoor backdrops, doors, stereo, controls, Pokedex, battle,
-  transitions and clean rollback on Quest.
+  a route transition, Pokedex/dialogue capture, battle, and clean rollback on
+  Quest.
+- [ ] Measure Dramaless + Kanto alone before attributing the current full-stack
+  36-38 FPS / ~2.1 GB PSS / ~714 MB graphics sample to Kanto itself.
 
 ## Priority 3B — Battle Art 1.8.6 transition and precache integration (10%)
 

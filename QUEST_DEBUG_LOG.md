@@ -2583,3 +2583,35 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `A14BE932462D7237266A3D843B6127CD31643547B47E7CC5A31F620A4F477F57`.
 - q3 now awaits the physical importer and visual regression matrix. q2 remains
   rejected and must not be selected again.
+
+### q3 rejection isolated to ZIP origin; q4 installs and runs physically
+
+- Android SAF copied all 16,083,540 q3 bytes to `picked_mod.zip`, but Android
+  PhysicsFS rejected both its in-memory mount and staged-path fallback. The
+  picker and byte transport were therefore not the failure.
+- A decisive control imported the untouched official Kanto archive pulled from
+  this headset. It mounted, read manifest id `ds_fp_ceiling`, and stopped only
+  at the intentional same-id-installed guard. Header comparison then isolated
+  the remaining meaningful difference: the accepted official archive carries
+  Unix-origin ZIP entries, while q2/q3 were Windows/FAT-origin archives.
+- q4 retains the exact audited q2 source adaptation and uses Windows `bsdtar`
+  to write deterministic Unix-origin entries under `ds_fp_ceiling/`. Its full
+  automated contract passed twice, including live apply/idempotence/byte-exact
+  rollback/refusal, package guards and LÖVE/PhysicsFS manifest mounting. Final
+  size: 16,283,284 bytes; SHA-256:
+  `C7C0D75912B6BC9AC96A15C0BDCEF785E49C37CC6CE81D73FD6ECB898C9C385D`.
+- Physical import first reached the installed-id guard, proving Android could
+  mount q4, then succeeded after the user removed the obsolete installed Kanto
+  copy. Runtime logs explicitly report `managing DRAMALESS_SHAPE
+  2.0.0-quest.3`, successful sun/battle/ceiling splices, `Active from this
+  boot`, and `loaded mod ds_fp_ceiling 1.60.0-quest.4`.
+- The user confirms Kanto now appears to work as intended. Logs also prove a
+  Saffron City -> Silph Co. 1F -> Saffron City building round trip without a
+  Lua error. This closes package/install and initial presentation compatibility;
+  route, Pokedex, battle and rollback checks remain.
+- Do not treat this full-stack run as an isolated Kanto performance result. The
+  active session also loaded Wilds of Kanto, Crystal 251, HGSS Sprites, Wild
+  Skies and the Crystal 251 sprite provider. In demanding Saffron traversal it
+  sampled roughly 36-38 FPS at a 72 Hz target, around 2.1 GB PSS and 714 MB
+  graphics allocation, with high GPU utilization. Retest Dramaless + Kanto
+  alone before assigning cost or selecting optimization changes.
