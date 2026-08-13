@@ -3,7 +3,10 @@
 #include <GLES3/gl3.h>
 #include <android/log.h>
 #include <dlfcn.h>
+#include <math.h>
 #include <pthread.h>
+#include <stdbool.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -23,10 +26,10 @@
 static JavaVM *questxr_vm;
 static jobject questxr_activity;
 static pthread_t questxr_bootstrap_thread;
-static int questxr_bootstrap_started;
+static atomic_int questxr_bootstrap_started;
 static int questxr_bootstrap_joinable;
-static volatile int questxr_bootstrap_shutdown_requested;
-static volatile int questxr_bootstrap_stopped = 1;
+static atomic_int questxr_bootstrap_shutdown_requested;
+static atomic_int questxr_bootstrap_stopped = 1;
 static pthread_mutex_t questxr_panel_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t questxr_input_mutex = PTHREAD_MUTEX_INITIALIZER;
 static uint32_t questxr_input_events;
@@ -153,6 +156,7 @@ static void *questxr_native_bootstrap(void *unused) {
     PFN_xrPollEvent xrPollEvent = NULL;
     PFN_xrBeginSession xrBeginSession = NULL;
     PFN_xrEndSession xrEndSession = NULL;
+    PFN_xrRequestExitSession xrRequestExitSession = NULL;
     PFN_xrWaitFrame xrWaitFrame = NULL;
     PFN_xrBeginFrame xrBeginFrame = NULL;
     PFN_xrEndFrame xrEndFrame = NULL;
@@ -247,6 +251,7 @@ static void *questxr_native_bootstrap(void *unused) {
     XR_PROC(instance, xrPollEvent);
     XR_PROC(instance, xrBeginSession);
     XR_PROC(instance, xrEndSession);
+    XR_PROC(instance, xrRequestExitSession);
     XR_PROC(instance, xrWaitFrame);
     XR_PROC(instance, xrBeginFrame);
     XR_PROC(instance, xrEndFrame);
@@ -455,12 +460,24 @@ static void *questxr_native_bootstrap(void *unused) {
     panel_pose.orientation.w = 1.0f;
     panel_pose.position.z = -1.35f;
     int panel_anchored = 0;
-    const int room_anchor_enabled = 0;
+    const int room_anchor_enabled = 1;
+    uint64_t anchor_after_frame = 180;
+    int exit_requested = 0;
 
     for (;;) {
-        if (questxr_bootstrap_shutdown_requested) {
+        if (questxr_bootstrap_shutdown_requested && !exit_requested) {
             XR_LOG("launcher OpenXR handoff requested");
-            goto done;
+            if (running && xrRequestExitSession) {
+                XrResult exit_result = xrRequestExitSession(session);
+                if (XR_FAILED(exit_result)) {
+                    XR_LOG("xrRequestExitSession failed: %d", exit_result);
+                    goto done;
+                }
+                exit_requested = 1;
+                XR_LOG("launcher OpenXR exit requested");
+            } else {
+                goto done;
+            }
         }
         XrEventDataBuffer event = { XR_TYPE_EVENT_DATA_BUFFER };
         while (xrPollEvent(instance, &event) == XR_SUCCESS) {
@@ -478,10 +495,22 @@ static void *questxr_native_bootstrap(void *unused) {
                 } else if (changed->state == XR_SESSION_STATE_STOPPING && running) {
                     xrEndSession(session);
                     running = 0;
+                    if (exit_requested) {
+                        XR_LOG("launcher OpenXR session ended for handoff");
+                        goto done;
+                    }
                 } else if (changed->state == XR_SESSION_STATE_EXITING
                         || changed->state == XR_SESSION_STATE_LOSS_PENDING) {
                     goto done;
                 }
+            } else if (event.type ==
+                       XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING) {
+                // Quest emits this after a Meta-button recenter. Reacquire the
+                // settled pose in the new LOCAL space rather than preserving
+                // the old room anchor.
+                panel_anchored = 0;
+                anchor_after_frame = submitted_frames + 30;
+                XR_LOG("launcher recenter requested by reference-space change");
             }
             event.type = XR_TYPE_EVENT_DATA_BUFFER;
             event.next = NULL;
@@ -498,6 +527,17 @@ static void *questxr_native_bootstrap(void *unused) {
             XR_LOG("xrBeginFrame failed: %d", frame_result);
             break;
         }
+        if (!frame.shouldRender) {
+            XrFrameEndInfo idle_end = { XR_TYPE_FRAME_END_INFO };
+            idle_end.displayTime = frame.predictedDisplayTime;
+            idle_end.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+            frame_result = xrEndFrame(session, &idle_end);
+            if (XR_FAILED(frame_result)) {
+                XR_LOG("idle xrEndFrame failed: %d", frame_result);
+                break;
+            }
+            continue;
+        }
         XrActiveActionSet active_action_set = { action_set, XR_NULL_PATH };
         XrActionsSyncInfo sync_info = { XR_TYPE_ACTIONS_SYNC_INFO };
         sync_info.countActiveActionSets = 1;
@@ -511,22 +551,28 @@ static void *questxr_native_bootstrap(void *unused) {
             xrGetActionStateVector2f(session, &state_info, &left_stick);
             state_info.action = right_stick_action;
             xrGetActionStateVector2f(session, &state_info, &right_stick);
-            static int stick_direction = 0;
+            static bool stick_emitted = false;
             float x = left_stick.currentState.x;
             float y = left_stick.currentState.y;
-            if (right_stick.currentState.x * right_stick.currentState.x +
-                    right_stick.currentState.y * right_stick.currentState.y > x * x + y * y) {
-                x = right_stick.currentState.x;
-                y = right_stick.currentState.y;
-            }
+            float magnitude2 = x * x + y * y;
             int new_direction = 0;
-            if (x > 0.65f) new_direction = QUESTXR_INPUT_RIGHT;
-            else if (x < -0.65f) new_direction = QUESTXR_INPUT_LEFT;
-            else if (y > 0.65f) new_direction = QUESTXR_INPUT_UP;
-            else if (y < -0.65f) new_direction = QUESTXR_INPUT_DOWN;
-            if (new_direction && new_direction != stick_direction)
+            // The right stick belongs to VR camera controls. Launcher
+            // navigation uses one left-stick edge per deliberate flick.
+            if (magnitude2 > 0.1225f && !stick_emitted) {
+                if (fabsf(x) >= fabsf(y)) {
+                    if (x > 0.35f) new_direction = QUESTXR_INPUT_RIGHT;
+                    else if (x < -0.35f) new_direction = QUESTXR_INPUT_LEFT;
+                } else {
+                    if (y > 0.35f) new_direction = QUESTXR_INPUT_UP;
+                    else if (y < -0.35f) new_direction = QUESTXR_INPUT_DOWN;
+                }
+            }
+            if (new_direction) {
                 input_events |= (uint32_t) new_direction;
-            stick_direction = new_direction;
+                stick_emitted = true;
+            } else if (magnitude2 < 0.04f) {
+                stick_emitted = false;
+            }
             XrActionStateBoolean button = { XR_TYPE_ACTION_STATE_BOOLEAN };
             state_info.action = select_action;
             if (XR_SUCCEEDED(xrGetActionStateBoolean(session, &state_info, &button)) &&
@@ -545,16 +591,26 @@ static void *questxr_native_bootstrap(void *unused) {
         // Quest may recenter LOCAL space during the first focused frames. Keep
         // the panel in VIEW space briefly, then capture the settled head pose
         // so the room-space anchor does not jump out of view after startup.
-        if (room_anchor_enabled && !panel_anchored && submitted_frames >= 450) {
+        if (room_anchor_enabled && !panel_anchored &&
+                submitted_frames >= anchor_after_frame) {
             XrSpaceLocation head = { XR_TYPE_SPACE_LOCATION };
             if (XR_SUCCEEDED(xrLocateSpace(view_space, space,
                                            frame.predictedDisplayTime, &head)) &&
                     (head.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) &&
                     (head.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT)) {
+                // Keep the room panel level: recenter poses may contain a few
+                // degrees of transient head pitch or roll, so preserve yaw.
+                XrQuaternionf q = head.pose.orientation;
+                float yaw = atan2f(2.0f * (q.w * q.y + q.x * q.z),
+                                   1.0f - 2.0f * (q.y * q.y + q.z * q.z));
+                XrQuaternionf yaw_orientation = {
+                    0.0f, sinf(yaw * 0.5f), 0.0f, cosf(yaw * 0.5f)
+                };
                 panel_pose = head.pose;
+                panel_pose.orientation = yaw_orientation;
                 XrVector3f forward = {0.0f, 0.0f, -1.35f};
                 XrVector3f offset = questxr_rotate_vector(
-                    head.pose.orientation, forward);
+                    yaw_orientation, forward);
                 panel_pose.position.x += offset.x;
                 panel_pose.position.y += offset.y;
                 panel_pose.position.z += offset.z;
@@ -692,7 +748,8 @@ done:
         eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         if (surface != EGL_NO_SURFACE) eglDestroySurface(display, surface);
         if (context != EGL_NO_CONTEXT) eglDestroyContext(display, context);
-        eglTerminate(display);
+        // EGLDisplay is process-global and is also owned by SDL/LÖVE. Calling
+        // eglTerminate here can invalidate gameplay during launcher handoff.
     }
     if (attached) (*questxr_vm)->DetachCurrentThread(questxr_vm);
     questxr_bootstrap_stopped = 1;

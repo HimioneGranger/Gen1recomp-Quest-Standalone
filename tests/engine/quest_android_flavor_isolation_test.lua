@@ -57,6 +57,20 @@ check(not questNative:find("Java_org_love2d_android_GameActivity", 1, true),
 check(questNative:find("pthread_join(questxr_bootstrap_thread", 1, true) and
       not questNative:find("pthread_detach", 1, true),
   "destroy can join the bootstrap before releasing Android context")
+check(questNative:find("static atomic_int questxr_bootstrap_started", 1, true) and
+      questNative:find("static atomic_int questxr_bootstrap_shutdown_requested", 1, true) and
+      questNative:find("static atomic_int questxr_bootstrap_stopped", 1, true),
+  "cross-thread bootstrap lifecycle flags use C11 atomics")
+check(questNative:find("xrRequestExitSession(session)", 1, true) and
+      questNative:find("XR_SESSION_STATE_STOPPING", 1, true),
+  "launcher handoff exits and ends the running OpenXR session cleanly")
+check(questNative:find("if (!frame.shouldRender)", 1, true),
+  "OpenXR frames honor shouldRender before acquiring a swapchain image")
+check(questNative:find("XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING", 1, true) and
+      questNative:find("const int room_anchor_enabled = 1", 1, true),
+  "launcher anchoring follows Quest recenter events")
+check(not questNative:find("eglTerminate(display)", 1, true),
+  "Quest handoff does not terminate SDL/Love's process-wide EGL display")
 check(not questManifest:find("QUEST_XR_BOOTSTRAP", 1, true),
   "Quest manifest has no obsolete metadata gate")
 
