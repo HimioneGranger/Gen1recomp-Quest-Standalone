@@ -169,6 +169,15 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
   process with no activity destruction or fatal signature. The user confirmed
   voxel visibility and working controller input afterward, completing the
   repeated-resume acceptance check.
+- The first current-build clean system Quit also passed: OpenXR, SDL surface,
+  audio, and the QuestXR Android bridge shut down before a clean process exit
+  status of zero. A fresh cold launch then initialized the full native launcher
+  pipeline under a new PID with no fatal or stuck-start signature. Physical
+  testing confirmed a visible launcher and working white controller pointer.
+  The ensuing Yellow launch also completed the colored loading path, automatic
+  immersive voxel transition, and functional gameplay controls under the same
+  PID. Launcher-to-gameplay OpenXR ownership moved from request to FOCUSED in
+  about 194 ms with no fatal signature.
 - Initial Yellow/mod/voxel loading remains slow, but it is no longer ambiguous:
   q14 displays real map/mesh progress on the colored GBC loading card. A Route
   8 physical sample spent 30.4 seconds between final save load and OpenXR

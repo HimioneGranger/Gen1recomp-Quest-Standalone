@@ -2068,9 +2068,10 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `7BE8565B7C7344D83954ACD79139FB8F1D37E65CD245F83F035AAEE928F6EF23`.
 - Validated q14 ZIP SHA-256:
   `1588EFCBE4985AD220D26F70BFA01AFBD80A35BD82E92FFFDAA6E92809CACC67`.
-- Remaining gate: long suspend/resume, controller-sleep, repeated handoff,
-  map-transition, and quit soak. An earlier destroyed-mutex quit abort remains
-  open and prevents release promotion.
+- Remaining gate: long suspend/resume, controller-sleep, repeated cold handoff,
+  map-transition, and quit soak. The earlier destroyed-mutex abort remains in
+  regression coverage, but is now classified as an old-build risk not
+  reproduced by the current resume and clean-exit probes.
 
 ## 2026-08-12 - PR 5 AudioTrack lifecycle crash audit
 
@@ -2112,3 +2113,36 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   cycle, the current `f9e8088b`/q14 candidate has four successful
   background/resume recoveries and no reproduction of the historical
   destroyed-mutex `AudioTrack` abort.
+
+## 2026-08-12 - Clean shutdown and cold-start probe
+
+- The user saved and selected Quest's system **Quit** action while the current
+  `f9e8088b`/q14 build was in voxel gameplay. OpenXR reached `STOPPING` and
+  `IDLE`; SDL paused and destroyed its surface; AAudio stopped; QuestXR logged
+  `Android OpenXR context bridge released`; and the app called
+  `System.exit(0)`.
+- Zygote explicitly reported `Process 8995 exited cleanly (0)`. No `FORTIFY`,
+  destroyed-mutex, fatal signal, tombstone, or ANR occurred. ActivityManager's
+  later cached-process “has died” message is normal exit bookkeeping in this
+  trace, not the historical SIGABRT.
+- AAudio received a brief `requestStart` after `onDestroy` and roughly 32 ms
+  before process exit. It succeeded and did not race into a crash. Preserve
+  this as a shutdown-soak observation; do not patch it without reproduction or
+  stronger ownership evidence.
+- Cold launch created new PID `12514` and successfully initialized
+  `QuestGameActivity`, SDL, the generic host display bridge, QuestXR bootstrap,
+  Touch actions, first OpenXR frame, room-anchored launcher panel, post-present
+  capture, and advancing live-panel generations. No fatal/OOM/stuck-start
+  signature was logged. The user confirmed that the launcher was visible and
+  the white controller pointer moved, completing the physical cold-start check.
+- The user then selected Yellow and loaded the save. The colored loading path
+  completed, immersive voxel rendering appeared, and gameplay controller input
+  behaved as intended.
+- Exact cold handoff timing: launcher handoff request `23:26:06.865`; launcher
+  session ended `23:26:06.884`; Dramaless confirmed launcher session release
+  `23:26:06.898`; gameplay OpenXR startup complete `23:26:06.966`; gameplay
+  session FOCUSED `23:26:07.059`. The same PID `12514` remained alive and the
+  request-to-FOCUSED ownership swap took approximately 194 ms.
+- Post-handoff scan: zero `FORTIFY`, destroyed-mutex, fatal-signal, ANR, OOM,
+  or app-process-death signatures. This completes one clean Quit -> true cold
+  launcher -> Yellow -> loading -> immersive voxel -> working-controls pass.

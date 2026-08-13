@@ -430,3 +430,38 @@ ownership; final headset-eye and controller-response confirmation is pending.
 The user then confirmed that the voxel world remained visible and controller
 input responded. The three-cycle soak therefore passed process, activity,
 audio, immersive-display, and controller recovery.
+
+### Clean exit and first cold relaunch
+
+The user saved in-game and selected Quest's system **Quit** action. OpenXR
+transitioned through `STOPPING` to `IDLE`, SDL destroyed its surface, AAudio
+stopped, the QuestXR Android bridge was released, and Android logged
+`System.exit called, status: 0` followed by `Process 8995 exited cleanly (0)`.
+There was no `FORTIFY`, destroyed-mutex, fatal signal, tombstone, or ANR. The
+generic ActivityManager `has died: cch+5 CEM` bookkeeping line is not a crash
+in this trace; the explicit zero exit status and absence of a fatal signature
+distinguish it from the historical abort.
+
+One shutdown-order observation remains in soak coverage: after `onDestroy`
+and bridge release, the AAudio stream briefly received `requestStart` about 10
+ms before the native main thread called `System.exit(0)`. It did not fail and
+does not justify a speculative fix, but future clean-exit repetitions should
+continue checking this interval.
+
+A subsequent cold `am start -W` created fresh PID `12514`. The Quest activity,
+SDL JNI, generic `HostDisplay`, QuestXR bootstrap, Touch launcher actions,
+launcher OpenXR session, anchored panel, post-present capture, and live panel
+generations all initialized successfully. No crash, ANR, OOM, or stuck-start
+signature appeared. The user confirmed in-headset that the launcher was visible
+and the white controller pointer moved, completing cold-start launcher
+acceptance.
+
+The user then selected Yellow, loaded the saved game, observed the colored
+preparation path, entered immersive voxel VR, and confirmed gameplay controls
+behaved as intended. The same PID `12514` survived the entire
+launcher-to-gameplay transition. The launcher handoff was requested at
+`23:26:06.865`, its session ended at `23:26:06.884`, Dramaless reported the
+launcher session released at `23:26:06.898`, gameplay OpenXR startup completed
+at `23:26:06.966`, and the gameplay session reached `FOCUSED` at
+`23:26:07.059`. The ownership swap took about 194 ms from request to FOCUSED,
+with no fatal, mutex, ANR, OOM, or process-death signature.
