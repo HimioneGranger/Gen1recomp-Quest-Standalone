@@ -157,8 +157,14 @@ The original upstream `origin` remotes remain unchanged in both checkouts.
 - Intermittently after install, restart, or sleep, the app remains on Quest's
   immersive loading screen with no OpenXR controller events. A force-stop and
   relaunch usually recovers. This is the current highest-priority defect.
-- Sleep/background lifecycle has produced destroyed-mutex and AudioTrack abort
-  logs and needs a deliberate suspend/resume fix.
+- An old `GameActivity` build produced a destroyed-mutex abort on its
+  `AudioTrack` thread while Android finished it behind Quest Home. Source audit
+  found no matching mutex destruction in the current Quest bridge, and a first
+  controlled current-build cycle kept the same PID alive for more than 60
+  seconds with no `FORTIFY`, `SIGABRT`, or process death. Treat this as an
+  unreproduced historical release risk pending repeated/long lifecycle and
+  clean-quit soak, not as a proven current defect or a reason for a speculative
+  audio rewrite.
 - Initial Yellow/mod/voxel loading remains slow, but it is no longer ambiguous:
   q14 displays real map/mesh progress on the colored GBC loading card. A Route
   8 physical sample spent 30.4 seconds between final save load and OpenXR

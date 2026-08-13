@@ -398,3 +398,22 @@ ray selection, pointer removal at Yellow handoff, the restored save-aware
 loading card, clean launcher session release, automatic gameplay OpenXR
 startup, and a FOCUSED immersive voxel session. Longer lifecycle/quit soak is
 still required before a release build.
+
+### 2026-08-12 current-build lifecycle probe
+
+A controlled Quest Home/background test was run against the same installed
+`f9e8088b`/q14 candidate. The running process was PID `8995` before the test,
+remained PID `8995` after more than 60 seconds away from the app, and resumed
+as `org.love2d.android.QuestGameActivity`. Logcat contained no `FORTIFY`,
+destroyed-mutex, `SIGABRT`, or app-process-death event.
+
+The historical `AudioTrack` crash is therefore not reproduced by this first
+current-build probe. Its saved evidence came from the former
+`org.love2d.android.GameActivity` build: Android moved that activity behind
+Quest Home at `02:45:10.531`, issued a duplicate finish at `02:45:10.548`, and
+the `AudioTrack` thread aborted at `02:45:11.194`. The current source does not
+destroy an audio mutex in the Quest bridge; final host cleanup joins the
+QuestXR bootstrap thread before releasing its Android references. Longer and
+repeated lifecycle/quit soak remains required. The Android screenshot API
+returned an empty capture for the immersive layer, so visual recovery from
+this probe still requires a headset-eye confirmation.

@@ -2071,3 +2071,28 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - Remaining gate: long suspend/resume, controller-sleep, repeated handoff,
   map-transition, and quit soak. An earlier destroyed-mutex quit abort remains
   open and prevents release promotion.
+
+## 2026-08-12 - PR 5 AudioTrack lifecycle crash audit
+
+- Re-read the saved crash evidence in
+  `logs/crystal251-b-button-freeze-logcat.txt`. The abort belonged to the old
+  `org.love2d.android.GameActivity` host, not the current Quest-specific host.
+  Android switched from the game to Quest Home at `02:45:10.531`, logged a
+  duplicate finish request at `02:45:10.548`, and the process's `AudioTrack`
+  thread hit `pthread_mutex_lock called on a destroyed mutex` at
+  `02:45:11.194`.
+- Audited the current activity, SDL, OpenAL, and QuestXR teardown paths. SDL
+  joins its native thread before `nativeQuit`; LÖVE OpenAL stops its pool thread
+  before destroying the context/device; and the Quest bridge joins its own
+  bootstrap thread before deleting Android references. QuestXR uses
+  process-lifetime static mutexes and does not call `pthread_mutex_destroy`.
+  There is not enough evidence to justify a speculative native teardown patch.
+- Ran a controlled background/resume probe on the installed `f9e8088b`/q14
+  candidate. PID `8995` survived more than 60 seconds in Quest Home and resumed
+  under `org.love2d.android.QuestGameActivity`; no `FORTIFY`, destroyed-mutex,
+  `SIGABRT`, or app-process-death event appeared.
+- Result: the historical crash is **not reproduced on the current build by one
+  controlled cycle**. Keep it in lifecycle soak coverage rather than marking
+  it fixed. Android's normal screenshot command produced a zero-byte capture
+  for the immersive layer, so headset-eye confirmation of the returned visual
+  state is still pending.
