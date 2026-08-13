@@ -2756,3 +2756,29 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   not claim a second Route 12 repetition, a fresh q7 Route 8 control, the clean
   REMOVE PATCH test or the isolated Kanto performance benchmark. q6 remains a
   preserved rollback while those broader gates remain open.
+
+### Deferred Wild Skies / Yanma model-contract defect
+
+- During ordinary q7 exploration on Route 8, the user observed a flying Yanma
+  rendered as a broken giant vertical model and captured two screenshots. The
+  images show Yanma artwork stretched/repeated through a tall billboard-like
+  column rather than a correctly sized flying sprite; this is not merely the
+  earlier generic Gen-1 fallback art.
+- Local evidence is preserved outside the public repository at
+  `E:/Gen1QuestVR/quest-screenshots/yanma-broken-model-route8-20260813-182735.jpg`
+  (SHA-256 `6250D4E97706DF13B2F397F334F2B5CC3D50ECB3DAD2CBA3B5908C2978E12E1A`)
+  and `...-182744.jpg` (SHA-256
+  `0FB390FF2B5AF6F46DD3514F90FD660634B40E67E977C602205BFE40402EC0ED`).
+  The screenshots are not packaged or pushed as game assets.
+- Device logs establish the active boundary: `wild_skies 1.8.0`,
+  `CRYSTAL_251 0.10.3`, `HGSS_SPRITES 0.3.1`, and
+  `CRYSTAL251_ROM_SPRITE_PROVIDER 0.1.3`. The provider registered itself as a
+  Wild Skies sprite source and explicitly supplied `YANMA` from the imported
+  Crystal cache (`193-yanma.png`) immediately before Wild Skies spawned Yanma
+  on Route 8. The likely defect is a producer/consumer image-dimension, frame,
+  UV or billboard-scale contract mismatch; source inspection is still required
+  before assigning the fault to either side.
+- Track this as a deferred Gen-2 sprite-provider/Wild Skies compatibility fix,
+  not a Kanto q7, battle-arena, launcher, controller or OpenXR regression. The
+  eventual fix must use ROM-imported or separately installed artwork and must
+  not add Pokémon art to the repository/package.

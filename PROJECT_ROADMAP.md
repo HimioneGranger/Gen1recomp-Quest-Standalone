@@ -443,6 +443,10 @@ tuning. General Kanto enhancements below remain Priority 8.
 - [x] Create isolated Crystal ROM sprite-provider project.
 - [x] Avoid distributing ROM data or Pokémon artwork.
 - [x] Diagnose Murkrow, Houndour and Yanma fallback registrations.
+- [ ] Fix the Wild Skies flying-Yanma model contract: provider `0.1.3` supplies
+  imported Crystal `193-yanma.png`, but Wild Skies `1.8.0` renders it as a giant
+  vertically stretched/repeated billboard. Audit image dimensions, frame/UV
+  interpretation and scale without bundling Pokémon artwork.
 - [x] Diagnose secondary-Flying species being classified as generic `MON` sprites.
 - [x] Implement the `0.1.4` systemic flyer correction.
 - [x] Package clearly named Quest import ZIP.
@@ -488,6 +492,8 @@ tuning. General Kanto enhancements below remain Priority 8.
 - [ ] Decide whether Dramatic Sky Ride remains disabled/deferred.
 - [ ] Revisit HGSS Sprites compatibility after provider validation.
 - [ ] Test Wilds/Wild Skies after the next stable Dramaless merge.
+- [ ] Retest Wild Skies after the Yanma provider/consumer contract fix and use
+  the preserved Route 8 screenshots as the visual regression reference.
 - [x] Maintain a machine-readable known-good mod/version matrix in
   `../mod-update-status.json`, with the human checklist in
   `../MOD_UPDATE_CHECKLIST.md`.
