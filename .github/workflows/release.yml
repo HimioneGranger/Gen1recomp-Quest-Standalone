@@ -51,7 +51,7 @@ jobs:
       version: ${{ steps.ver.outputs.version }}
       tag: ${{ steps.ver.outputs.tag }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -126,7 +126,7 @@ jobs:
     needs: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Build shared payload
         run: |
           scripts/pack_love.sh \
@@ -134,7 +134,7 @@ jobs:
             --listing dist/payload/love-listing.txt \
             --version "${{ needs.version.outputs.version }}"
       - name: Upload shared payload
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: gen1recomp-release-love
           path: dist/payload/game.love
@@ -149,9 +149,9 @@ jobs:
     # container, and the qemu-emulated alternative takes hours.
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Download shared payload
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: gen1recomp-release-love
           path: .bazinga/work
@@ -162,7 +162,7 @@ jobs:
             --version "${{ needs.version.outputs.version }}" \
             --game-love .bazinga/work/game.love
       - name: Upload Linux arm64 release
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: gen1recomp-linux-arm64-release
           path: |
@@ -176,9 +176,9 @@ jobs:
     needs: [version, love-payload]
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Download shared payload
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: gen1recomp-release-love
           path: .bazinga/work
@@ -233,7 +233,7 @@ jobs:
             -CertificatePath $env:UWP_PFX `
             -CertificatePassword $env:CERTIFICATE_PASSWORD
       - name: Upload Xbox UWP release
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: gen1recomp-xbox-uwp-release
           path: |
@@ -264,7 +264,7 @@ jobs:
         run: echo "::add-mask::$HOME"
 
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -407,14 +407,14 @@ jobs:
 
       - name: Download Xbox UWP release
         if: github.repository == 'bryanthaboi/gen1recomp'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: gen1recomp-xbox-uwp-release
           path: dist/xbox-uwp
 
       - name: Download Linux arm64 release
         if: github.repository == 'bryanthaboi/gen1recomp'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: gen1recomp-linux-arm64-release
           path: dist/linux-arm64

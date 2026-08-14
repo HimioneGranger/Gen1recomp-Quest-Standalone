@@ -32,7 +32,7 @@ jobs:
     outputs:
       changed: ${{ steps.paths.outputs.changed }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - id: paths
@@ -58,7 +58,7 @@ jobs:
     outputs:
       ipa_url: ${{ steps.upload-ipa.outputs.artifact-url }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: import signing certificate
         if: github.repository == 'bryanthaboi/gen1recomp'
         run: |
@@ -92,7 +92,7 @@ jobs:
       - name: upload iOS release artifact
         id: upload-ipa
         if: github.repository == 'bryanthaboi/gen1recomp'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: gen1recomp++-ios-ipa
           path: dist/ios/gen1recomp++.ipa
@@ -108,7 +108,7 @@ jobs:
     outputs:
       changed: ${{ steps.paths.outputs.changed }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - id: paths
@@ -132,7 +132,7 @@ jobs:
     if: needs.switch-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install luajit
         run: sudo apt-get update && sudo apt-get install -y luajit
       - name: Switch offline selftest
@@ -164,7 +164,7 @@ jobs:
           || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ["self-hosted", "macOS"]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Build Switch fused NRO
         run: |
           set -euo pipefail
@@ -172,7 +172,7 @@ jobs:
           scripts/build_switch.sh --fetch --fused --version "$VER"
           echo "SWITCH_VER=$VER" >> "$GITHUB_ENV"
       - name: upload Switch NRO artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: gen1recomp-switch-nro
           path: |
@@ -187,7 +187,7 @@ jobs:
     outputs:
       changed: ${{ steps.paths.outputs.changed }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - id: paths
@@ -211,7 +211,7 @@ jobs:
     if: needs.xbox-uwp-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Xbox UWP offline selftest
         run: bash scripts/xbox-uwp/selftest_build_xbox_uwp.sh
       - name: Build shared payload
@@ -221,7 +221,7 @@ jobs:
             --listing .bazinga/work/ci-love-listing.txt \
             --version 0.0.0
       - name: Upload shared payload
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: gen1recomp-xbox-uwp-payload
           path: .bazinga/work/ci-game.love
@@ -237,9 +237,9 @@ jobs:
       && needs.xbox-uwp-selftest.result == 'success'
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Download shared payload
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: gen1recomp-xbox-uwp-payload
           path: .bazinga/work
@@ -251,7 +251,7 @@ jobs:
             --version 0.0.0 \
             --game-love .bazinga/work/ci-game.love
       - name: Upload Xbox UWP package
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: gen1recomp-xbox-uwp
           path: |
@@ -266,7 +266,7 @@ jobs:
     outputs:
       changed: ${{ steps.paths.outputs.changed }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - id: paths
@@ -290,7 +290,7 @@ jobs:
     if: needs.linux-arm64-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # Deliberately on x86_64: everything this gate checks (pins, the
       # host-arch guard, the dependency exclude list, the AppRun fusion
       # contract) is answerable without a container or an aarch64 machine,
@@ -310,7 +310,7 @@ jobs:
     # so contributors get the same coverage on their own PRs.
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Build the aarch64 AppImage
         run: |
           set -euo pipefail
@@ -362,7 +362,7 @@ jobs:
           [ "$highest" = "GLIBC_2.31" ] \
             || { echo "::error::AppImage requires $floor, above the bullseye 2.31 floor"; exit 1; }
       - name: Upload the AppImage
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: gen1recomp-linux-arm64
           path: |
@@ -375,7 +375,7 @@ jobs:
     name: headless suites (no ROM)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # LuaJIT, not lua5.4: LOVE 11.x embeds LuaJIT 2.1 and the engine is
       # written to Lua 5.1 semantics, so CI must run the interpreter the
@@ -396,7 +396,7 @@ jobs:
     name: fixture dataset integrity
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: sudo apt-get update && sudo apt-get install -y luajit
       - run: python3 -m pip install --upgrade pillow
 
@@ -438,7 +438,7 @@ jobs:
     name: screenshot differ (capture not yet wired)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: python3 -m pip install --upgrade pillow
 
       # 21-testing-and-ci §"Testing & acceptance criteria": compare_shots
@@ -486,7 +486,7 @@ jobs:
     name: mod lint (no ROM-derived content)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # the MK305 dump check key-diffs shipped tables through luajit, and
       # modkit treats a missing interpreter as a fatal MK100 -- without

@@ -79,3 +79,10 @@ Release preparation happens on `release/<version>`. The release owner follows
 [`docs/quest-release-checklist.md`](docs/quest-release-checklist.md), and the
 other partner independently checks the APK identity, version, signer, and
 download link before the release is announced.
+
+## Security reports
+
+Do not discuss suspected vulnerabilities in a public issue. Follow the
+[security policy](.github/SECURITY.md) and use GitHub's private vulnerability
+reporting form. Never attach a ROM, save, signing key, token, or unredacted
+personal data.
