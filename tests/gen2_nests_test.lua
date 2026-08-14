@@ -17,14 +17,17 @@ local Nests = require("src.core.gen2.Nests")
 -- Landmark indices from constants/landmark_constants.asm: Johto runs below
 -- PALLET_TOWN ($2e), Kanto from it up to ROUTE_28.
 local DATA = {
-  maps = {
+  -- gen2Maps, matching Game2's key for the Gold map table.
+  gen2Maps = {
     ROUTE_29        = { landmark = 2 },   -- Johto
     ILEX_FOREST     = { landmark = 11 },  -- Johto
     ROUTE_1         = { landmark = 0x2f }, -- Kanto
     UNION_CAVE_1F   = { landmark = 9 },   -- Johto
     NOWHERE         = { },                -- no landmark at all
   },
-  encounters = {
+  -- Game2 loads the encounter tables under gen2Encounters, not `encounters`:
+  -- the flat name is Gen 1's and Gen2Compat only maps it for mods.
+  gen2Encounters = {
     grass = {
       ROUTE_29 = { slots = {
         MORN = { { species = "PIDGEY" }, { species = "SENTRET" } },

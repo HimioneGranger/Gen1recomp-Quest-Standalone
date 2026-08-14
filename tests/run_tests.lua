@@ -2788,15 +2788,23 @@ do
   press("down")
   eq(om.index, 25, "cursor reaches CONTROLS")
   press("down")
-  eq(om.index, 26, "CANCEL stays the fixed final row")
-  eq(om.scroll, 21, "CANCEL keeps the last option boxes on screen")
+  eq(om.index, 26, "cursor reaches DATE FORMAT")
+  press("down")
+  eq(om.index, 27, "cursor reaches TIME FORMAT")
+  press("down")
+  -- CANCEL is appended after the descriptor list rather than living in it, so
+  -- it lands one past #rows and the window holds the last six boxes.  Counted
+  -- off #rows so the next row added here is not read as a wrap bug.
+  local cancelRow = #om.rows + 1
+  eq(om.index, cancelRow, "CANCEL stays the fixed final row")
+  eq(om.scroll, cancelRow - 5, "CANCEL keeps the last option boxes on screen")
   om:draw() -- smoke: scrolled layout draws under the headless stub
   press("a")
   check(popped, "A on CANCEL closes the options menu")
   local om2 = OptionsMenu.new(og)
   OInput.pressed = { up = true }; om2:update(1 / 60); OInput.pressed = {}
-  eq(om2.index, 26, "up from the top wraps to CANCEL")
-  eq(om2.scroll, 21, "wrapping to CANCEL scrolls to the tail")
+  eq(om2.index, cancelRow, "up from the top wraps to CANCEL")
+  eq(om2.scroll, cancelRow - 5, "wrapping to CANCEL scrolls to the tail")
   -- headless-safe: no love.audio, setters only update internal state
   require("src.core.Music").applyOptions(og.save.options)
   require("src.core.Sound").applyOptions(og.save.options)

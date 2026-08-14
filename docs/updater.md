@@ -26,7 +26,7 @@ JSON parsing, and sha256 verification run on a background `love.thread`
 
 ## Version.lua fields
 
-`src/core/Version.lua` carries three fields the updater reads directly (the
+`src/core/Version.lua` carries four fields the updater reads directly (the
 existing `modApi`, `linkProtocol`, `saveFormat`, and `cache` fields are
 untouched):
 
@@ -37,6 +37,11 @@ untouched):
   as a valid payload to chainload).
 - `shell` - the native-shell contract this build's fused executable
   implements.
+- `payloadHost` - the native host family an in-place payload targets. Ordinary
+  LÖVE packages use `"love"`. A specialized native package uses a distinct,
+  stable identifier and accepts only payloads carrying that same identifier.
+  A missing field defaults to `"love"`, preserving compatibility with payloads
+  released before this field existed.
 - `minShell` - the lowest shell contract required to *run* this payload.
 
 Bump `minShell` only when a payload needs something the currently-shipped
@@ -48,6 +53,12 @@ rather than deleting it, in case a future shell upgrade can run it, and
 `Check`'s worker reports `needs_full` so the player is pointed at a full
 installer instead. Do not bump `minShell` for an ordinary Lua/data release;
 that is exactly the case the updater exists to avoid a reinstall for.
+
+Change `payloadHost` only when the packaged Lua depends on a different native
+host family. This is separate from `minShell`: the host name answers *which*
+native integration the payload targets, while the shell number answers *which
+revision* of that integration it requires. A mismatched-host payload is never
+mounted or deleted as stale; the launcher directs the player to a full package.
 
 ## Release assets
 

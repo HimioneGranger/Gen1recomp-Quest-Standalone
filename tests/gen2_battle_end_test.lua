@@ -252,10 +252,15 @@ do
   local outcome
   screen.onDone = function(result) outcome = result end
 
+  -- Battle lines end in `prompt` and PromptButton waits on A/B with no
+  -- countdown (home/joypad.asm:383-412), so the drain presses.
   local function drain(cap)
     for _ = 1, (cap or 3000) do
+      local waiting = (screen.messageTimer or 0) > 0
+      if waiting then Input:overlayPressed("a") end
       Input:step()
       screen:update(1 / 60)
+      if waiting then Input:overlayReleased("a") end
       if screen.phase == "menu" or screen.phase == "done" then return true end
     end
     return false

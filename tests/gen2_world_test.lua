@@ -3315,7 +3315,8 @@ local function grassLatchChecks()
   check(hp.jumping, "and it is a jump")
   check(not hp.grassShake, "no rustle spawns for the airborne cells")
   check(not hp.inGrass, "and IN_GRASS is clear for the whole hop")
-  for _ = 1, PlayerMod.STEP_FRAMES + 1 do hopGrass:step() end
+  -- A hop clears two cells, so it runs two step-times, not one (#1165).
+  for _ = 1, PlayerMod.STEP_FRAMES * 2 + 1 do hopGrass:step() end
   check(hp.inGrass, "the landing tile latches it once the hop ends")
 end
 grassLatchChecks()

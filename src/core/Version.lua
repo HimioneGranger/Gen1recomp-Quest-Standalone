@@ -8,6 +8,9 @@ local Version = {
                           -- "-dev" placeholder; CI stamps the real X.Y.Z into
                           -- the packed game.love only, never the working tree.
   shell = 1,              -- native-shell contract this build implements
+  payloadHost = "love",   -- native host family for in-place Lua payloads.
+                          -- A payload must name the same family; this prevents
+                          -- mounting code packaged for a different native host.
   minShell = 1,           -- lowest shell contract that can RUN this payload.
                           -- Bump only when a payload needs a newer native
                           -- binary (e.g. a LOVE version bump); an older shell

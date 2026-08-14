@@ -48,10 +48,15 @@ function fs.load(path)
 end
 function fs.getDirectoryItems(path)
   local items = {}
+  -- -print plus a basename in Lua, not -printf: that is a GNU extension and
+  -- BSD find (macOS) fails the whole call, which silently emptied the listing
+  -- and left the probe mod undiscovered.
   local pipe = io.popen("find " .. quote(full(path))
-    .. " -mindepth 1 -maxdepth 1 -printf '%f\\n' 2>/dev/null")
+    .. " -mindepth 1 -maxdepth 1 -print 2>/dev/null")
   if pipe then
-    for item in pipe:lines() do items[#items + 1] = item end
+    for item in pipe:lines() do
+      items[#items + 1] = item:match("[^/]+$") or item
+    end
     pipe:close()
   end
   table.sort(items)

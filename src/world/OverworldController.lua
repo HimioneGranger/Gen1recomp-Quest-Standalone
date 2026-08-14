@@ -1397,14 +1397,16 @@ function OverworldState:checkLedgeHop(dir)
           return false
         end
         require("src.core.Sound").play(Game.data, "Ledge")
-        p.hopFrames, p.hopTotal = 32, 32 -- jump arc (cosmetic)
+        local hop = (p.stepFramesCur or p.stepFrames or 16) * 2
+        p.hopFrames, p.hopTotal = hop, hop -- jump arc (cosmetic)
         self:scriptMove(p, dir, 1, function() self:checkEdgeExit(dir) end)
         return true
       end
       if not Collision.occupied(self.entities, lx, ly, p)
          and self.map:isWalkableCell(lx, ly) then
         require("src.core.Sound").play(Game.data, "Ledge")
-        p.hopFrames, p.hopTotal = 32, 32 -- jump arc (cosmetic)
+        local hop = (p.stepFramesCur or p.stepFrames or 16) * 2
+        p.hopFrames, p.hopTotal = hop, hop -- jump arc (cosmetic)
         self:scriptMove(p, dir, 2)
         return true
       end
@@ -3515,10 +3517,21 @@ end
 
 function OverworldState:onStepComplete()
   local p = self.player
-  local suppressWildEncounter = self.wildEncounterGraceSteps > 0
-  if suppressWildEncounter then
-    self.wildEncounterGraceSteps = self.wildEncounterGraceSteps - 1
+  -- Defaulted: a state built without the constructor (a mod harness, a test
+  -- fixture) reaches this before :234 ever ran, and nil > 0 threw the step.
+  local grace = self.wildEncounterGraceSteps or 0
+  if grace > 0 then
+    self.wildEncounterGraceSteps = grace - 1
   end
+  -- TryDoWildEncounter's first guard is `ld a, [wNPCMovementScriptPointerTable
+  -- Num] / and a / ret nz` (engine/battle/wild_encounters.asm:3-9): a step the
+  -- player did not take never rolls, which is why Oak's escort walks to the lab
+  -- through Pallet's grass without being jumped.
+  local runner = self.runner
+  local scripted = (runner and runner.isRunning and runner:isRunning())
+    or #(self.scriptMoves or {}) > 0
+    or self.engaging or self.emote or self.teleportOut
+  local suppressWildEncounter = grace > 0 or scripted and true or false
   self.todSteps = (self.todSteps or 0) + 1
   -- UpdatePikachuHappinessAndMood rides the step counter (poison.asm)
   require("src.world.PikachuFollower").onStep(Game.save)

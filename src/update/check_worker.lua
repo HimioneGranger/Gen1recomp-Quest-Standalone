@@ -153,8 +153,9 @@ local function gatePasses(rel)
   local info = Boot.probePayload(rel)
   if not info then return true end
   local shell = (Version and Version.shell) or 1
-  if info.minShell and info.minShell > shell then return false end
-  return true
+  local payloadHost = (Version and Version.payloadHost) or "love"
+  if Boot.canHost then return Boot.canHost(info, shell, payloadHost) end
+  return not (info.minShell and info.minShell > shell)
 end
 
 -- ---------------------------------------------------------------------------

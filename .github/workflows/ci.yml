@@ -94,8 +94,8 @@ jobs:
         if: github.repository == 'bryanthaboi/gen1recomp'
         uses: actions/upload-artifact@v7
         with:
-          name: gen1recomp-ios-ipa
-          path: dist/ios/gen1recomp.ipa
+          name: gen1recomp++-ios-ipa
+          path: dist/ios/gen1recomp++.ipa
           if-no-files-found: error
           retention-days: 7
       - name: clean up signing keychain

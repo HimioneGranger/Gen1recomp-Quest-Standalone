@@ -207,6 +207,11 @@ if type(storage) == "table" then
   T.check(type(normalBytes) == "string" and normalBytes ~= "",
     "first checkpoint anchor is durably represented before restart")
   local anchoredAt = SaveSerializer.decode(normalBytes).meta.savedAt
+
+  -- Model a durable checkpoint captured by the previous shipped engine.
+  -- RFC 0004 treats engineVersion as compatibility metadata, not runtime state.
+  checkpoint.identity.engineVersion = "0.1.79"
+
   SaveData.resetSlotState()
   local titleRuntime = makeRuntime(SaveData.newGame({ version = "red" }), true)
   titleRuntime.save.options = { volume = 9, bindings = {} }
@@ -224,7 +229,14 @@ if type(storage) == "table" then
       version = "red", meta = { playthroughId = originalId },
     }, fs).savedAt, anchoredAt,
       "title bootstrap never rewrites the first normal save")
-    T.same(checkpoints:capture(titleRuntime), checkpoint,
+    local recaptured = checkpoints:capture(titleRuntime)
+    T.eq(recaptured and recaptured.identity
+        and recaptured.identity.engineVersion, Version.engine,
+      "cross-version resume recaptures the running engine version")
+    if recaptured and recaptured.identity then
+      recaptured.identity.engineVersion = checkpoint.identity.engineVersion
+    end
+    T.same(recaptured, checkpoint,
       "bootstrapped overworld differentially recaptures the selected checkpoint")
     T.eq(_G.MOD_TITLE_RESTORE_COUNT, 1,
       "a successfully verified title resume emits checkpoint.restored exactly once")

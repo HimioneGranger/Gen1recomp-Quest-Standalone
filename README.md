@@ -1,4 +1,13 @@
-# Gen1Recomp
+# Gen1Recomp — VR Unplugged
+
+<p align="center">
+  <img src="assets/logo/gen1recomp_vr_unplugged_8bit.png" alt="Gen1Recomp VR Unplugged" width="760">
+</p>
+
+> **Meta Quest 3 standalone:** this public sideload build is based on
+> Gen1Recomp `v0.1.81` with the Quest OpenXR launcher and gameplay bridge. It
+> is a public beta with known performance limitations and contains no ROM,
+> save, or extracted game data.
 
 A native LÖVE2D recreation of Poke Red, Blue and Yellow. The engine and map
 behavior are hand-written Lua; game data and graphics are decoded from a ROM
@@ -7,7 +16,34 @@ supplied by the player.
 > [!CAUTION]
 > **We are NOT affiliated with the website `gen1recomp[.]com`** That website is not run by this project, was not authorized by us, and we have no idea who operates it. It is impersonating this project; do not download anything from it, and treat anything it hosts or claims as untrustworthy. Even if the site currently links back to this repository, the people behind it can change its content at any time, so nothing on it should ever be trusted. This GitHub repository and the Discord linked below are the only official sources for this project.
 
-<p align="center"><img src="https://raw.githubusercontent.com/bryanthaboi/gen1recomp/refs/heads/dev/assets/logo/logo.png"></p>
+## Meta Quest 3 standalone
+
+The VR Unplugged APK runs the launcher and game directly on Meta Quest 3. A PC
+is only needed to sideload the APK. The launcher imports a legally obtained,
+supported US Red, Blue, Yellow, or Gold ROM supplied by the player; no ROM or
+extracted game content is included in this repository or release.
+
+<p align="center">
+  <a href="https://github.com/HimioneGranger/Gen1recomp-Quest-Standalone/releases/latest/download/Gen1Recomp-VR-Unplugged-v0.1.81-Quest.apk"><strong>Download the latest Quest APK</strong></a>
+</p>
+
+### Install
+
+1. Enable Developer Mode for the headset and connect it by USB.
+2. Install the downloaded APK with SideQuest, or run
+   `adb install -r Gen1Recomp-VR-Unplugged-v0.1.81-Quest.apk`.
+3. In the headset, open **App Library → Unknown Sources → Gen1Recomp VR
+   Unplugged**.
+4. Use the launcher to select and import your own supported ROM.
+5. Import compatible Quest mod ZIPs separately from the launcher's **MODS**
+   tab. Mods are not bundled into the APK.
+
+The current build has been developed and physically tested on Quest 3. Use
+**RES: FULL** and **SHADOWS: LOW** as the starting graphics preset. Initial ROM
+import and voxel mesh preparation can take longer than later launches.
+
+For updates, install the new APK with `adb install -r` so Android keeps the
+existing app data. Back up important saves before upgrading.
 
 **SUPPORT / ANNOUNCEMENTS / MODS:** [Discord](https://bois.icu)
 
@@ -242,7 +278,7 @@ in [docs/linux-arm64-build.md](docs/linux-arm64-build.md).
 
 ## iOS
 
-Every release ships `gen1recomp-*-ios.ipa`. Sideload it with AltStore
+Every release ships `gen1recomp++-*-ios.ipa`. Sideload it with AltStore
 (Windows or Mac) — see [docs/ios-sideload.md](docs/ios-sideload.md). To
 build and install from source on a Mac instead, see
 [docs/ios-install.md](docs/ios-install.md).

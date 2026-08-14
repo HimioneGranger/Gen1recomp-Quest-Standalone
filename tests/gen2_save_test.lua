@@ -417,22 +417,25 @@ check("only the written byte is stored", memCount, 1)
 local _, _, _, loadReport = Save.load("gold")
 check("load reports a clean save", Save.emptyReport(loadReport), true)
 
--- A second write backs the first up, so the previous file is always recoverable.
+-- A second write backs the first up, so the previous file is always
+-- recoverable.  The file lives at saves/<version>/<slot>.lua since Gold grew
+-- launcher slots (#1107); the flat save_gold.lua is only the migration source.
+local SLOT = "saves/gold/slot1.lua"
 written.player.money = 5555
 Save.save(written)
-check("backup written", files["save_gold.lua.bak"] ~= nil, true)
+check("backup written", files[SLOT .. ".bak"] ~= nil, true)
 check("new value loads", Save.load("gold").player.money, 5555)
 
 -- A corrupt main file falls back to the backup rather than losing the game.
-files["save_gold.lua"] = "this is not a lua table"
+files[SLOT] = "this is not a lua table"
 local recoveredSave, how = Save.load("gold")
 check("recovered from the backup", recoveredSave ~= nil, true)
 check("recovery reported", how, "bak")
 check("backup held the previous money", recoveredSave.player.money, 4321)
 
 -- A staged .tmp is preferred over the backup: it is the newer of the two.
-files["save_gold.lua"] = nil
-files["save_gold.lua.tmp"] = files["save_gold.lua.bak"]
+files[SLOT] = nil
+files[SLOT .. ".tmp"] = files[SLOT .. ".bak"]
 local staged, stagedHow = Save.load("gold")
 check("recovered from the staged copy", staged ~= nil, true)
 check("staged recovery reported", stagedHow, "tmp")

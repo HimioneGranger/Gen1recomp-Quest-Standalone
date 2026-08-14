@@ -51,7 +51,9 @@ check(mainSrc:find("prepareOverlayHandoff", 1, true) ~= nil
       and mainSrc:find("openTouchControlsEditor", 1, true) ~= nil,
       "main.lua mentions prepareOverlayHandoff + touch editor")
 -- prepare must run inside openTouchControlsEditor, not only openEditor
-local touchOpen = mainSrc:match("local function openTouchControlsEditor%(%)(.-)\nend")
+-- The signature takes the launcher tab since #1100, so match any parameter
+-- list rather than pinning the arity.
+local touchOpen = mainSrc:match("local function openTouchControlsEditor%(.-%)(.-)\nend")
 check(touchOpen ~= nil, "openTouchControlsEditor body found")
 check(touchOpen:find("prepareOverlayHandoff", 1, true) ~= nil,
       "openTouchControlsEditor prepares overlay handoff like the save editor")

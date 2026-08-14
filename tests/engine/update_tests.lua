@@ -104,6 +104,34 @@ local function nameSet(list)
   return s
 end
 
+-- Host-family compatibility is independent from the numeric shell revision.
+-- Missing fields preserve the historical ordinary-LOVE defaults.
+do
+  check(Boot.canHost({}, 1, "love"),
+    "canHost: legacy payload defaults to ordinary LOVE host and shell 1")
+  check(Boot.canHost({ payloadHost = "love", minShell = 2 }, 2, "love"),
+    "canHost: matching host and sufficient shell pass")
+  check(not Boot.canHost({ payloadHost = "love", minShell = 2 }, 1, "love"),
+    "canHost: newer shell requirement fails")
+  check(not Boot.canHost({ payloadHost = "special", minShell = 1 }, 9, "love"),
+    "canHost: a high shell revision cannot override a host mismatch")
+  check(Boot.canHost({ payloadHost = "special", minShell = 3 }, 3, "special"),
+    "canHost: a specialized host accepts its own payload")
+  check(not Boot.canHost(nil, 1, "love"),
+    "canHost: malformed payload metadata fails closed")
+end
+
+-- Even an older mismatched-host payload is not ours to clean up.
+do
+  local candidates = {
+    { name = "other-old.love", engine = "0.5.0", minShell = 1,
+      payloadHost = "special" },
+  }
+  local chosen, del = Boot.select(candidates, "1.0.0", 1, "love")
+  eq(chosen, nil, "select: old payload for another host is not runnable")
+  eq(#del, 0, "select: old payload for another host is not deleted")
+end
+
 -- empty candidate list: nothing to run, nothing to delete
 do
   local chosen, del = Boot.select({}, "1.0.0", 1)
@@ -125,6 +153,34 @@ do
   eq(#del, 2, "select: both losers are marked for deletion")
   check(d["a.love"] and d["c.love"], "select: superseded runnable payloads are deleted")
   check(not d["b.love"], "select: the chosen payload is never deleted")
+end
+
+-- A newer payload for another native host is neither selected nor deleted.
+-- It may be valid for another full package sharing this save directory.
+do
+  local candidates = {
+    { name = "other.love", engine = "2.0.0", minShell = 1,
+      payloadHost = "special" },
+    { name = "ours.love", engine = "1.5.0", minShell = 1,
+      payloadHost = "love" },
+  }
+  local chosen, del = Boot.select(candidates, "1.0.0", 1, "love")
+  eq(chosen, "ours.love", "select: chooses the matching host payload")
+  eq(#del, 0, "select: incompatible newer host payload is retained")
+end
+
+-- The same candidate set selects the specialized payload when the bundled
+-- package identifies as that host family.
+do
+  local candidates = {
+    { name = "ordinary.love", engine = "2.1.0", minShell = 1,
+      payloadHost = "love" },
+    { name = "special.love", engine = "2.0.0", minShell = 1,
+      payloadHost = "special" },
+  }
+  local chosen, del = Boot.select(candidates, "1.0.0", 1, "special")
+  eq(chosen, "special.love", "select: specialized package chooses its host payload")
+  eq(#del, 0, "select: newer ordinary payload remains available to its host")
 end
 
 -- skips payloads whose minShell is above the bundled shell, and KEEPS an

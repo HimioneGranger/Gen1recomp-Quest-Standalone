@@ -22,7 +22,7 @@ jobs:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
         run: |
-          artifact_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "gen1recomp-ios-ipa") | .id')"
+          artifact_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "gen1recomp++-ios-ipa") | .id')"
           [ -n "$artifact_id" ] || exit 0
           head_owner="${HEAD_REPOSITORY%%/*}"
           pr_number="$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&head=$head_owner:$HEAD_BRANCH" --jq '.[0].number // empty')"
@@ -44,7 +44,7 @@ jobs:
         uses: thollander/actions-comment-pull-request@v3
         with:
           message: |
-            [gen1recomp.ipa](${{ steps.artifact.outputs.artifact_url }})
+            [gen1recomp++.ipa](${{ steps.artifact.outputs.artifact_url }})
 
             **Commit**: [#${{ steps.build-info.outputs.hash }}](https://github.com/${{ github.event.workflow_run.head_repository.full_name }}/commit/${{ github.event.workflow_run.head_sha }})
             **Build Time**: `${{ steps.build-info.outputs.time }}`

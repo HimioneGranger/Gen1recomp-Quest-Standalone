@@ -7,7 +7,7 @@ an iOS app with LÖVE 12.0.
 
 The app uses the public iOS Documents directory as its LÖVE save directory.
 There is no `pokemon-love2d` subdirectory and the app does not create a
-README file there. When browsing `On My iPhone > gen1recomp` in Files, the
+README file there. When browsing `On My iPhone > gen1recomp++` in Files, the
 directory contains the app's runtime data directly, including:
 
 - installed mods and downloaded ROMs
@@ -46,7 +46,7 @@ scripts/build_ios.sh --device --release --install
 Device builds require a paired, unlocked device and a valid Apple signing
 identity. Set `DEVELOPMENT_TEAM` or `CODE_SIGN_IDENTITY` when automatic
 signing cannot select the intended account. Add `--ipa` to create
-`dist/ios/gen1recomp.ipa`.
+`dist/ios/gen1recomp++.ipa`.
 
 The script verifies the final app before packaging it:
 
@@ -76,10 +76,10 @@ option.
 Simulator and device app bundles are copied to:
 
 ```text
-dist/ios/Debug-iphonesimulator/gen1recomp.app
-dist/ios/Release-iphonesimulator/gen1recomp.app
-dist/ios/Debug-iphoneos/gen1recomp.app
-dist/ios/Release-iphoneos/gen1recomp.app
+dist/ios/Debug-iphonesimulator/gen1recomp++.app
+dist/ios/Release-iphonesimulator/gen1recomp++.app
+dist/ios/Debug-iphoneos/gen1recomp++.app
+dist/ios/Release-iphoneos/gen1recomp++.app
 ```
 
 The intermediate Xcode products are under `mobile/ios/build/`. Both locations
@@ -94,9 +94,9 @@ saves; those are created at runtime in Documents.
 
 | Field | Default |
 | --- | --- |
-| Display name | `gen1recomp` |
-| Product name | `gen1recomp` |
-| Bundle identifier | `com.theboisclub.gen1recomp` |
+| Display name | `gen1recomp++` |
+| Product name | `gen1recomp++` |
+| Bundle identifier | `com.theboisclub.gen1recompplusplus` |
 | Save directory | Public `Documents` root |
 | Orientation | Portrait |
 
