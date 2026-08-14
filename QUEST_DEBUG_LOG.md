@@ -2925,3 +2925,32 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `ac80d31c83ec7808208f056603026af261b5e68bab716c0189479a4338188d2e`,
   matching the host. The package is staged only; q3 remains installed until
   the user performs replacement import through the normal Mod Manager.
+
+### q4 physical stereo and Route 8 gate recovery pass
+
+- The user imported the hash-verified q4 package and the runtime loaded
+  `overworld_wild_spawns 2.0.1-quest.4`. The accepted Dramaless Quest and Kanto
+  Quest render path remained active.
+- Physical Quest 3 testing passed the exact q3 regression route: Route 8 ->
+  Route 8 Gate -> Route 8 remained immersive stereoscopic voxel, controls did
+  not freeze, and the flat 2D fallback did not recur. The user explicitly
+  reported that the gate test passed with no freezing.
+- Runtime evidence independently records both gate and Route 8 map-entry
+  events. On the repeat traversal, both entries reported zero pending and zero
+  urgent streaming jobs. This accepts q4's narrow seventh-argument stereo
+  forwarding correction; it does not claim a streaming-performance change.
+- The live q4 process remained healthy with no app fatal, ANR, OOM or OpenXR
+  session loss. The post-route snapshot was approximately 1,985,756 KB total
+  PSS, 2,077,560 KB RSS and 795,944 KB graphics, with only 5,665 KB swap PSS.
+  Initial Saffron/full-neighbor meshing was still expensive, so memory and
+  startup/transition cost remain performance-hardening work rather than a q4
+  improvement claim.
+- Repeated nonfatal Wilds warnings remain for world billboards whose
+  `pose()` returned a nil sprite before the spatial emergency fallback. The
+  next physical gate is one ordinary visible-wild battle using Poke Followers
+  plus Classic size, including a visual check of overworld sprite bodies after
+  battle. HGSS/PokeMMO geometry and OW Catch remain disabled until that passes.
+- q4 is physically accepted for stereo startup and the Route 8 gate round
+  trip, but is not yet promoted as the fully integrated Wilds package. q3
+  remains rejected evidence; q4 still needs battle, alternate-geometry and
+  physical-throw stages.

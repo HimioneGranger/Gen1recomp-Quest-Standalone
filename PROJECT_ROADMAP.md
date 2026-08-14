@@ -1,6 +1,6 @@
 # Gen1Recomp Quest VR — Master Roadmap
 
-Last reconciled: 2026-08-13 20:27 CDT
+Last reconciled: 2026-08-13 21:06 CDT
 
 This is the single checkbox list for the project. Percentages are estimates of
 the work completed for that item, including required physical headset testing.
@@ -17,9 +17,9 @@ prototype alone does not count as 100%.
 - **Dramaless 2.0 Quest migration:** 96% (q3 passed the complete core physical
   matrix and is the accepted comparison baseline; retained transition continuity
   and Kanto compatibility work are tracked separately)
-- **Wilds of Kanto 2.0.1 Quest rebase:** 82% (q3 imported but failed by
-  discarding Quest's stereo render argument; q4 fixes that exact seam and
-  passes source/package parity, with physical retest, HGSS and throw gates remaining)
+- **Wilds of Kanto 2.0.1 Quest rebase:** 88% (q4 physically restores stereo
+  voxel and passes the Route 8/gate round trip without freezing; battle,
+  alternate sprite geometry and physical-throw gates remain)
 - **Battle Art 1.8.6 transition/precache integration:** 10% (scope,
   provenance and maintainer guidance recorded; source audit pending)
 - **Performance and lifecycle hardening:** 70%
@@ -51,9 +51,13 @@ prototype alone does not count as 100%.
   `AC80D31C83EC7808208F056603026AF261B5E68BAB716C0189479A4338188D2E`.
 - [x] Copy that exact 14,101,914-byte q4 ZIP to Quest Downloads and verify the
   same full SHA-256 on-device; it is staged, not installed or accepted.
-- [ ] Import q4 and, with OW Catch OFF plus Poke Followers/Classic geometry,
-  verify stereo voxel startup, Route 8/gate transition, one battle, menus,
-  controllers and voxel stability.
+- [x] Import q4 with OW Catch OFF and physically verify stereo voxel startup
+  plus Route 8 -> gate -> Route 8. The world remained voxel, controls stayed
+  live and the transition did not freeze; repeat map-entry telemetry showed an
+  empty pending/urgent queue.
+- [ ] With Poke Followers/Classic geometry, complete one ordinary visible-wild
+  battle and verify battle entry/exit, menus, controllers, Pokédex and visible
+  overworld sprite bodies.
 - [ ] Switch to HGSS/PokeMMO and test scale, crop, land/water changes and frame
   pacing.
 - [ ] Enable OW Catch and test physical throw, cancel, ordinary A interaction
@@ -292,7 +296,7 @@ performance work measures the combined stack.
 - [ ] Measure Dramaless + Kanto alone before attributing the current full-stack
   36-38 FPS / ~2.1 GB PSS / ~714 MB graphics sample to Kanto itself.
 
-## Priority 3B — Wilds of Kanto 2.0.1 Quest rebase (82%)
+## Priority 3B — Wilds of Kanto 2.0.1 Quest rebase (88%)
 
 - [x] Preserve the earlier upstream-2.0.0 `quest-v2` branch as rollback
   evidence and create isolated `quest-v2.0.1` from exact official commit
@@ -336,9 +340,14 @@ performance work measures the combined stack.
   `AC80D31C83EC7808208F056603026AF261B5E68BAB716C0189479A4338188D2E`.
 - [x] Stage the exact q4 ZIP in Quest Downloads and verify the device-side hash
   matches; leave replacement import to the normal launcher workflow.
-- [ ] Import q4 on Quest with OW Catch OFF and verify Poke Followers/Classic
-  geometry, stereo voxel startup, Route 8/gate transition, battle, menus,
-  controllers and stability.
+- [x] Import q4 on Quest with OW Catch OFF. The runtime loaded
+  `2.0.1-quest.4`; stereo voxel survived Route 8 -> gate -> Route 8 with no
+  freeze, and the repeat traversal reached both maps with no pending or urgent
+  streaming work.
+- [ ] With Poke Followers/Classic geometry, complete one ordinary visible-wild
+  battle and verify battle entry/exit, menus, controllers, Pokédex and visible
+  overworld sprite bodies. Repeated `pose() returned nil sprite` emergency
+  billboard warnings remain a separate visual/provider investigation target.
 - [ ] Switch to HGSS/PokeMMO and verify Dramaless 2.0 public variable geometry,
   land/water rebinds and no crop/stretch or new frame-time regression.
 - [ ] Enable OW Catch only after the baseline passes; verify physical throwing,
