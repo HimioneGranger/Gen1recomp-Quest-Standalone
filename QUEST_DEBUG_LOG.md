@@ -2984,3 +2984,33 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
 - q4 still is not fully promoted. Next isolate the alternate HGSS/PokeMMO
   variable-geometry path, then test OW Catch physical throwing and controller
   arbitration. Do not mix those two remaining gates into one run.
+
+### q4 HGSS/PokeMMO stable-fallback result
+
+- The user switched Wilds to HGSS/PokeMMO and completed the requested physical
+  observation. Pokémon remained the same apparent size, but no crop, stretch,
+  stereo, controller, battle or lifecycle defect was observed, and performance
+  felt similar to the accepted Followers run.
+- This is a compatibility pass with a known feature limitation, not a True Size
+  pass. Wilds source explicitly maps `sprite_style=pokemmo` to `true_size`, then
+  falls back to Classic 16x16 in voxel mode unless the active renderer proves it
+  can consume variable `SpriteDef` geometry. Its user guide documents that
+  renderer-dependent fallback as a known limitation.
+- The Quest Dramaless 2.0 fork exposes `exports.lib`, `VoxelScene` and a
+  fixed-16 `SpriteBillboards.mesh`; Wilds contains an in-memory adapter intended
+  to wrap that mesh. However, device logs repeatedly place active Wilds bodies
+  on `SPATIAL_OVERLAY_EMERGENCY` after `pose() returned nil sprite`, and the
+  captured log does not prove that the live option switch successfully reached
+  a variable-geometry billboard. Treat this as a candidate relationship, not a
+  confirmed root cause, until focused instrumentation distinguishes option
+  persistence, adapter capability and per-entity fallback state.
+- The user reports the same-size behavior is already publicly known. An attempt
+  to inspect the open Wilds Discord thread was stopped safely: Discord exposed
+  no message accessibility text and Windows Graphics Capture failed twice with
+  `0x80004002`. No blind clicks or messages were sent. Preserve a screenshot or
+  pasted maintainer statement if exact public provenance is needed later.
+- The same-size limitation does not block q4 because its Classic fallback is
+  stable and the current release goal is Quest VR compatibility, not adding a
+  new upstream feature. Keep True Size/provider-depth cleanup on the Wilds fork
+  backlog. The final q4 promotion gate is OW Catch physical throwing and
+  controller arbitration, tested separately.

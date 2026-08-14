@@ -1,6 +1,6 @@
 # Gen1Recomp Quest VR — Master Roadmap
 
-Last reconciled: 2026-08-13 21:18 CDT
+Last reconciled: 2026-08-13 21:54 CDT
 
 This is the single checkbox list for the project. Percentages are estimates of
 the work completed for that item, including required physical headset testing.
@@ -17,9 +17,9 @@ prototype alone does not count as 100%.
 - **Dramaless 2.0 Quest migration:** 96% (q3 passed the complete core physical
   matrix and is the accepted comparison baseline; retained transition continuity
   and Kanto compatibility work are tracked separately)
-- **Wilds of Kanto 2.0.1 Quest rebase:** 92% (q4 restores stereo voxel, passes
-  the Route 8/gate round trip and survives repeated Followers battles plus
-  extended traversal; alternate sprite geometry and physical-throw gates remain)
+- **Wilds of Kanto 2.0.1 Quest rebase:** 95% (q4 restores stereo voxel, passes
+  the gate/battle/traversal matrix and keeps HGSS/PokeMMO stable at similar
+  performance; True Size remains a known fallback and physical throwing remains)
 - **Battle Art 1.8.6 transition/precache integration:** 10% (scope,
   provenance and maintainer guidance recorded; source audit pending)
 - **Performance and lifecycle hardening:** 70%
@@ -59,8 +59,10 @@ prototype alone does not count as 100%.
   battles and verify battle entry/exit, menus, controllers, Pokédex and visible
   overworld sprite bodies. Three Route 8 battles and one Diglett's Cave battle
   completed, and voxel traversal continued through Vermilion and Route 11.
-- [ ] Switch to HGSS/PokeMMO and test scale, crop, land/water changes and frame
-  pacing.
+- [x] Switch to HGSS/PokeMMO and test scale, crop and frame pacing. Stability,
+  presentation and performance remained comparable, but all Pokémon retained
+  the same Classic size; defer True Size as a known public renderer-integration
+  limitation rather than treating it as a q4 stereo/lifecycle regression.
 - [ ] Enable OW Catch and test physical throw, cancel, ordinary A interaction
   and controller ownership.
 - [ ] Promote q4 only after all three physical stages pass; otherwise restore
@@ -297,7 +299,7 @@ performance work measures the combined stack.
 - [ ] Measure Dramaless + Kanto alone before attributing the current full-stack
   36-38 FPS / ~2.1 GB PSS / ~714 MB graphics sample to Kanto itself.
 
-## Priority 3B — Wilds of Kanto 2.0.1 Quest rebase (92%)
+## Priority 3B — Wilds of Kanto 2.0.1 Quest rebase (95%)
 
 - [x] Preserve the earlier upstream-2.0.0 `quest-v2` branch as rollback
   evidence and create isolated `quest-v2.0.1` from exact official commit
@@ -352,8 +354,11 @@ performance work measures the combined stack.
   traversal through Saffron, Route 6, Vermilion and Route 11. Repeated
   `pose() returned nil sprite` emergency billboard warnings remain a separate
   visual/provider investigation target rather than a failed lifecycle gate.
-- [ ] Switch to HGSS/PokeMMO and verify Dramaless 2.0 public variable geometry,
-  land/water rebinds and no crop/stretch or new frame-time regression.
+- [x] Switch to HGSS/PokeMMO and test the Dramaless 2.0 variable-geometry path.
+  The mode remained stable with no crop/stretch, control, stereo or noticeable
+  frame-time regression, but Pokémon stayed the same Classic size. Record True
+  Size as a deferred Wilds/Dramaless integration defect; the compatibility
+  fallback itself passed.
 - [ ] Enable OW Catch only after the baseline passes; verify physical throwing,
   cancellation, ordinary A interaction and controller arbitration.
 - [ ] Keep the fork local/unpublished until the user explicitly authorizes a
