@@ -2954,3 +2954,33 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   trip, but is not yet promoted as the fully integrated Wilds package. q3
   remains rejected evidence; q4 still needs battle, alternate-geometry and
   physical-throw stages.
+
+### q4 Followers battle and extended-traversal pass
+
+- The user reported that the build remained working while walking from Route 8
+  all the way to Vermilion. Device evidence confirms the active q4 process was
+  still PID `21071` and Wilds initialized with `sprite_style=followers`.
+- Three Route 8 battle sessions completed cleanly: one win and two run results.
+  Each emitted `standalone-voxel-2d-finish reason=battle.ended`, after which the
+  same process continued through Route 8 Gate, Saffron City, Route 6, Route 6
+  Gate and Vermilion City. The user retained working voxel presentation and
+  controls throughout.
+- The user continued past Vermilion into Route 11 and Diglett's Cave. A fourth
+  visible-wild battle there also completed normally, followed by successful
+  returns through the cave entrance and onto Route 11. This is stronger than a
+  one-battle smoke test and accepts q4's Followers/Classic battle-and-traversal
+  stage.
+- No app fatal, ANR, OOM or OpenXR session loss occurred. Android `signal 9`
+  records in the interval belonged to unrelated PIDs, not the live app. The
+  later memory snapshot was approximately 1,591,395 KB total PSS, 1,682,624 KB
+  RSS and 642,580 KB graphics with 4,117 KB swap PSS; it is a health snapshot,
+  not a controlled performance comparison.
+- Repeated `pose() returned nil sprite` emergency-fallback warnings remain for
+  several active Wilds entities, alongside missing pre-registration fallbacks
+  for some Gen 2 species and nonfatal occupancy conflicts. Because visible
+  gameplay, battles and traversal remained functional, retain these as sprite
+  provider/overlay cleanup rather than misclassifying the q4 stereo/lifecycle
+  gate as failed.
+- q4 still is not fully promoted. Next isolate the alternate HGSS/PokeMMO
+  variable-geometry path, then test OW Catch physical throwing and controller
+  arbitration. Do not mix those two remaining gates into one run.

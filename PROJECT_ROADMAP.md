@@ -1,6 +1,6 @@
 # Gen1Recomp Quest VR — Master Roadmap
 
-Last reconciled: 2026-08-13 21:06 CDT
+Last reconciled: 2026-08-13 21:18 CDT
 
 This is the single checkbox list for the project. Percentages are estimates of
 the work completed for that item, including required physical headset testing.
@@ -17,9 +17,9 @@ prototype alone does not count as 100%.
 - **Dramaless 2.0 Quest migration:** 96% (q3 passed the complete core physical
   matrix and is the accepted comparison baseline; retained transition continuity
   and Kanto compatibility work are tracked separately)
-- **Wilds of Kanto 2.0.1 Quest rebase:** 88% (q4 physically restores stereo
-  voxel and passes the Route 8/gate round trip without freezing; battle,
-  alternate sprite geometry and physical-throw gates remain)
+- **Wilds of Kanto 2.0.1 Quest rebase:** 92% (q4 restores stereo voxel, passes
+  the Route 8/gate round trip and survives repeated Followers battles plus
+  extended traversal; alternate sprite geometry and physical-throw gates remain)
 - **Battle Art 1.8.6 transition/precache integration:** 10% (scope,
   provenance and maintainer guidance recorded; source audit pending)
 - **Performance and lifecycle hardening:** 70%
@@ -55,9 +55,10 @@ prototype alone does not count as 100%.
   plus Route 8 -> gate -> Route 8. The world remained voxel, controls stayed
   live and the transition did not freeze; repeat map-entry telemetry showed an
   empty pending/urgent queue.
-- [ ] With Poke Followers/Classic geometry, complete one ordinary visible-wild
-  battle and verify battle entry/exit, menus, controllers, Pokédex and visible
-  overworld sprite bodies.
+- [x] With Poke Followers/Classic geometry, complete ordinary visible-wild
+  battles and verify battle entry/exit, menus, controllers, Pokédex and visible
+  overworld sprite bodies. Three Route 8 battles and one Diglett's Cave battle
+  completed, and voxel traversal continued through Vermilion and Route 11.
 - [ ] Switch to HGSS/PokeMMO and test scale, crop, land/water changes and frame
   pacing.
 - [ ] Enable OW Catch and test physical throw, cancel, ordinary A interaction
@@ -296,7 +297,7 @@ performance work measures the combined stack.
 - [ ] Measure Dramaless + Kanto alone before attributing the current full-stack
   36-38 FPS / ~2.1 GB PSS / ~714 MB graphics sample to Kanto itself.
 
-## Priority 3B — Wilds of Kanto 2.0.1 Quest rebase (88%)
+## Priority 3B — Wilds of Kanto 2.0.1 Quest rebase (92%)
 
 - [x] Preserve the earlier upstream-2.0.0 `quest-v2` branch as rollback
   evidence and create isolated `quest-v2.0.1` from exact official commit
@@ -344,10 +345,13 @@ performance work measures the combined stack.
   `2.0.1-quest.4`; stereo voxel survived Route 8 -> gate -> Route 8 with no
   freeze, and the repeat traversal reached both maps with no pending or urgent
   streaming work.
-- [ ] With Poke Followers/Classic geometry, complete one ordinary visible-wild
-  battle and verify battle entry/exit, menus, controllers, Pokédex and visible
-  overworld sprite bodies. Repeated `pose() returned nil sprite` emergency
-  billboard warnings remain a separate visual/provider investigation target.
+- [x] With Poke Followers/Classic geometry, complete ordinary visible-wild
+  battles and verify battle entry/exit, menus, controllers, Pokédex and visible
+  overworld sprite bodies. The runtime confirms `sprite_style=followers`, three
+  Route 8 battle finishes, one Diglett's Cave battle finish and continued voxel
+  traversal through Saffron, Route 6, Vermilion and Route 11. Repeated
+  `pose() returned nil sprite` emergency billboard warnings remain a separate
+  visual/provider investigation target rather than a failed lifecycle gate.
 - [ ] Switch to HGSS/PokeMMO and verify Dramaless 2.0 public variable geometry,
   land/water rebinds and no crop/stretch or new frame-time regression.
 - [ ] Enable OW Catch only after the baseline passes; verify physical throwing,
