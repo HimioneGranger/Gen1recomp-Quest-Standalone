@@ -1,6 +1,6 @@
 # Gen1Recomp Quest VR — Master Roadmap
 
-Last reconciled: 2026-08-13 19:31 CDT
+Last reconciled: 2026-08-13 20:27 CDT
 
 This is the single checkbox list for the project. Percentages are estimates of
 the work completed for that item, including required physical headset testing.
@@ -17,8 +17,9 @@ prototype alone does not count as 100%.
 - **Dramaless 2.0 Quest migration:** 96% (q3 passed the complete core physical
   matrix and is the accepted comparison baseline; retained transition continuity
   and Kanto compatibility work are tracked separately)
-- **Wilds of Kanto 2.0.1 Quest rebase:** 75% (q3 source/package gates pass and
-  exact official parity is recorded; physical Classic, HGSS and throw gates remain)
+- **Wilds of Kanto 2.0.1 Quest rebase:** 82% (q3 imported but failed by
+  discarding Quest's stereo render argument; q4 fixes that exact seam and
+  passes source/package parity, with physical retest, HGSS and throw gates remaining)
 - **Battle Art 1.8.6 transition/precache integration:** 10% (scope,
   provenance and maintainer guidance recorded; source audit pending)
 - **Performance and lifecycle hardening:** 70%
@@ -32,22 +33,31 @@ prototype alone does not count as 100%.
 - **Overall playable Quest release:** **80%**
 - **Whole long-term vision, including Gen 2, MR and PCVR:** **46%**
 
-## Current checkpoint — Wilds q3 physical acceptance
+## Current checkpoint — Wilds q4 stereo recovery
 
 - [x] Rebase the Quest fork onto exact official Wilds 2.0.1.
 - [x] Freeze and hash the deterministic `2.0.1-quest.3` package.
 - [x] Copy the exact package to Quest Downloads and verify its device-side
   SHA-256 matches `51864D1C...EA2A`.
-- [ ] Import `IMPORT_ME__WILDS_OF_KANTO_QUEST__v2.0.1-quest.3.zip` through the
-  launcher; confirm the Mod Manager reports `2.0.1-quest.3`.
-- [ ] With OW Catch OFF and GSC/Classic sprites, test a route round trip, one
-  battle, menus, controllers and voxel stability.
+- [x] Import `IMPORT_ME__WILDS_OF_KANTO_QUEST__v2.0.1-quest.3.zip` through the
+  launcher and confirm the runtime loads `2.0.1-quest.3`.
+- [x] Capture the q3 failure with OW Catch OFF: OpenXR and audio stayed alive,
+  but the voxel projection disappeared and the flat 2D panel remained.
+- [x] Identify the exact compatibility defect: Wilds wrapped
+  `VoxelScene.render` with the historical six-argument signature and dropped
+  Quest's optional seventh `eyes` table, so Dramaless could not return two eye
+  canvases.
+- [x] Build deterministic `2.0.1-quest.4` from commit `a836e865`; ZIP SHA-256
+  `AC80D31C83EC7808208F056603026AF261B5E68BAB716C0189479A4338188D2E`.
+- [ ] Import q4 and, with OW Catch OFF plus Poke Followers/Classic geometry,
+  verify stereo voxel startup, Route 8/gate transition, one battle, menus,
+  controllers and voxel stability.
 - [ ] Switch to HGSS/PokeMMO and test scale, crop, land/water changes and frame
   pacing.
 - [ ] Enable OW Catch and test physical throw, cancel, ordinary A interaction
   and controller ownership.
-- [ ] Promote q3 only after all three physical stages pass; otherwise restore
-  the preserved older Wilds package.
+- [ ] Promote q4 only after all three physical stages pass; otherwise restore
+  the preserved older Wilds package. q3 is a rejected evidence baseline.
 
 ## Release gate — Upstream engine and API contributions (70%)
 
@@ -280,7 +290,7 @@ performance work measures the combined stack.
 - [ ] Measure Dramaless + Kanto alone before attributing the current full-stack
   36-38 FPS / ~2.1 GB PSS / ~714 MB graphics sample to Kanto itself.
 
-## Priority 3B — Wilds of Kanto 2.0.1 Quest rebase (75%)
+## Priority 3B — Wilds of Kanto 2.0.1 Quest rebase (82%)
 
 - [x] Preserve the earlier upstream-2.0.0 `quest-v2` branch as rollback
   evidence and create isolated `quest-v2.0.1` from exact official commit
@@ -308,8 +318,23 @@ performance work measures the combined stack.
   `51864D1C13EFE5E1C21FDC31150FE3BFF0DA74252314D3A2101FDCD8A182EA2A`.
 - [x] Copy the 14,101,326-byte ZIP to Quest Downloads and verify the same full
   SHA-256 on-device; copying does not count as installation or acceptance.
-- [ ] Import q3 on Quest with OW Catch OFF and verify baseline GSC/Classic
-  sprites, route transition, battle, menus, controllers and voxel stability.
+- [x] Import q3 on Quest with OW Catch OFF. The runtime loaded the intended
+  version, but the physical baseline failed: Route 8/gate fell to a 2D panel
+  inside a still-running OpenXR session.
+- [x] Trace that failure to Wilds' six-argument `VoxelScene.render` wrapper,
+  which discarded the Quest fork's seventh stereo-eye argument. Fix only that
+  wrapper in q4 and add a ROM-free test proving both eyes reach Dramaless while
+  the temporary emergency-entity filter still restores the original list.
+- [x] Compile all 127 Lua files; run the focused stereo/version/options tests;
+  and compare all 53 discovered standalone Lua test files against frozen q3.
+  q4 and q3 both pass 39 and fail the same 14, so q4 adds no broad-suite
+  failure. The earlier curated 50-test parity record remains valid separately.
+- [x] Build q4 twice byte-identically; freeze local commit `a836e865`, tag
+  `wilds-quest-2.0.1-q4-stereo-candidate`, and ZIP SHA-256
+  `AC80D31C83EC7808208F056603026AF261B5E68BAB716C0189479A4338188D2E`.
+- [ ] Import q4 on Quest with OW Catch OFF and verify Poke Followers/Classic
+  geometry, stereo voxel startup, Route 8/gate transition, battle, menus,
+  controllers and stability.
 - [ ] Switch to HGSS/PokeMMO and verify Dramaless 2.0 public variable geometry,
   land/water rebinds and no crop/stretch or new frame-time regression.
 - [ ] Enable OW Catch only after the baseline passes; verify physical throwing,
@@ -317,9 +342,10 @@ performance work measures the combined stack.
 - [ ] Keep the fork local/unpublished until the user explicitly authorizes a
   release and the third-party artwork notices/permissions are reviewed.
 
-Completion condition: q3 passes the three staged physical checks without
-regressing the accepted Dramaless q3/Kanto q7 line; q2 remains rollback and the
-known upstream strict-lint mismatch is not concealed.
+Completion condition: q4 passes the three staged physical checks without
+regressing the accepted Dramaless q3/Kanto q7 line; q3 remains the rejected
+stereo-loss evidence baseline, q2 remains rollback, and the known upstream
+strict-lint mismatch is not concealed.
 
 ## Priority 3C — Battle Art 1.8.6 transition and precache integration (10%)
 

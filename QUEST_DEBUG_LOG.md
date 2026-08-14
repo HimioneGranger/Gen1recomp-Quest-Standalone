@@ -2863,3 +2863,59 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `51864D1C13EFE5E1C21FDC31150FE3BFF0DA74252314D3A2101FDCD8A182EA2A`.
   The headset still has older Wilds ZIPs in Downloads for rollback; the active
   mod remains unchanged until the user completes the launcher import.
+
+### q3 physical failure and q4 stereo-forwarding correction
+
+- The user imported q3 and the runtime explicitly loaded
+  `overworld_wild_spawns 2.0.1-quest.3`. The isolation stack retained
+  Dramaless `2.0.0-quest.3`, Kanto `1.60.0-quest.7`, Crystal 251 `0.10.3` and
+  HGSS Sprites `0.3.1`; Wild Skies and the Crystal ROM sprite provider were
+  not loaded. Wilds actually reported `sprite_style=pokedex`, so this run does
+  not count as the requested Poke Followers/Classic visual baseline.
+- The route test became sluggish, froze during the Route 8/gate transition,
+  and left the user looking at the flat 2D game panel. This was not an Android
+  process death or OpenXR session loss: audio continued, the OpenXR session
+  remained running at 72 Hz, and there was no Lua fatal, native signal, ANR or
+  out-of-memory record. The live process measured about 1,696 MB total PSS,
+  1,791 MB RSS and 729 MB graphics with roughly 2.0 GB system memory still
+  free.
+- The same capture exposes a separate performance concern. Initial Saffron
+  urgent full meshing consumed about 15.7 seconds elapsed / 15.0 seconds CPU,
+  including a 1.97-second maximum resume. Background route/town bodies then
+  competed with the Route 8 and Route 8 Gate urgent work; compositor delivery
+  fell to roughly 7-26 FPS before recovering to 72/72 after the queue drained.
+  This does not prove Wilds alone caused the mesh cost and does not justify a
+  speculative streaming rewrite. Retain it as a matched q4 performance
+  comparison target.
+- Source tracing found the exact 2D cause in Wilds, not Dramaless or the APK.
+  Wilds' `VoxelAdapter:ensureHooks()` replaced `VoxelScene.render` with a
+  wrapper accepting six historical arguments. Dramaless Quest calls the same
+  function with a seventh `eyes` table containing the two OpenXR cameras. The
+  wrapper silently discarded it, so Dramaless returned one flat canvas and
+  the VR conductor correctly rejected that result as a stereo world, leaving
+  only its flat fallback panel.
+- Wilds q4 changes only that compatibility seam: the optional seventh `eyes`
+  table is accepted and forwarded unchanged. Six-argument desktop/non-VR
+  calls remain valid, and the existing temporary emergency-entity filter is
+  preserved. A focused ROM-free test proves the wrapped renderer receives the
+  identical eye table, returns its two-canvas table unchanged, filters only the
+  emergency entity during the call and restores the original entity list.
+- All 127 Lua files compile. Focused Quest identity, stereo-wrapper, option and
+  version tests pass. A 53-file standalone discovery run passes 39 and fails
+  14 on both q4 and frozen q3 with the exact same failure names; q4 introduces
+  no broad-suite regression. The existing curated q3 38/50 official-parity
+  result remains a separate recorded gate.
+- The water-sprite validator required Pillow 10.4.0, installed only in a
+  workspace-local build environment on the HDD. It validated 2,616 generated
+  runtime sheets with zero missing/invalid files. The checked engine modkit is
+  still unavailable under this mod clone, so the existing audited manual pack
+  path was used; it confirmed a flat root, 12,614 allowed files and no
+  scripts, Git metadata, ROM, save, patch, private inspection path or excluded
+  commercial atlas.
+- Two clean q4 builds are byte-identical: 14,101,914 bytes, SHA-256
+  `AC80D31C83EC7808208F056603026AF261B5E68BAB716C0189479A4338188D2E`.
+  Local source milestone: commit `a836e865`, annotated tag
+  `wilds-quest-2.0.1-q4-stereo-candidate`. The fork remains unpublished.
+  q4 now awaits replacement import and the same Route 8/gate physical test;
+  do not promote it or attribute a performance improvement before that device
+  evidence.
