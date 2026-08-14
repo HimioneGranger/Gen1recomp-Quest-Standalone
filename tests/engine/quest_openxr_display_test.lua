@@ -63,6 +63,9 @@ launcher = {
 }
 check(type(backend) == "table", "test factory returns a backend")
 eq(backend.beginFrame, nil, "adapter does not invent a beginFrame policy")
+-- HostDisplay learns the active draw subject from a completed frame. Seed the
+-- launcher once before its next update, matching LÖVE's update/draw cadence.
+backend:endFrame("launcher", launcher)
 backend:update(1 / 30)
 eq(launcher._lastMouseX, 123,
   "Quest pointer owns the launcher's desktop-mouse handoff baseline")
