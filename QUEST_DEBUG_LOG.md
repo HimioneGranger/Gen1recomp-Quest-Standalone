@@ -2826,3 +2826,35 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   not a Kanto q7, battle-arena, launcher, controller or OpenXR regression. The
   eventual fix must use ROM-imported or separately installed artwork and must
   not add Pokémon art to the repository/package.
+
+## 2026-08-13 - Wilds of Kanto official 2.0.1 Quest q3 candidate
+
+- Preserved the prior upstream-2.0.0 `quest-v2` line and created
+  `quest-v2.0.1` from exact official tag commit
+  `71c334f819f27ec7c22e19aeed02544babde776d`. Replayed all six reviewed Quest
+  commits; conflicts were limited to version/changelog identity. Upstream
+  follower land-water rebind and renderer-scoped variable-geometry adapters
+  remain intact.
+- Assigned version `2.0.1-quest.3`, retained mod ID
+  `overworld_wild_spawns`, and kept optional OW Catch OFF by default. Focused
+  identity, metadata, option, provider, follower, and Quest throwing tests pass;
+  the physical throw adapter passes all 13 checks.
+- The complete standalone sweep passes 38/50. An A/B run against an untouched
+  archive of official 2.0.1 reproduces every remaining 12 failure, including
+  Windows shell assumptions and stale upstream expectations. q3 adds no failure
+  to that comparison.
+- Current engine modkit commit `e579a61d2fa7710838eac0796579d0900cbe083c`
+  reports exactly 7,773 `MK301` findings plus one `MK305` warning on both the
+  untouched official source and q3. The newer lint gate classifies official
+  checked-in generated follower/water sheets as ROM-cache paths. Strict modkit
+  validation therefore remains failed and is documented as an upstream
+  packaging-policy mismatch, not falsely reported as a pass.
+- The audited fallback ZIP has a flat import root and 12,614 entries, all from
+  Git-tracked source. It contains no ROM/save/patch/private/inspection paths,
+  Git metadata, or excluded commercial `POKEMON 1.png` atlas. Two clean builds
+  are byte-identical: 14,101,326 bytes, SHA-256
+  `51864D1C13EFE5E1C21FDC31150FE3BFF0DA74252314D3A2101FDCD8A182EA2A`.
+- Frozen local milestone: commit `86b2e99f`, annotated tag
+  `wilds-quest-2.0.1-q3-candidate`. It is not published and has not replaced
+  the headset's known working Wilds. Physical import with OW Catch OFF is the
+  next gate, followed by HGSS geometry and optional physical throwing.

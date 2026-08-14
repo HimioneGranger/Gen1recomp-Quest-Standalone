@@ -17,6 +17,8 @@ prototype alone does not count as 100%.
 - **Dramaless 2.0 Quest migration:** 96% (q3 passed the complete core physical
   matrix and is the accepted comparison baseline; retained transition continuity
   and Kanto compatibility work are tracked separately)
+- **Wilds of Kanto 2.0.1 Quest rebase:** 75% (q3 source/package gates pass and
+  exact official parity is recorded; physical Classic, HGSS and throw gates remain)
 - **Battle Art 1.8.6 transition/precache integration:** 10% (scope,
   provenance and maintainer guidance recorded; source audit pending)
 - **Performance and lifecycle hardening:** 70%
@@ -261,7 +263,46 @@ performance work measures the combined stack.
 - [ ] Measure Dramaless + Kanto alone before attributing the current full-stack
   36-38 FPS / ~2.1 GB PSS / ~714 MB graphics sample to Kanto itself.
 
-## Priority 3B — Battle Art 1.8.6 transition and precache integration (10%)
+## Priority 3B — Wilds of Kanto 2.0.1 Quest rebase (75%)
+
+- [x] Preserve the earlier upstream-2.0.0 `quest-v2` branch as rollback
+  evidence and create isolated `quest-v2.0.1` from exact official commit
+  `71c334f819f27ec7c22e19aeed02544babde776d`.
+- [x] Replay the six reviewed Quest compatibility, packaging, provenance,
+  sprite-sheet reuse and physical-throw commits without replacing upstream
+  2.0.1 renderer or follower-surface fixes.
+- [x] Assign new identity `2.0.1-quest.3`; retain runtime mod ID
+  `overworld_wild_spawns` and keep OW Catch OFF by default.
+- [x] Pass Quest identity/ASCII/option/version gates, all 13 physical-throw
+  unit checks, follower land-water rebind, and Dramaless/Battle Art variable
+  sprite-geometry contracts.
+- [x] Run all 50 standalone Lua tests. q3 passes 38; every one of the remaining
+  12 failures reproduces on an untouched official 2.0.1 archive, so the Quest
+  replay adds no full-suite failure.
+- [x] Compare strict current-engine lint against untouched official 2.0.1.
+  Both report the exact same 7,773 `MK301` generated-sprite-cache findings and
+  one `MK305` warning. Record this as an upstream packaging-policy mismatch,
+  not a successful strict-modkit gate and not a Quest regression.
+- [x] Audit the manual package: 12,614 Git-tracked entries, flat import root,
+  and no ROM, save, patch, private/inspection, Git, or excluded commercial
+  atlas paths.
+- [x] Build twice byte-identically; freeze local commit `86b2e99f`, tag
+  `wilds-quest-2.0.1-q3-candidate`, and ZIP SHA-256
+  `51864D1C13EFE5E1C21FDC31150FE3BFF0DA74252314D3A2101FDCD8A182EA2A`.
+- [ ] Import q3 on Quest with OW Catch OFF and verify baseline GSC/Classic
+  sprites, route transition, battle, menus, controllers and voxel stability.
+- [ ] Switch to HGSS/PokeMMO and verify Dramaless 2.0 public variable geometry,
+  land/water rebinds and no crop/stretch or new frame-time regression.
+- [ ] Enable OW Catch only after the baseline passes; verify physical throwing,
+  cancellation, ordinary A interaction and controller arbitration.
+- [ ] Keep the fork local/unpublished until the user explicitly authorizes a
+  release and the third-party artwork notices/permissions are reviewed.
+
+Completion condition: q3 passes the three staged physical checks without
+regressing the accepted Dramaless q3/Kanto q7 line; q2 remains rollback and the
+known upstream strict-lint mismatch is not concealed.
+
+## Priority 3C — Battle Art 1.8.6 transition and precache integration (10%)
 
 This starts after the Dramaless 2.0 q3 physical gate and Kanto 2.0 compatibility
 restoration. It remains ahead
