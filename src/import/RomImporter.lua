@@ -1662,8 +1662,56 @@ function RomImporter:_installMod(source)
     pcall(self._refreshMods, self)
     self.modNotice = { ok = true, text = "Installed " .. tostring(res) }
   else
-    self.modNotice = { ok = false, text = tostring(res) }
+    -- A direct package keeps its existing install path.  Only an archive with
+    -- no package manifest can become a bundle; prepareBundle performs every
+    -- nested-package check before this confirmation is shown and writes none
+    -- of them until the player explicitly accepts it.
+    local bundleOk, plan, bundleErr = pcall(function()
+      local LauncherMods = require("src.mods.LauncherMods")
+      return LauncherMods.prepareBundle(source)
+    end)
+    if bundleOk and plan then
+      local lines = { "Found " .. tostring(#plan.members) .. " valid mod packages:" }
+      local shown = math.min(#plan.members, 3)
+      for i = 1, shown do
+        local member = plan.members[i]
+        lines[#lines + 1] = member.id .. " v" .. tostring(member.version)
+      end
+      if #plan.members > shown then
+        lines[#lines + 1] = "+ " .. tostring(#plan.members - shown) .. " more packages"
+      end
+      lines[#lines + 1] = "Cancel leaves installed mods unchanged."
+      self._modConfirm = {
+        kind = "bundleImport", plan = plan,
+        title = "Import mod bundle",
+        yesLabel = "Import " .. tostring(#plan.members) .. " mods",
+        lines = lines,
+      }
+    else
+      local reason = bundleOk and bundleErr or res
+      -- A malformed direct package has a manifest, so it must keep the
+      -- ordinary install error instead of being described as a failed bundle.
+      if reason == "this archive is already a mod package" then reason = res end
+      self.modNotice = { ok = false, text = tostring(reason) }
+    end
   end
+end
+
+function RomImporter:_installModBundle(plan)
+  local ok, installed, ids = pcall(function()
+    local LauncherMods = require("src.mods.LauncherMods")
+    return LauncherMods.installBundle(plan)
+  end)
+  if not ok then
+    self.modNotice = { ok = false, text = "Bundle import failed: " .. tostring(installed) }
+    return
+  end
+  if not installed then
+    self.modNotice = { ok = false, text = tostring(ids) }
+    return
+  end
+  pcall(self._refreshMods, self)
+  self.modNotice = { ok = true, text = "Imported mods: " .. table.concat(ids or {}, ", ") }
 end
 
 -- Remove an installed mod from the save-dir mods/ tree and refresh the panel.

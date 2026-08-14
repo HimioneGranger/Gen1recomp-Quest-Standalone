@@ -404,31 +404,64 @@ local function isHostAbsolutePath(path)
     )
 end
 
-local function readArchive(source)
+local function readArchive(source, maxBytes, label)
+  local function tooLarge(size)
+    if maxBytes and size and size > maxBytes then
+      return nil, (label or "archive") .. " is larger than the "
+        .. tostring(maxBytes) .. " byte import limit"
+    end
+  end
   local t = type(source)
   if (t == "userdata" or t == "table") and type(source.open) == "function" then
+    local size = type(source.getSize) == "function" and source:getSize() or nil
+    local ok, err = tooLarge(size)
+    if not ok and err then return nil, err end
     local ok = source:open("r")
     if not ok then return nil, "could not open the dropped file" end
     local data = source:read(source:getSize())
     source:close()
     if not data then return nil, "the dropped file could not be read" end
+    ok, err = tooLarge(#data)
+    if not ok and err then return nil, err end
     return data
   end
   if t == "string" then
     if not isHostAbsolutePath(source) and love and love.filesystem then
+      local info = love.filesystem.getInfo and love.filesystem.getInfo(source)
+      local ok, err = tooLarge(info and info.size)
+      if not ok and err then return nil, err end
       local data = love.filesystem.read(source)
-      if data then return data end
+      if data then
+        ok, err = tooLarge(#data)
+        if not ok and err then return nil, err end
+        return data
+      end
     end
     local f = io.open(source, "rb")
     if f then
+      if maxBytes then
+        local size = f:seek("end")
+        f:seek("set", 0)
+        local ok, err = tooLarge(size)
+        if not ok and err then f:close(); return nil, err end
+      end
       local data = f:read("*a")
       f:close()
       if not data then return nil, "could not read " .. source end
+      local ok, err = tooLarge(#data)
+      if not ok and err then return nil, err end
       return data
     end
     if love and love.filesystem then
+      local info = love.filesystem.getInfo and love.filesystem.getInfo(source)
+      local ok, err = tooLarge(info and info.size)
+      if not ok and err then return nil, err end
       local data = love.filesystem.read(source)
-      if data then return data end
+      if data then
+        ok, err = tooLarge(#data)
+        if not ok and err then return nil, err end
+        return data
+      end
     end
     return nil, "could not open " .. source
   end
@@ -535,6 +568,304 @@ local function sameIdTrees(fs, id)
     end
   end
   return out, installed
+end
+
+-- ------- bundle import (top-level package archives only)
+
+-- A bundle is an ordinary .zip which is not itself a mod package, but holds a
+-- small set of ordinary mod archives.  It is intentionally not a general
+-- archive extractor: only .zip/.modpkg files at the bundle root are examined,
+-- and their contents are mounted through LOVE/PhysFS exactly like a direct
+-- import.  This keeps README files harmless and gives nested packages no path
+-- outside the game's controlled filesystem.
+local BUNDLE_LIMITS = {
+  maxOuterBytes = 40 * 1024 * 1024,
+  maxMembers = 16,
+  maxMemberBytes = 8 * 1024 * 1024,
+  maxTotalMemberBytes = 32 * 1024 * 1024,
+  maxFilesPerMember = 256,
+  maxMemberFileBytes = 4 * 1024 * 1024,
+  maxMemberExpandedBytes = 32 * 1024 * 1024,
+  maxPathDepth = 8,
+  maxPathBytes = 240,
+}
+LauncherMods.BUNDLE_LIMITS = BUNDLE_LIMITS
+
+local bundleMountSerial = 0
+
+local function mountArchiveBytes(data, tag)
+  local fs = love and love.filesystem
+  if not fs then return nil, "mod import needs LOVE" end
+  bundleMountSerial = bundleMountSerial + 1
+  local suffix = tostring(os.time()) .. "_" .. tostring(bundleMountSerial)
+  local mount = "mod_" .. tag .. "_mount_" .. suffix
+  local tmp, mountKey, mounted = nil, nil, false
+  if fs.newFileData then
+    local okFd, fd = pcall(fs.newFileData, data, "mod_" .. tag .. "_" .. suffix .. ".zip")
+    if okFd and fd and fs.mount(fd, mount) then
+      mounted, mountKey = true, fd
+    end
+  end
+  if not mounted then
+    tmp = "mod_" .. tag .. "_" .. suffix .. ".zip"
+    local ok, writeErr = fs.write(tmp, data)
+    if not ok then return nil, "could not stage the archive: " .. tostring(writeErr) end
+    if not fs.mount(tmp, mount) then
+      fs.remove(tmp)
+      return nil, "that archive could not be opened"
+    end
+    mountKey = tmp
+  end
+  return mount, function()
+    pcall(fs.unmount, mountKey)
+    if tmp then pcall(fs.remove, tmp) end
+  end
+end
+
+local function safeArchiveName(name)
+  return type(name) == "string" and name ~= "" and #name <= BUNDLE_LIMITS.maxPathBytes
+    and not name:find("/", 1, true) and not name:find("\\", 1, true)
+    and not name:find("\0", 1, true) and name ~= "." and name ~= ".."
+end
+
+local function safeArchivePath(path)
+  if type(path) ~= "string" or path == "" or #path > BUNDLE_LIMITS.maxPathBytes
+      or path:sub(1, 1) == "/" or path:find("\\", 1, true)
+      or path:find("\0", 1, true) then
+    return false
+  end
+  for piece in path:gmatch("[^/]+") do
+    if not safeArchiveName(piece) then return false end
+  end
+  return not path:find("//", 1, true) and path:sub(-1) ~= "/"
+end
+
+local function scanPackageTree(root)
+  local fs = love.filesystem
+  local state = { files = 0, bytes = 0 }
+  local function walk(path, depth)
+    if depth > BUNDLE_LIMITS.maxPathDepth then
+      return nil, "package path is deeper than " .. BUNDLE_LIMITS.maxPathDepth .. " folders"
+    end
+    local items = fs.getDirectoryItems(path)
+    for _, name in ipairs(items) do
+      if not safeArchiveName(name) then return nil, "package has an unsafe file name" end
+      local child = path .. "/" .. name
+      local info = fs.getInfo(child)
+      if not info then return nil, "package has an unreadable file" end
+      if info.type == "directory" then
+        local ok, err = walk(child, depth + 1)
+        if not ok then return nil, err end
+      elseif info.type == "file" then
+        state.files = state.files + 1
+        if state.files > BUNDLE_LIMITS.maxFilesPerMember then
+          return nil, "package has more than " .. BUNDLE_LIMITS.maxFilesPerMember .. " files"
+        end
+        if info.size and info.size > BUNDLE_LIMITS.maxMemberFileBytes then
+          return nil, "package file is larger than " .. BUNDLE_LIMITS.maxMemberFileBytes .. " bytes"
+        end
+        local data = fs.read(child)
+        if type(data) ~= "string" then return nil, "package has an unreadable file" end
+        if #data > BUNDLE_LIMITS.maxMemberFileBytes then
+          return nil, "package file is larger than " .. BUNDLE_LIMITS.maxMemberFileBytes .. " bytes"
+        end
+        state.bytes = state.bytes + #data
+        if state.bytes > BUNDLE_LIMITS.maxMemberExpandedBytes then
+          return nil, "package expands beyond " .. BUNDLE_LIMITS.maxMemberExpandedBytes .. " bytes"
+        end
+      else
+        return nil, "package contains an unsupported filesystem entry"
+      end
+    end
+    return true
+  end
+  return walk(root, 0)
+end
+
+local function openValidatedPackage(data, tag)
+  if not zipLooksValid(data) then return nil, "not a zip file" end
+  local mount, cleanup = mountArchiveBytes(data, tag)
+  if not mount then return nil, cleanup end
+  local function fail(err)
+    cleanup()
+    return nil, err
+  end
+  local prefix, rootErr = LauncherMods.locateRoot(topLevelPaths(mount))
+  if not prefix then return fail(rootErr) end
+  local root = prefix == "" and mount or (mount .. "/" .. prefix)
+  local raw = love.filesystem.read(root .. "/manifest.json")
+  if not raw then return fail("the package has no readable manifest.json") end
+  local manifest, manifestErr = decodeManifest(raw, root)
+  if not manifest then return fail("invalid mod manifest: " .. tostring(manifestErr)) end
+  local treeOk, treeErr = scanPackageTree(root)
+  if not treeOk then return fail(treeErr) end
+  for _, field in ipairs({ "entry", "options_schema", "assets_transforms" }) do
+    local path = manifest[field]
+    if path then
+      if not safeArchivePath(path) then return fail("manifest " .. field .. " has an unsafe path") end
+      if not love.filesystem.getInfo(root .. "/" .. path, "file") then
+        return fail("manifest " .. field .. " file is missing: " .. path)
+      end
+    end
+  end
+  return { mount = mount, root = root, manifest = manifest, cleanup = cleanup }
+end
+
+local function compatibleConflict(a, b)
+  for _, spec in ipairs(a.conflictSpecs or {}) do
+    if spec.id == b.id and (not spec.range or Semver.satisfies(b.version, spec.range)) then
+      return true
+    end
+  end
+  return false
+end
+
+local function validateBundlePlan(plan)
+  if type(plan) ~= "table" or type(plan.members) ~= "table" or #plan.members == 0 then
+    return nil, "bundle import has no prepared packages"
+  end
+  if #plan.members > BUNDLE_LIMITS.maxMembers then
+    return nil, "bundle has more than " .. BUNDLE_LIMITS.maxMembers .. " packages"
+  end
+  local fs = love and love.filesystem
+  if not fs then return nil, "mod import needs LOVE" end
+  local byId, total = {}, 0
+  for _, member in ipairs(plan.members) do
+    if type(member.data) ~= "string" then return nil, "bundle package data is missing" end
+    if #member.data > BUNDLE_LIMITS.maxMemberBytes then
+      return nil, "bundle package is larger than " .. BUNDLE_LIMITS.maxMemberBytes .. " bytes"
+    end
+    total = total + #member.data
+    if total > BUNDLE_LIMITS.maxTotalMemberBytes then
+      return nil, "bundle packages exceed " .. BUNDLE_LIMITS.maxTotalMemberBytes .. " bytes"
+    end
+    local opened, err = openValidatedPackage(member.data, "bundle_check")
+    if not opened then return nil, "invalid package '" .. tostring(member.name) .. "': " .. tostring(err) end
+    local manifest = opened.manifest
+    opened.cleanup()
+    if byId[manifest.id] then
+      return nil, "bundle contains duplicate mod id '" .. manifest.id .. "'"
+    end
+    if member.id and (member.id ~= manifest.id or member.version ~= manifest.version) then
+      return nil, "bundle package changed after it was checked: " .. tostring(member.name)
+    end
+    member.id, member.version, member.manifest = manifest.id, manifest.version, manifest
+    byId[manifest.id] = member
+    local _, installed = sameIdTrees(fs, manifest.id)
+    if installed then return nil, "a mod named '" .. manifest.id .. "' is already installed" end
+  end
+  local all = {}
+  for _, manifest in ipairs(discover()) do all[manifest.id] = manifest end
+  for id, member in pairs(byId) do all[id] = member.manifest end
+  for id, member in pairs(byId) do
+    for otherId, other in pairs(all) do
+      if otherId ~= id and (compatibleConflict(member.manifest, other)
+          or compatibleConflict(other, member.manifest)) then
+        return nil, "bundle mod '" .. id .. "' conflicts with '" .. otherId .. "'"
+      end
+    end
+  end
+  return true
+end
+
+-- prepareBundle(source) -> plan | nil, reason.  No mod files are written by
+-- this phase.  It accepts only an outer archive with no package manifest and
+-- only top-level nested package files; other files such as README are ignored.
+function LauncherMods.prepareBundle(source)
+  local ok, plan, err = pcall(function()
+    if not (love and love.filesystem) then return nil, "mod import needs LOVE" end
+    local data, readErr = readArchive(source, BUNDLE_LIMITS.maxOuterBytes, "mod bundle")
+    if not data then return nil, readErr end
+    if not zipLooksValid(data) then return nil, "not a zip file" end
+    local mount, cleanup = mountArchiveBytes(data, "bundle_outer")
+    if not mount then return nil, cleanup end
+    local function fail(reason)
+      cleanup()
+      return nil, reason
+    end
+    local root = LauncherMods.locateRoot(topLevelPaths(mount))
+    if root then return fail("this archive is already a mod package") end
+    local members, total = {}, 0
+    for _, name in ipairs(love.filesystem.getDirectoryItems(mount)) do
+      local info = love.filesystem.getInfo(mount .. "/" .. name)
+      local lower = type(name) == "string" and name:lower() or ""
+      if info and info.type == "file" and (lower:match("%.zip$") or lower:match("%.modpkg$")) then
+        if not safeArchiveName(name) then return fail("bundle has an unsafe package name") end
+        if #members >= BUNDLE_LIMITS.maxMembers then
+          return fail("bundle has more than " .. BUNDLE_LIMITS.maxMembers .. " packages")
+        end
+        if info.size and info.size > BUNDLE_LIMITS.maxMemberBytes then
+          return fail("bundle package '" .. name .. "' is larger than "
+            .. BUNDLE_LIMITS.maxMemberBytes .. " bytes")
+        end
+        local memberData = love.filesystem.read(mount .. "/" .. name)
+        if type(memberData) ~= "string" then return fail("could not read bundle package '" .. name .. "'") end
+        if #memberData > BUNDLE_LIMITS.maxMemberBytes then
+          return fail("bundle package '" .. name .. "' is larger than "
+            .. BUNDLE_LIMITS.maxMemberBytes .. " bytes")
+        end
+        total = total + #memberData
+        if total > BUNDLE_LIMITS.maxTotalMemberBytes then
+          return fail("bundle packages exceed " .. BUNDLE_LIMITS.maxTotalMemberBytes .. " bytes")
+        end
+        members[#members + 1] = { name = name, data = memberData }
+      end
+    end
+    cleanup()
+    if #members == 0 then
+      return nil, "the .zip has no package manifest and no top-level .zip or .modpkg files"
+    end
+    table.sort(members, function(a, b) return a.name < b.name end)
+    local result = { members = members }
+    local valid, validErr = validateBundlePlan(result)
+    if not valid then return nil, validErr end
+    return result
+  end)
+  if not ok then return nil, "bundle inspection failed: " .. tostring(plan) end
+  return plan, err
+end
+
+-- installBundle(plan) -> true, { id, ... } | nil, reason.  Every package is
+-- rechecked immediately before copy.  Existing ids are refused during the
+-- preflight, so a failed copy can safely delete only the new destinations and
+-- leave the prior active mod set unchanged.
+function LauncherMods.installBundle(plan)
+  local ok, result, err = pcall(function()
+    local valid, validErr = validateBundlePlan(plan)
+    if not valid then return nil, validErr end
+    local fs = love.filesystem
+    local created, ids = {}, {}
+    local savedPrefix = CacheFs.prefix
+    CacheFs.prefix = ""
+    local function rollback()
+      for i = #created, 1, -1 do pcall(removeTree, created[i]) end
+    end
+    local committed, commitErr = pcall(function()
+      for _, member in ipairs(plan.members) do
+        local opened, openErr = openValidatedPackage(member.data, "bundle_install")
+        if not opened then error("invalid package '" .. member.name .. "': " .. tostring(openErr)) end
+        if opened.manifest.id ~= member.id or opened.manifest.version ~= member.version then
+          opened.cleanup()
+          error("bundle package changed after it was checked: " .. member.name)
+        end
+        local dest = "mods/" .. member.id
+        local copied, copyErr = copyTree(opened.root, dest)
+        opened.cleanup()
+        if not copied then
+          pcall(removeTree, dest)
+          error(copyErr or "could not copy bundle package '" .. member.name .. "'")
+        end
+        created[#created + 1] = dest
+        ids[#ids + 1] = member.id
+      end
+    end)
+    if not committed then rollback() end
+    CacheFs.prefix = savedPrefix
+    if not committed then return nil, "bundle import failed; no mods were installed: " .. tostring(commitErr) end
+    return true, ids
+  end)
+  if not ok then return nil, "bundle import failed; no mods were installed: " .. tostring(result) end
+  return result, err
 end
 
 -- ------- strays: mods dropped beside the game that it cannot see

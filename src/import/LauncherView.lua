@@ -1738,6 +1738,8 @@ local function buildConfirmModal(imp, m)
           imp:_confirmModUpdate(c.id, c.release)
         elseif c.kind == "enableAll" then
           imp:_setAllMods(true, true)
+        elseif c.kind == "bundleImport" then
+          imp:_installModBundle(c.plan)
         elseif c.kind == "importOversize" then
           imp:_importSave(c.version, c.source, true)
         else
