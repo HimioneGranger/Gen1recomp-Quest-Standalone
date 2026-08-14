@@ -2858,3 +2858,8 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   `wilds-quest-2.0.1-q3-candidate`. It is not published and has not replaced
   the headset's known working Wilds. Physical import with OW Catch OFF is the
   next gate, followed by HGSS geometry and optional physical throwing.
+- Copied the exact 14,101,326-byte q3 ZIP to `/sdcard/Download/` without
+  installing it. Quest-side `sha256sum` returned the same full
+  `51864D1C13EFE5E1C21FDC31150FE3BFF0DA74252314D3A2101FDCD8A182EA2A`.
+  The headset still has older Wilds ZIPs in Downloads for rollback; the active
+  mod remains unchanged until the user completes the launcher import.

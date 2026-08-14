@@ -1,6 +1,6 @@
 # Gen1Recomp Quest VR — Master Roadmap
 
-Last reconciled: 2026-08-13
+Last reconciled: 2026-08-13 19:31 CDT
 
 This is the single checkbox list for the project. Percentages are estimates of
 the work completed for that item, including required physical headset testing.
@@ -31,6 +31,23 @@ prototype alone does not count as 100%.
 - **Upstream engine/API contribution gate:** 70%
 - **Overall playable Quest release:** **80%**
 - **Whole long-term vision, including Gen 2, MR and PCVR:** **46%**
+
+## Current checkpoint — Wilds q3 physical acceptance
+
+- [x] Rebase the Quest fork onto exact official Wilds 2.0.1.
+- [x] Freeze and hash the deterministic `2.0.1-quest.3` package.
+- [x] Copy the exact package to Quest Downloads and verify its device-side
+  SHA-256 matches `51864D1C...EA2A`.
+- [ ] Import `IMPORT_ME__WILDS_OF_KANTO_QUEST__v2.0.1-quest.3.zip` through the
+  launcher; confirm the Mod Manager reports `2.0.1-quest.3`.
+- [ ] With OW Catch OFF and GSC/Classic sprites, test a route round trip, one
+  battle, menus, controllers and voxel stability.
+- [ ] Switch to HGSS/PokeMMO and test scale, crop, land/water changes and frame
+  pacing.
+- [ ] Enable OW Catch and test physical throw, cancel, ordinary A interaction
+  and controller ownership.
+- [ ] Promote q3 only after all three physical stages pass; otherwise restore
+  the preserved older Wilds package.
 
 ## Release gate — Upstream engine and API contributions (70%)
 
@@ -289,6 +306,8 @@ performance work measures the combined stack.
 - [x] Build twice byte-identically; freeze local commit `86b2e99f`, tag
   `wilds-quest-2.0.1-q3-candidate`, and ZIP SHA-256
   `51864D1C13EFE5E1C21FDC31150FE3BFF0DA74252314D3A2101FDCD8A182EA2A`.
+- [x] Copy the 14,101,326-byte ZIP to Quest Downloads and verify the same full
+  SHA-256 on-device; copying does not count as installation or acceptance.
 - [ ] Import q3 on Quest with OW Catch OFF and verify baseline GSC/Classic
   sprites, route transition, battle, menus, controllers and voxel stability.
 - [ ] Switch to HGSS/PokeMMO and verify Dramaless 2.0 public variable geometry,
