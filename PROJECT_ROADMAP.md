@@ -49,6 +49,8 @@ prototype alone does not count as 100%.
   canvases.
 - [x] Build deterministic `2.0.1-quest.4` from commit `a836e865`; ZIP SHA-256
   `AC80D31C83EC7808208F056603026AF261B5E68BAB716C0189479A4338188D2E`.
+- [x] Copy that exact 14,101,914-byte q4 ZIP to Quest Downloads and verify the
+  same full SHA-256 on-device; it is staged, not installed or accepted.
 - [ ] Import q4 and, with OW Catch OFF plus Poke Followers/Classic geometry,
   verify stereo voxel startup, Route 8/gate transition, one battle, menus,
   controllers and voxel stability.
@@ -332,6 +334,8 @@ performance work measures the combined stack.
 - [x] Build q4 twice byte-identically; freeze local commit `a836e865`, tag
   `wilds-quest-2.0.1-q4-stereo-candidate`, and ZIP SHA-256
   `AC80D31C83EC7808208F056603026AF261B5E68BAB716C0189479A4338188D2E`.
+- [x] Stage the exact q4 ZIP in Quest Downloads and verify the device-side hash
+  matches; leave replacement import to the normal launcher workflow.
 - [ ] Import q4 on Quest with OW Catch OFF and verify Poke Followers/Classic
   geometry, stereo voxel startup, Route 8/gate transition, battle, menus,
   controllers and stability.

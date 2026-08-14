@@ -2919,3 +2919,9 @@ the verified OpenXR handoff unchanged while isolating those rendering issues.
   q4 now awaits replacement import and the same Route 8/gate physical test;
   do not promote it or attribute a performance improvement before that device
   evidence.
+- Copied the exact 14,101,914-byte q4 package to
+  `/sdcard/Download/IMPORT_ME__WILDS_OF_KANTO_QUEST__v2.0.1-quest.4.zip`.
+  Quest-side `sha256sum` returned
+  `ac80d31c83ec7808208f056603026af261b5e68bab716c0189479a4338188d2e`,
+  matching the host. The package is staged only; q3 remains installed until
+  the user performs replacement import through the normal Mod Manager.
