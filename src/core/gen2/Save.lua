@@ -764,7 +764,12 @@ end
 function Save.summary(save)
   if type(save) ~= "table" then return nil end
   local badges = 0
+  -- Continue_DisplayBadgeCount counts TWO bytes, wJohtoBadges then wKantoBadges
+  -- (engine/menus/intro_menu.asm:461-469).
   for _, has in pairs(save.player and save.player.badges or {}) do
+    if has then badges = badges + 1 end
+  end
+  for _, has in pairs(save.player and save.player.kantoBadges or {}) do
     if has then badges = badges + 1 end
   end
   local caught = 0

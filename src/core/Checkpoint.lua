@@ -313,6 +313,16 @@ local function equalData(a, b)
   return okA and okB and encodedA == encodedB
 end
 
+local function normalizeVerificationMetadata(actual, expected)
+  if type(actual) == "table" and type(actual.identity) == "table"
+      and type(expected) == "table" and type(expected.identity) == "table" then
+    -- RFC 0004 treats engineVersion as compatibility metadata, not runtime
+    -- state. A fresh recapture stamps the running engine, so normalize only
+    -- that metadata before differential verification.
+    actual.identity.engineVersion = expected.identity.engineVersion
+  end
+end
+
 local function firstDifference(a, b, path)
   path = path or "$"
   if type(a) ~= type(b) then return path .. " (type)" end
@@ -394,6 +404,7 @@ function Checkpoint.restore(game, checkpoint)
   if ok then
     local restored, verifyCode = Checkpoint.capture(game)
     if restored and validated.rng == nil then restored.rng = nil end
+    normalizeVerificationMetadata(restored, validated)
     if restored and equalData(restored, validated) then
       emitRestored(game, validated)
       return true
@@ -474,6 +485,7 @@ function Checkpoint.resume(game, checkpoint)
   if ok then
     local restored, verifyCode = Checkpoint.capture(game)
     if restored and validated.rng == nil then restored.rng = nil end
+    normalizeVerificationMetadata(restored, validated)
     if restored and equalData(restored, validated) then
       emitRestored(game, validated)
       return true

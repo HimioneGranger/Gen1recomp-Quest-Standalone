@@ -22,6 +22,13 @@ local function mustNotContain(body, needle, label)
     label .. " must not contain " .. string.format("%q", needle))
 end
 
+local function mustPinActions(body, label)
+  for action, revision in body:gmatch("uses:%s*([^@%s]+)@([^%s#]+)") do
+    check(#revision == 40 and revision:match("^[0-9a-f]+$") ~= nil,
+      label .. " action " .. action .. " must use a full commit SHA")
+  end
+end
+
 -- Exact path regex contract (SWCI-01 / 4A + SWFIX-03 test path).
 -- Also gates the NX runtime modules and the NX engine suites so an NX
 -- runtime regression cannot slip past switch-selftest / switch-build.
@@ -32,6 +39,13 @@ local ci = read(".github/workflows/ci.yml")
 local release = read(".github/workflows/release.yml")
 local comment_wf = read(".github/workflows/switch-artifact-comment.yml")
 local ios_comment_wf = read(".github/workflows/ios-artifact-comment.yml")
+local COMMENT_ACTION =
+  "thollander/actions-comment-pull-request@65f9e5c9a1f2cd378bd74b2e057c9736982a8e74"
+
+mustPinActions(ci, "ci.yml")
+mustPinActions(release, "release.yml")
+mustPinActions(comment_wf, "switch-artifact-comment")
+mustPinActions(ios_comment_wf, "ios-artifact-comment")
 
 -- --- SWCI-01: path detector ---
 mustContain(ci, "switch-changes:", "ci.yml")
@@ -136,12 +150,12 @@ mustContain(comment_wf, 'exit 0', "switch-artifact-comment no-op")
 mustContain(comment_wf, "**Commit**:", "switch-artifact-comment")
 mustContain(comment_wf, "**Build Time**:", "switch-artifact-comment")
 mustContain(comment_wf, "View workflow run", "switch-artifact-comment")
-mustContain(comment_wf, "thollander/actions-comment-pull-request@v3", "switch-artifact-comment")
+mustContain(comment_wf, COMMENT_ACTION, "switch-artifact-comment")
 mustNotContain(comment_wf, "delete-comment", "switch-artifact-comment")
 mustNotContain(comment_wf, "izhangzhihao/delete-comment", "switch-artifact-comment")
 
 mustContain(ios_comment_wf, "comment-tag: ios-build-result", "ios-artifact-comment")
-mustContain(ios_comment_wf, "thollander/actions-comment-pull-request@v3", "ios-artifact-comment")
+mustContain(ios_comment_wf, COMMENT_ACTION, "ios-artifact-comment")
 mustNotContain(ios_comment_wf, "delete-comment", "ios-artifact-comment")
 mustNotContain(ios_comment_wf, "izhangzhihao/delete-comment", "ios-artifact-comment")
 -- Distinct tags so both commenters can coexist on the same PR

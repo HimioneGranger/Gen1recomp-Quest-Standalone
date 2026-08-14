@@ -13,7 +13,7 @@
 #         dist/linux/gen1recomp-linux.zip (fused x86_64 AppImage)
 #         dist/android/debug/*.apk (full gradle output stays under
 #           mobile/android/app/build/outputs/apk/embedNoRecord/)
-#         dist/ios/<Config>-<sdk>/gen1recomp.app (full xcodebuild output stays
+#         dist/ios/<Config>-<sdk>/gen1recomp++.app (full xcodebuild output stays
 #           under mobile/ios/build/Build/Products/)
 
 set -euo pipefail

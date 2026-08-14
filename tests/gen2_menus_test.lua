@@ -356,11 +356,14 @@ local optionsGame, optionsInput = newGame(Save.newGame())
 local options = OptionsMenu.new(optionsGame, {
   options = Save.defaultOptions(),
 })
--- The cart's seven value rows, then the port's audio, speed and display
--- rows, then CANCEL -- which is what makes this screen scroll.
-check("sixteen rows", #OptionsMenu.ROWS, 16)
+-- The cart's seven value rows, then CONTROLS, the port's audio, speed and
+-- display rows, the three touch rows and CANCEL -- which is what makes this
+-- screen scroll.  The touch three are gated to mobile by buildRows; ROWS
+-- itself carries every descriptor.
+check("twenty rows", #OptionsMenu.ROWS, 20)
 check("the cart's rows come first", OptionsMenu.ROWS[7].key, "frame")
-check("then the port's audio group", OptionsMenu.ROWS[8].key, "musicVol")
+check("then the rebind screen", OptionsMenu.ROWS[8].id, "controls")
+check("then the port's audio group", OptionsMenu.ROWS[9].key, "musicVol")
 check("last row is CANCEL", OptionsMenu.ROWS[#OptionsMenu.ROWS].cancel, true)
 check("starts on TEXT SPEED", options:row().key, "textSpeed")
 check("default text speed", options.options.textSpeed, "MID")
@@ -401,7 +404,9 @@ local exiting = OptionsMenu.new(exitGame, {
   options = Save.defaultOptions(),
   onDone = function(o) savedOptions = o end,
 })
-exiting.index = #OptionsMenu.ROWS
+-- The screen's own rows, not ROWS: buildRows drops the touch three off a
+-- desktop, so the raw descriptor count overshoots CANCEL.
+exiting.index = #exiting.rows
 exitInput:press("a")
 exiting:update(0)
 check("CANCEL leaves", savedOptions ~= nil, true)

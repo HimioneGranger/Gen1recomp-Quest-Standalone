@@ -1,0 +1,98 @@
+name: Quest bug or validation report
+description: Report a Quest launcher, OpenXR, controller, lifecycle, or performance problem.
+labels: ["bug", "quest"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for Meta Quest behavior. Do not upload ROMs, saves,
+        generated caches, or signing material.
+
+  - type: input
+    id: summary
+    attributes:
+      label: One-line summary
+      placeholder: Launcher pointer stops moving after the right controller wakes
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: APK version or commit
+      placeholder: v0.1.81-quest or 447d5ab3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: headset
+    attributes:
+      label: Headset
+      options:
+        - Meta Quest 3
+        - Meta Quest 3S
+        - Meta Quest 2
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: refresh
+    attributes:
+      label: Refresh rate and graphics preset
+      placeholder: 72 Hz, RES FULL, SHADOWS LOW
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Launcher display
+        - Touch controller input
+        - ROM import
+        - Launcher-to-gameplay handoff
+        - Gameplay rendering
+        - Suspend or resume
+        - Quit or shutdown
+        - Performance
+        - Packaging or install
+    validations:
+      required: true
+
+  - type: input
+    id: mod
+    attributes:
+      label: Mod and version
+      description: Write "vanilla" when no gameplay mod was enabled.
+      placeholder: Dramaless Shape 1.6.4-quest.15
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Install with adb install -r
+        2. Launch from Unknown Sources
+        3. Put the right controller to sleep
+        4. Wake it and point at the launcher
+    validations:
+      required: true
+
+  - type: textarea
+    id: result
+    attributes:
+      label: Actual and expected result
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs, video, screenshots, or timing measurements
+      description: Redact local paths and personal information. Never attach game data.
+    validations:
+      required: false

@@ -26,6 +26,18 @@ mobile/android/local.properties
 mobile/android/app/src/embed/assets/game.love
 mobile/android/**/build/
 
+# Signing credentials and local secret configuration
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
+*.mobileprovision
+keystore.properties
+.env
+.env.*
+!.env.example
+
 # iOS love-src (downloaded love-*-ios-source; see mobile/ios/README.md)
 mobile/ios/love-src/
 mobile/ios/cache/

@@ -266,7 +266,10 @@ function OakSpeech.new(game, onDone)
   -- RedSprite: the walking sprite the pic shrinks into (frame 0 =
   -- standing, facing down)
   local playerSprites = (game.data.field and game.data.field.playerSprites) or {}
-  local red = game.data.sprites and game.data.sprites[playerSprites.walk or "SPRITE_RED"] or game.data.sprites.SPRITE_RED
+  -- The fallback has to read the same guarded table: reaching for
+  -- game.data.sprites.SPRITE_RED after the `and` already found it nil threw.
+  local sprites = game.data.sprites or {}
+  local red = sprites[playerSprites.walk or "SPRITE_RED"] or sprites.SPRITE_RED
   self.walkSheet = tryImage(red and red.image)
   return self
 end

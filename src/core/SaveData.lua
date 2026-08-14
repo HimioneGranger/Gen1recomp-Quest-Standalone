@@ -335,11 +335,11 @@ function SaveData.defaultOptions()
     -- TouchControls.normalizeConfig folds it into both orientations on load.
     touchControls = { enabled = true },
     -- Haptic feedback level for on-screen pad presses (#806):
-    -- off | light | medium | heavy, mapped to a love.system.vibrate
-    -- duration in src/core/TouchControls.lua.  LIGHT by default, like the
-    -- overlay itself defaulting on, so an options.lua predating this key
-    -- gets the tick without going looking for the row.  Inert wherever the
-    -- overlay never appears (desktop) or LOVE has no vibrator.
+    -- off | light | normal | strong, mapped to a love.system.vibrate duration
+    -- in src/core/TouchControls.lua.  LIGHT by default, so an options.lua
+    -- predating this key gets the tick without going looking for the row.
+    -- Inert wherever the overlay never appears (desktop) or LOVE has no
+    -- vibrator.
     haptics = "light",
     -- Shared UI/mod timestamp presentation. DEVICE follows the process time
     -- locale where the platform exposes one; otherwise DateTime falls back to
@@ -818,9 +818,19 @@ end
 function SaveData.slotSummary(save)
   if type(save) ~= "table" then return nil, nil end
   local name = save.player and save.player.name or nil
+  -- A Gen 2 slot carries no badge items and fills pokedex.caught, so both
+  -- counts come off wJohtoBadges/wPokedexCaught (engine/menus/intro_menu.asm:461).
+  local vinfo = type(save.version) == "string" and GameVersion.info(save.version)
+  local gen2 = save.generation == 2 or (vinfo and vinfo.generation == 2) or false
   local dexCount = 0
-  for _ in pairs((save.pokedex and save.pokedex.owned) or {}) do
-    dexCount = dexCount + 1
+  if gen2 then
+    for _, has in pairs((save.pokedex and save.pokedex.caught) or {}) do
+      if has then dexCount = dexCount + 1 end
+    end
+  else
+    for _ in pairs((save.pokedex and save.pokedex.owned) or {}) do
+      dexCount = dexCount + 1
+    end
   end
   -- playTime is a plain seconds count in a Gen 1 save but a
   -- { hours, minutes, seconds, frames } table in a Gen 2 (Gold) save, matching
@@ -838,8 +848,21 @@ function SaveData.slotSummary(save)
   end
   local timeText = ("%d:%02d"):format(math.floor(t / 3600),
                                       math.floor(t / 60) % 60)
+  local badges
+  if gen2 then
+    -- Continue_DisplayBadgeCount walks TWO bytes, Johto then Kanto
+    -- (engine/menus/intro_menu.asm:461-469).
+    badges = 0
+    local p = save.player or {}
+    for _, has in pairs(p.badges or {}) do if has then badges = badges + 1 end end
+    for _, has in pairs(p.kantoBadges or {}) do
+      if has then badges = badges + 1 end
+    end
+  else
+    badges = Badges.count(nil, save)
+  end
   return name, {
-    badges = Badges.count(nil, save),
+    badges = badges,
     timeText = timeText,
     dexCount = dexCount,
   }

@@ -29,6 +29,9 @@ WRAP_SYSTEM = LOVE_SRC / "src" / "modules" / "system" / "wrap_System.cpp"
 PBXPROJ = LOVE_SRC / "platform" / "xcode" / "love.xcodeproj" / "project.pbxproj"
 APPLE_MM = LOVE_SRC / "src" / "common" / "apple.mm"
 FILESYSTEM_CPP = LOVE_SRC / "src" / "modules" / "filesystem" / "physfs" / "Filesystem.cpp"
+IOS_MM = LOVE_SRC / "src" / "common" / "ios.mm"
+IOS_H = LOVE_SRC / "src" / "common" / "ios.h"
+SYSTEM_CPP = LOVE_SRC / "src" / "modules" / "system" / "System.cpp"
 ENTITLEMENTS_SRC = IOS_DIR / "overlays" / "love-ios.entitlements"
 
 NATIVE_FILES = ("GRPickerBridge.swift", "GRHealthBridge.swift", "GRBootstrap.m")
@@ -120,7 +123,7 @@ int w_pickFileKinds(lua_State *L)
 	typedef const char *(*GRUTF8)(id, SEL);
 	const char *bytes = ((GRUTF8)objc_msgSend)(kinds,
 	                                           sel_registerName("UTF8String"));
-	if (bytes == nullptr || bytes[0] == '\0')
+	if (bytes == nullptr || bytes[0] == '\\0')
 	{
 		lua_pushnil(L);
 		return 1;
@@ -358,6 +361,50 @@ def patch_public_documents():
     print("patch_love_src: iOS save directory routed to Documents root")
 
 
+def patch_ios_haptics():
+    text = pristine(IOS_MM, ("UIImpactFeedbackGenerator",))
+    original = """void vibrate()
+{
+	@autoreleasepool
+	{
+		AudioServicesPlaySystemSound(kSystemSoundID_Vibrate);
+	}
+}
+"""
+    replacement = """void vibrate(double seconds)
+{
+	@autoreleasepool
+	{
+		UIImpactFeedbackStyle style = UIImpactFeedbackStyleLight;
+		if (seconds >= 0.035)
+			style = UIImpactFeedbackStyleHeavy;
+		else if (seconds >= 0.02)
+			style = UIImpactFeedbackStyleMedium;
+		UIImpactFeedbackGenerator *generator = [[UIImpactFeedbackGenerator alloc]
+			initWithStyle:style];
+		[generator prepare];
+		[generator impactOccurred];
+	}
+}
+"""
+    if original not in text:
+        fail(f"iOS haptic anchor not found in {IOS_MM}")
+    IOS_MM.write_text(text.replace(original, replacement, 1))
+
+    header = pristine(IOS_H, ("void vibrate(double seconds);",))
+    header_original = "void vibrate();"
+    if header_original not in header:
+        fail(f"iOS haptic declaration not found in {IOS_H}")
+    IOS_H.write_text(header.replace(header_original, "void vibrate(double seconds);", 1))
+
+    system = pristine(SYSTEM_CPP, ("love::ios::vibrate(seconds)",))
+    system_original = "love::ios::vibrate();"
+    if system_original not in system:
+        fail(f"iOS haptic call site not found in {SYSTEM_CPP}")
+    SYSTEM_CPP.write_text(system.replace(system_original, "love::ios::vibrate(seconds);", 1))
+    print("patch_love_src: iOS haptics use Taptic Engine impact presets")
+
+
 def patch_pbxproj():
     text = pristine(PBXPROJ)
 
@@ -408,7 +455,9 @@ def patch_pbxproj():
             fail(f"build configuration {config_id} not found")
         settings = (
             "\t\t\t\tSWIFT_VERSION = 5.0;\n"
-            "\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 14.0;\n"
+            "\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 15.0;\n"
+            "\t\t\t\tPRODUCT_NAME = \"gen1recomp++\";\n"
+            "\t\t\t\tEXECUTABLE_NAME = \"gen1recomp++\";\n"
             '\t\t\t\tCODE_SIGN_ENTITLEMENTS = "ios/native/love-ios.entitlements";\n'
         )
         text = text[: m.end()] + settings + text[m.end():]
@@ -422,6 +471,7 @@ def main():
         fail("love-src/ missing; run scripts/build_ios.sh --fetch first")
     copy_native_files()
     patch_public_documents()
+    patch_ios_haptics()
     patch_wrap_system()
     patch_pbxproj()
 

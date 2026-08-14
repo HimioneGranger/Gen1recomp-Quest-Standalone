@@ -1,363 +1,231 @@
-# Gen1Recomp
-
-A native LÖVE2D recreation of Poke Red, Blue and Yellow. The engine and map
-behavior are hand-written Lua; game data and graphics are decoded from a ROM
-supplied by the player.
-
-> [!CAUTION]
-> **We are NOT affiliated with the website `gen1recomp[.]com`** That website is not run by this project, was not authorized by us, and we have no idea who operates it. It is impersonating this project; do not download anything from it, and treat anything it hosts or claims as untrustworthy. Even if the site currently links back to this repository, the people behind it can change its content at any time, so nothing on it should ever be trusted. This GitHub repository and the Discord linked below are the only official sources for this project.
-
-<p align="center"><img src="https://raw.githubusercontent.com/bryanthaboi/gen1recomp/refs/heads/dev/assets/logo/logo.png"></p>
-
-**SUPPORT / ANNOUNCEMENTS / MODS:** [Discord](https://bois.icu)
+# Gen1Recomp — VR Unplugged
 
 <p align="center">
-
-<a href="https://www.youtube.com/@bryanthaboi">
-  <img src="https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube">
-</a>
-<a href="https://www.tiktok.com/@bryanthaboi">
-  <img src="https://img.shields.io/badge/TikTok-000000?style=for-the-badge&logo=tiktok&logoColor=white" alt="TikTok">
-</a>
-<a href="https://x.com/bryanthaboi">
-  <img src="https://img.shields.io/badge/X-000000?style=for-the-badge&logo=x&logoColor=white" alt="X">
-</a>
-<a href="https://bsky.app/profile/bryanthaboi.live">
-  <img src="https://img.shields.io/badge/Bluesky-0285FF?style=for-the-badge&logo=bluesky&logoColor=white" alt="Bluesky">
-</a>
-<a href="https://www.instagram.com/bryanthaboi">
-  <img src="https://img.shields.io/badge/Instagram-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram">
-</a>
-
+  <img src="assets/logo/gen1recomp_vr_unplugged_8bit.png" alt="Gen1Recomp VR Unplugged" width="760">
 </p>
 
-
-<p align="center"> <a href="https://www.polygon.com/pokemon-red-blue-3d-voxel-mod-battle-pixels-gameplay-footage-remake/"> <img src="https://img.shields.io/badge/AS%20SEEN%20ON-POLYGON-ea2e49?style=for-the-badge" alt="As seen on Polygon"> </a> 
-<a href="https://kotaku.com/pokemon-red-blue-recompilation-project-voxel-3d-mod-2000720281"> <img src="https://img.shields.io/badge/AS%20SEEN%20ON-KOTAKU-ea2e49?style=for-the-badge" alt="As seen on KOTAKU"> </a> 
-
-  <a href="https://www.digitalfoundry.net/news/2026/07/pokemon-yellow-voxel-mod-turns-the-original-gameboy-code-into-a-stunning-world">
-    <img src="https://img.shields.io/badge/AS%20SEEN%20ON-DIGITAL%20FOUNDRY-ea2e49?style=for-the-badge" alt="As seen on Digital Foundry">
-  </a>
-  <a href="https://www.androidauthority.com/unofficial-android-port-pokemon-red-blue-yellow-3692724/">
-  <img src="https://img.shields.io/badge/AS%20SEEN%20ON-ANDROID%20AUTHORITY-ea2e49?style=for-the-badge" alt="As seen on Android Authority">
-</a>
-
-<a href="https://www.xda-developers.com/this-amazing-pokemon-red-and-blue-voxel-mod-adds-a-3d-perspective-without-an-emulator/">
-  <img src="https://img.shields.io/badge/AS%20SEEN%20ON-XDA%20DEVELOPERS-ea2e49?style=for-the-badge" alt="As seen on XDA Developers">
-</a>
+<p align="center">
+  <strong>A standalone first-person voxel overhaul of Pokémon Red, Blue, and Yellow for Meta Quest.</strong>
 </p>
 
-### Watch the latest update video
+VR Unplugged is more than an Android port. The goal is to turn Kanto into a
+complete standalone VR experience: a spatial launcher, native stereo OpenXR,
+6DoF head tracking, Touch controls, a tracked Pokédex, first-person voxel
+environments, visible wild Pokémon, followers, physical catching, and a
+Quest-tested mod stack that works as one cohesive overhaul.
+
+No gaming PC, Link, SteamVR, or Virtual Desktop is needed while playing. A PC
+is only needed to sideload the APK. The project is physically tested on
+**Meta Quest 3**; Quest 3S is an intended target but has not yet received the
+same validation coverage.
+
+> [!IMPORTANT]
+> This is a public beta. The core experience is playable, but performance,
+> long-session stability, and parts of the enhanced mod stack are still being
+> finished. See [Development progress](#development-progress) before treating
+> it as a polished release.
+
+> [!CAUTION]
+> **We are not affiliated with `gen1recomp[.]com`.** That website is not run
+> or authorized by this project. Do not download anything from it. This GitHub
+> repository and the Discord linked below are the only official sources for
+> VR Unplugged.
+
+## Download and install
+
+<p align="center">
+  <a href="https://github.com/HimioneGranger/Gen1recomp-Quest-Standalone/releases/latest/download/Gen1Recomp-VR-Unplugged-v0.1.81-Quest.apk"><strong>Download the latest Quest APK</strong></a>
+</p>
+
+1. Enable Developer Mode on your headset and connect it by USB.
+2. Install the APK with SideQuest, or run:
+
+   ```sh
+   adb install -r Gen1Recomp-VR-Unplugged-v0.1.81-Quest.apk
+   ```
+
+3. In the headset, open **App Library → Unknown Sources → Gen1Recomp VR
+   Unplugged**.
+4. Use the room-anchored launcher to import your own supported ROM.
+5. Import Quest-compatible mod ZIPs separately from the launcher's **MODS**
+   tab. Mods are not bundled with the APK.
+
+When updating, use `adb install -r` so Android keeps your app data. Back up
+important saves before upgrading.
+
+## What the Quest overhaul adds
+
+| Feature | What it does | Current state |
+| --- | --- | --- |
+| Standalone Quest build | Runs directly on Quest as a native ARM64 Android APK | Working on Quest 3 |
+| Spatial launcher | Places the existing launcher on a readable room-anchored panel with a Touch-controller pointer | Working |
+| OpenXR handoff | Cleanly transfers ownership from the flat launcher session to immersive gameplay | Working |
+| Native stereo VR | Per-eye rendering, OpenXR view/projection data, and 6DoF head tracking | Working |
+| Tracked controls and UI | Touch input for navigation, movement, menus, turning, recentering, and mod interactions | Working |
+| Tracked Pokédex | Uses the left-hand display for menus, dialogue, and game information | Working; battle framing needs polish |
+| Quest graphics controls | Adjustable refresh request, eye resolution, draw distance, scale, player height, shadows, and comfort settings | Working |
+| On-headset content management | Imports supported ROMs, save files, and compatible mod ZIPs through Android's file picker | Working |
+| Multi-game launcher | Keeps Red, Blue, and Yellow profiles, save slots, and mods in private app storage | Working |
+| Save-safe updates | A replacement APK can retain existing private app data | Working; backups are still recommended |
+
+The launcher accepts canonical US Red, Blue, Yellow, and Gold ROMs. Red, Blue,
+and Yellow are the current VR focus. Gold import and the developing flat Gen 2
+engine are available, but **Gold voxel/VR gameplay is not implemented yet**.
+
+## Recommended complete-experience mod stack
+
+The APK provides the Quest host, launcher, and game engine. The immersive
+overhaul is assembled from separately maintained mods so each author keeps
+ownership of their work and each component can be updated, disabled, or
+removed independently.
+
+Only install ZIPs specifically marked as Quest compatible. Upstream desktop
+packages may lack the OpenXR, input, memory, or rendering changes required on
+the headset. Quest builds are distributed through this project's official
+release/Discord channels when author permission and testing allow it.
+
+### Stable baseline
+
+| Mod | What it adds | Quest status |
+| --- | --- | --- |
+| [Dramaless Shape](https://github.com/artyrambles/DRAMALESS_SHAPE/tree/v2.0.0) Quest | The stereo voxel renderer, VR camera, world geometry, lighting, water, battles, and OpenXR gameplay conductor | Core 2.0 migration is about **96%** complete |
+| [Kanto in First Person](https://github.com/mrmushrooms11/kanto-first-person/releases/tag/firstperson1.60.0) Quest | First-person interiors, ceilings, caves, skyline, weather, foliage, particles, doors, and corrected battle stages without changing game logic or saves | `1.60.0-quest.7` is integrated and hardware-tested |
+| [Crystal 251](https://github.com/Deftones565/gen1recomp-mod-crystal-251/releases/tag/v0.10.3) | Expanded species/content support used by the enhanced visual stack | `0.10.3` is integrated and smoke-tested |
+| HGSS Visual Overhaul | Gen 4-style sprite presentation and icon sources for the enhanced stack | `0.3.1` works on Quest; public fork distribution still needs its license/asset audit completed |
+| [Wild Skies](https://github.com/shanehudson-gen1recomp-mods/wild_skies/releases/tag/v1.8.0) | Flyer support and additional overworld life | `1.8.0` is integrated and hardware-tested |
+
+### Near-complete additions
+
+| Mod | What it adds | Quest status |
+| --- | --- | --- |
+| [Wilds of Kanto](https://github.com/YoDrehDenSwagAuf/overworld-spawn-mod/releases/tag/v2.0.1) Quest | Visible wild Pokémon, followers, overworld behavior, optional direct catching, a tracked held Poké Ball, and stereo ball flight | q8 is about **97%** complete; the final low-poly and Stadium-model headset gate remains |
+| [StadiumBattleFX](https://github.com/anxiousintrovert/StadiumBattleFX) Quest | Keeps Stadium/Stadium 2 imports in one bounded private cache and supplies optional authentic Poké Ball models to Wilds | Provider integration is about **80%** complete; automated tests pass and physical appearance/performance testing remains |
+| Crystal 251 ROM Sprite Provider | Supplies additional ROM-derived sprites to compatible overworld mods without bundling commercial assets | About **86%** complete; remaining species and secondary-Flying coverage needs headset validation |
+
+For the most dependable experience today, use the stable baseline first. Add
+Wilds/Stadium candidates only when the release notes identify the exact pair
+as hardware-approved. The launcher can disable a mod without deleting it.
+
+### Compatibility guardrails
+
+- **PotatoVoxel** is an alternative renderer and conflicts with the primary
+  Dramaless/Kanto stack. Do not enable both stacks together.
+- **Dramaless + Battle Art Quest** is an isolated experimental renderer path,
+  not part of the recommended baseline yet.
+- **Stadium Pokédex Viewer** is excluded because its current renderer can grow
+  GPU usage without a safe bound during long Pokédex browsing.
+- **Side Door Fix** and **Dramatic Sky Ride** remain test projects until their
+  visual, input, interaction, and performance gates pass.
+
+## Recommended Quest 3 settings
+
+Start with:
+
+- **Refresh rate:** 72 Hz
+- **Resolution:** Full
+- **Shadows:** Low
+- **Render distance:** Medium
+
+This is the current readability/performance baseline. Half resolution lowers
+memory pressure but noticeably reduces sharpness. Initial ROM extraction and
+voxel preparation take longer than later launches, and entering a new complex
+area can still cause a visible streaming hitch.
+
+## Development progress
+
+These are maintainer planning estimates as of **August 14, 2026**. They include
+physical-headset validation, not just code completion, and will move as new
+bugs or upstream changes are discovered.
+
+| Area | Progress | What remains |
+| --- | ---: | --- |
+| Overall playable Quest release | **80%** | Performance, lifecycle soak, mod-pair validation, broader route coverage, and release hardening |
+| Standalone Quest/OpenXR core | **90%** | Longer suspend/resume, controller sleep, repeated handoff, transition, and quit stress testing |
+| Stable first-person voxel experience | **92%** | Performance/rollback gates and additional world/battle presentation validation |
+| Dramaless 2.0 Quest migration | **96%** | Repeat regression coverage and maintainability cleanup |
+| Wilds of Kanto 2.0.1 Quest | **97%** | Final q8 low-poly behavior, physical throwing/catching, and optional Stadium-provider headset pass |
+| Stadium Ball model integration | **80%** | Physical model checks, performance measurement, and automatic fallback validation |
+| Gen 2/HGSS sprite providers | **86%** | Remaining species coverage plus license and asset-provenance work |
+| Performance and lifecycle hardening | **70%** | Memory/thermal reduction, transition latency, long-session testing, and intermittent startup investigation |
+| Battle Art transition/precache integration | **10%** | Architecture and asset audit before implementation can move into the accepted stack |
+| Gold/Gen 2 voxel VR | **10%** | Most immersive rendering, interaction, and mod-integration work is still ahead |
+| Portal/mixed-reality modes | **10%** | Prototype and research stage |
+| Whole long-term overhaul vision | **46%** | Includes finished Gen 1 VR, Gen 2 VR, MR modes, broader hardware support, and optional integrations |
+
+### Current priorities
+
+1. Finish the Wilds q8 and StadiumBattleFX paired headset gate.
+2. Reduce memory use, heat, and transition stalls without sacrificing full
+   resolution.
+3. Run 30–60 minute traversal, battle, suspend/resume, and quit stress tests.
+4. Validate more cities, forests, caves, interiors, Victory Road, Indigo
+   Plateau, Fly/warp transitions, saves, and battles.
+5. Finish Pokédex battle framing and remaining visual polish.
+6. Keep Quest changes maintainable as the upstream engine evolves.
+
+### Known performance cost
+
+The complete mod-heavy voxel stack is substantially more expensive than flat
+gameplay. Recent Quest 3 traversal samples at full resolution and low shadows
+generally land in the high-20s to mid-30s FPS while the headset requests
+72 Hz. Full-stack process memory has measured roughly 2.0–2.3 GB, with device
+temperature around 50–53 °C during demanding sessions. These are development
+measurements, not promised final targets, and improving them is the largest
+remaining release task.
+
+## Project boundaries
+
+This project contains **no ROM, save, extracted ROM cache, or commercial game
+assets**. You must provide your own legally obtained supported ROM. The
+importer verifies it, creates a private cache in the app's writable storage,
+and releases the ROM from memory. The ROM itself is not copied into that
+cache.
+
+VR Unplugged is a fan project and is not affiliated with or endorsed by
+Nintendo, Game Freak, Creatures Inc., The Pokémon Company, or Meta.
+
+The Quest overhaul builds on
+[Gen1Recomp](https://github.com/bryanthaboi/gen1recomp), the hand-written
+Lua/LÖVE recreation maintained by Bryan and its contributors. The Quest path
+is developed as a collaboration around that foundation while the standalone
+OpenXR integration and Quest mod forks are maintained and tested here.
+
+## Support, bugs, and collaboration
+
+**Support / announcements / Quest-compatible mods:**
+[Discord](https://bois.icu)
+
+- Quest problem: [open a Quest report](https://github.com/HimioneGranger/Gen1recomp-Quest-Standalone/issues/new?template=quest_report.yml)
+- Engine or launcher idea: [open a feature request](https://github.com/HimioneGranger/Gen1recomp-Quest-Standalone/issues/new?template=feature_request.yml)
+- Mod request: [open a mod request](https://github.com/HimioneGranger/Gen1recomp-Quest-Standalone/issues/new?template=mod_request.yml)
+- Contributors: start with [CONTRIBUTING.md](CONTRIBUTING.md)
+- Release maintainers: use the [Quest release checklist](docs/quest-release-checklist.md)
+- OpenXR architecture: read the [Quest backend notes](docs/quest-openxr-backend.md)
+- Upstream platform maintainers: the preserved Switch **CI vs release**
+  contract remains documented in [switch-build.md](docs/switch-build.md)
+
+Development is coordinated through issues and pull requests so both partners
+can see decisions, reproduce builds, and take over work without relying on a
+private chat history.
+
+## Watch the latest update
 
 [![Watch the latest update video](https://img.youtube.com/vi/8IOgqbe4YvA/maxresdefault.jpg)](https://www.youtube.com/watch?v=8IOgqbe4YvA)
 
-
-This project does not include a ROM, emulate the Game Boy, transpile assembly,
-or download a disassembly. A canonical US Poke Red, Blue, Yellow, or Gold ROM
-is the only game content input.
-
-The ROM is verified, used during import, and then released from memory. It is
-not copied into the cache. Later launches load the private generated cache and
-do not ask for the ROM again. Red, Blue, Yellow, and Gold can all be imported
-side by side. Gold is Gen 2 Phase 1 (import + launcher; see
-`docs/gold-phase1.md`): the Gen 2 engine is still under construction.
-
-## Quick Start
-
-Open the desktop app. On first boot, choose your legally obtained `.gb` /
-`.gbc` file or drop it onto the window. Import takes a few seconds and the
-game starts automatically.
-
-Only the canonical US Red, Blue, Yellow (1 MiB), and Gold (2 MiB) ROMs are
-accepted. The importer verifies SHA-1 before creating any game data:
-
-- Red: `ea9bcae617fdf159b045185467ae58b2e4a48b9a`
-- Blue: `d7037c83e1ae5b39bde3c30787637ba1d4c48ce2`
-- Yellow: `cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1`
-- Gold: `d8b8a3600a465308c9953dfa04f0081c05bdcb94`
-
-The packaged app contains neither a ROM nor pre-extracted game data. Music,
-sound effects, and cries are synthesized while the game runs from compact
-audio channel programs copied out of the verified ROM.
-
-### A note on Windows Defender warnings
-
-Windows Defender sometimes flags the Windows build with a generic
-machine-learning detection such as `Trojan:Win32/Wacatac!ml` (#621). This is
-a known false positive: the exe is the official LÖVE runtime with the game
-archive appended (the standard way LÖVE games ship), and Defender's
-heuristics distrust unsigned executables with appended data. Every release
-publishes SHA-256 checksums (`sha256sums.txt`) so you can verify your
-download, and you can confirm a flagged file yourself on
-[VirusTotal](https://www.virustotal.com), where these builds come back clean
-on every engine except Defender's heuristic. False positives are reported to
-Microsoft as they come up.
-
-## Controls
-
-
-| Action | Keyboard          | Controller         |
-| ------ | ----------------- | ------------------ |
-| Move   | Arrow keys / WASD | D-pad / left stick |
-| A      | Z / Enter / Space | A                  |
-| B      | X / Backspace     | B                  |
-| Start  | Escape            | Start              |
-| Select | Tab / Shift       | Back / Select      |
-
-
-Rebind any of these in-game under **OPTIONS → CONTROLS**. Controllers are
-supported out of the box.
-
-### Hotkeys
-
-
-| Key       | What it does                                         |
-| --------- | ---------------------------------------------------- |
-| `-` / `=` | Zoom out / in (overworld; also mouse wheel)          |
-| `1`       | Cycle GAME SPEED up (controller: R2 faster, L2 slower) |
-| `2`       | Cycle COLORS                                         |
-| `3`       | Cycle TILT (free-roam overworld)                     |
-| `4`       | Cycle ZOOM through every level (free-roam overworld) |
-| `5`       | Cycle GBC FX                                         |
-| `F1`      | Save                                                 |
-| `F2`      | Load                                                 |
-| `F10`     | Open / close the mod manager                         |
-
-
-COLORS, TILT, ZOOM, GBC FX, GAME SPEED, and VOID FILL are also in the
-Options menu and persist in `options.lua`.
-
-### Low-end devices
-
-**OPTIONS → PERFORMANCE** scales the port's optional extras for weaker
-hardware: **HIGH** (everything on), **BALANCED** (no 3D tilt or GBC FX),
-**LOW** (also no survey zoom, FPS capped), or **AUTO** — the default, which
-picks a tier from your device (ARM handhelds → LOW, phones → BALANCED,
-normal desktops → HIGH, unchanged). It only scales presentation; the
-fixed-step game logic is identical on every tier, and a lower tier hides
-your tilt/zoom/GBC-FX preferences without forgetting them. Details in
-[docs/new-features.md](docs/new-features.md#performance-tier-low-end-devices).
-
-### Rulesets
-
-**OPTIONS → RULESET** picks which set of Gen 1 battle behaviors to run.
-Both rulesets share the same damage formulas; they differ only in whether
-the original's quirks are kept. The setting persists in `options.lua`, and
-mods can register their own.
-
-`gen1_faithful` is the default and reproduces the original cartridge,
-famous bugs included:
-
-| Rule                        | Behavior                                              |
-| --------------------------- | ----------------------------------------------------- |
-| `oneIn256Miss`              | A 100%-accurate move still misses on a roll of 255     |
-| `critUsesBaseSpeed`         | Crit rate reads base speed, not the current stat       |
-| `critIgnoresStages`         | Crit rate ignores stat stages                          |
-| `focusEnergyBug`            | FOCUS ENERGY quarters the crit rate instead of x4      |
-| `enemyUnlimitedPP`          | Enemies never spend PP, so they never Struggle         |
-| `hyperBeamSkipRechargeOnKO` | HYPER BEAM skips its recharge when the target faints   |
-| `randMin` / `randMax`       | Damage random factor 217-255                           |
-
-`modern_clean` keeps the formulas but removes the notorious quirks:
-
-| Rule                        | Behavior                                              |
-| --------------------------- | ----------------------------------------------------- |
-| `oneIn256Miss`              | Off: a 100%-accurate move always hits                  |
-| `critUsesBaseSpeed`         | Unchanged: crit rate still reads base speed            |
-| `critIgnoresStages`         | Off: stat stages count toward the crit rate            |
-| `focusEnergyBug`            | Off: FOCUS ENERGY raises the crit rate as intended     |
-| `enemyUnlimitedPP`          | Off: enemies deplete PP and Struggle when empty        |
-| `hyperBeamSkipRechargeOnKO` | Off: HYPER BEAM always recharges, like Gen 2+          |
-| `randMin` / `randMax`       | Damage random factor 217-255, same as faithful         |
-
-## Running From Source
-
-Requires LÖVE 11.x. Place a Red, Blue, or Yellow ROM in the project folder and
-double-click `Play-Mac.command` or `Play-Windows.bat`, or run:
-
-```sh
-scripts/setup.sh --rom "/path/to/Poke Red.gb"   # or Blue.gb / Yellow.gbc
-scripts/run.sh
-```
-
-then `love .` for later launches. Windows PowerShell scripts, the optional
-developer data build, test suites, and cache management are covered in
-[Developer Setup](https://github.com/bryanthaboi/gen1recomp/wiki/Guide-Developer-Setup).
-
-## Portable Mode
-
-By default the game keeps your save, options, and the private ROM-derived
-data cache in your OS's normal per-user app data folder. To keep everything
-next to the game instead (handy for a USB stick or portable drive you carry
-between computers), drop an empty file named `portable.txt` next to the app
-(next to `gen1recomp.app`/`.exe`, or next to `main.lua`/`conf.lua` when
-running from source), then launch the game. Portable mode is desktop-only
-(Windows, Linux, macOS); it has no effect on Android or iOS, where the app
-runs from a read-only package.
-
-With `portable.txt` present:
-
-- `save.lua`, `save.lua.bak`, and `options.lua` are read from and written to
-that same folder instead of the OS save directory.
-- A ROM import writes the generated `data/generated` and `assets/generated`
-cache straight into that folder too (nothing is left in the OS save
-directory), so a later launch reuses it without asking for the ROM again
-even on a different computer, as long as the same folder comes along.
-- Deleting `portable.txt` switches back to the normal OS save directory; nothing
-already written to either location is touched automatically, so copy files
-over yourself if you want to carry existing progress across the switch.
-
-## Launch Options
-
-By default the app opens the launcher so you can pick a game. Launch options
-skip it and start one game directly, which is what you want for a one-click
-entry: a desktop shortcut per game, a Steam entry, or a handheld frontend.
-
-| Option | Effect |
-| --- | --- |
-| `--game=red` | boot Red, skipping the launcher (`blue` and `yellow` too, or just `r` / `b` / `y`) |
-| `--slot=2` | load that save slot; takes a slot number or a slot id |
-| `--launcher` | open the launcher anyway, so you can edit a shortcut you already made |
-
-
-## Linux on arm64 (Raspberry Pi)
-
-Alongside the x86_64 `gen1recomp-*-linux.zip`, every release ships
-`gen1recomp-*-linux-arm64.AppImage` for 64-bit ARM desktop Linux — Raspberry
-Pi 4/5, Armbian and other SBC distros, and arm64 VMs on Apple Silicon:
-
-```sh
-chmod +x gen1recomp-*-linux-arm64.AppImage
-./gen1recomp-*-linux-arm64.AppImage
-```
-
-LÖVE publishes no aarch64 binary of any kind, so this artifact compiles the
-engine — and SDL2, OpenAL and the codecs — from source inside a Debian
-bullseye arm64 container. It needs only glibc 2.29+, libstdc++, freetype and
-zlib on the host; OpenGL, X11, Wayland, KMSDRM, ALSA and PulseAudio are all
-dlopened, so the same image runs on a full desktop, a Wayland-only session or
-a KMSDRM handheld with no X server. Build instructions and the reasoning are
-in [docs/linux-arm64-build.md](docs/linux-arm64-build.md).
-
-
-## iOS
-
-Every release ships `gen1recomp-*-ios.ipa`. Sideload it with AltStore
-(Windows or Mac) — see [docs/ios-sideload.md](docs/ios-sideload.md). To
-build and install from source on a Mac instead, see
-[docs/ios-install.md](docs/ios-install.md).
-
-<div>
-    <a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://github.com/bryanthaboi/gen1recomp/raw/refs/heads/main/mobile/ios/app-repo.json"><img src="./.github/resources/sidestore-badge.png" alt="Add to SideStore" height="60"></a>
-    &nbsp;
-    <a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://github.com/bryanthaboi/gen1recomp/raw/refs/heads/main/mobile/ios/app-repo.json"><img src="./.github/resources/feather-badge.png" alt="Add to Feather" height="60"></a>
-    &nbsp;
-    <a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://github.com/bryanthaboi/gen1recomp/raw/refs/heads/main/mobile/ios/app-repo.json"><img src="./.github/resources/altstore-badge.png" alt="Add to AltStore" height="60"></a>
-    &nbsp;
-    <a href="https://github.com/bryanthaboi/gen1recomp/releases/latest"><img src="./.github/resources/github-badge.png" alt="Download from GitHub" height="60"></a>
-</div>
-
-## Xbox Dev Mode
-
-Every release ships `gen1recomp-*-xbox-uwp.zip` for Xbox One and Xbox Series
-consoles in Developer Mode. It cannot be installed in retail mode.
-
-Extract the archive, then use Xbox Device Portal to install the `.msix` and
-the x64 package under `Dependencies`.
-
-### External setup
-
-1. Put your legally obtained Red, Blue, or Yellow ROMs on an external drive.
-   Mod ZIPs can go on the same drive.
-2. Connect the drive to the Xbox and open Gen1Recomp.
-3. Select **Import ROM** or **Import Mod**, then choose the file with the Xbox
-   file picker.
-4. Repeat the ROM import for each version you want to use.
-
-### Internal setup
-
-1. Create a folder named `baseroms` on your PC and place your legally obtained
-   Red, Blue, or Yellow ROMs inside it.
-2. ZIP the folder, keeping `baseroms` at the top level of the archive.
-3. Launch Gen1Recomp once, then close it.
-4. Open Xbox Device Portal and upload the ZIP to
-   `Gen1Recomp/LocalState/pokemon-love2d/`.
-5. Choose **Yes** when Device Portal asks whether to extract the archive.
-6. Open Gen1Recomp. The launcher checks baseroms once at startup. When it finds a compatible ROM, that game’s tab shows ROM FOUND and an Import detected ROM button.
-
-ROMs, generated game data, saves, and mods remain in LocalState and are not
-included in the app.
-
-Source builds and package details are covered in
-[the Xbox UWP build notes](ports/uwp/BUILD.md).
-
-## Handhelds
-
-A PortMaster-style port for the **Anbernic RG34XXSP** on Stock OS 64-bit MOD
-ships with every release as `gen1recomp-*-rg34xxsp-stockos64-mod.zip`.
-Install steps, controls, and troubleshooting live in
-[docs/anbernic-rg34xxsp.md](docs/anbernic-rg34xxsp.md).
-
-## Nintendo Switch
-
-Releases ship an SD-ready `gen1recomp-*-switch.zip`. Runtime target is pinned
-[love-nx](https://github.com/retronx-team/love-nx) `11.5-nx1`. Requires a
-console that can run Switch homebrew.
-
-- Players: [docs/switch-install.md](docs/switch-install.md). Download the
-  zip, extract at the microSD root (install or update), title-override
-  launch, import your own legal ROM, Joy-Con controls and shortcuts.
-- Builders: [docs/switch-build.md](docs/switch-build.md). `--fetch` /
-  `--loose` / `--fused`, toolchain, Docker fallback, and CI vs release
-  (path-gated ubuntu selftest, fused PR artifact on the main repo, release
-  hard-fail).
-- File transfer (MTP / SD / FTP): [docs/switch-transfer.md](docs/switch-transfer.md).
-
-## Modding
-
-The game ships a native mod platform: content registries, events and hooks,
-per-mod saves and options, and an in-game manager. The full modding book —
-getting started, a twelve-rung tutorial ladder, a cookbook, and the generated
-reference — lives on the
-[project wiki](https://github.com/bryanthaboi/gen1recomp/wiki).
-
-Shipped example mods, one per kind of author, live in `[mods/](mods/)`.
-
-Maps can be edited in our own build of [Tiled](https://www.mapeditor.org),
-[bryanthaboi/tiled_gen1recomp](https://github.com/bryanthaboi/tiled_gen1recomp/releases),
-and exported back out as a mod; see
-[docs/tiled-map-editing.md](docs/tiled-map-editing.md).
-
-## Bugs and Ideas
-
-Found a bug? A warp dropping you somewhere it shouldn't, a battle doing math
-that looks wrong, text in the wrong box, anything that does not match the
-original game.
-[Open a bug report](https://github.com/bryanthaboi/gen1recomp/issues/new?template=bug_report.yml).
-Attach a screenshot if you can. It saves a lot of back and forth, and if you
-can't get one, the form asks you to describe what you saw instead.
-
-Thought of a feature that could be good, or a way to improve one that already
-exists?
-[Open a feature request](https://github.com/bryanthaboi/gen1recomp/issues/new?template=feature_request.yml).
-Say what you want, why it is worth doing, and how you picture it working. A
-request with real detail is one that can actually get built.
-
-## More
-
-- [Link play](https://github.com/bryanthaboi/gen1recomp/wiki/Guide-Link-Play)
-— START > LINK connects two copies directly over UDP.
-- [Save editor](https://github.com/bryanthaboi/gen1recomp/wiki/Guide-Save-Editor)
-— edit party, boxes, items, events, and Pokédex flags outside the game.
-- `docs/architecture.md` — runtime details;
-`docs/behavior-porting-notes.md` — formula provenance.
-
-
-
-## Special Thanks
-
-This project would not be possible without [pret](https://github.com/pret) >
-the pret band of decompiling maniacs > and their
-[pokered](https://github.com/pret/pokered) disassembly.
-
-<p align="center"><a href="https://boisclub.games"><img src="https://raw.githubusercontent.com/bryanthaboi/gen1recomp/refs/heads/dev/assets/logo/bcg.png"></a></p>
+<p align="center">
+  <a href="https://www.youtube.com/@bryanthaboi"><img src="https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube"></a>
+  <a href="https://www.tiktok.com/@bryanthaboi"><img src="https://img.shields.io/badge/TikTok-000000?style=for-the-badge&logo=tiktok&logoColor=white" alt="TikTok"></a>
+  <a href="https://x.com/bryanthaboi"><img src="https://img.shields.io/badge/X-000000?style=for-the-badge&logo=x&logoColor=white" alt="X"></a>
+  <a href="https://bsky.app/profile/bryanthaboi.live"><img src="https://img.shields.io/badge/Bluesky-0285FF?style=for-the-badge&logo=bluesky&logoColor=white" alt="Bluesky"></a>
+  <a href="https://www.instagram.com/bryanthaboi"><img src="https://img.shields.io/badge/Instagram-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram"></a>
+</p>
+
+## Credits
+
+Thank you to the Gen1Recomp contributors, every original mod author who has
+worked with us on Quest compatibility, the testers putting real headset time
+into the project, and [pret](https://github.com/pret) and the
+[pokered](https://github.com/pret/pokered) contributors whose research makes
+accurate recreation possible.
+
+<p align="center"><a href="https://boisclub.games"><img src="https://raw.githubusercontent.com/bryanthaboi/gen1recomp/refs/heads/dev/assets/logo/bcg.png" alt="Bois Club Games"></a></p>

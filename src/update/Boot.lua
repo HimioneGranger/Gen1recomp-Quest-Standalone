@@ -80,7 +80,8 @@ local function purgeBundledModules()
   end
 end
 
--- Boot.probePayload(rel) -> { engine = string, minShell = number } | nil, err
+-- Boot.probePayload(rel)
+--   -> { engine = string, minShell = number, payloadHost = string } | nil, err
 --
 -- Mount the archive at rel (a save-directory-relative path) on an isolated
 -- mountpoint, read its src/core/Version.lua by executing the source with
@@ -104,24 +105,50 @@ function Boot.probePayload(rel)
   if type(v) ~= "table" or type(v.engine) ~= "string" then
     return nil, "payload has no usable Version table"
   end
-  return { engine = v.engine, minShell = tonumber(v.minShell) or 1 }
+  return {
+    engine = v.engine,
+    minShell = tonumber(v.minShell) or 1,
+    payloadHost = type(v.payloadHost) == "string" and v.payloadHost or "love",
+  }
 end
 
--- Boot.select(candidates, bundledEngine, bundledShell) -> chosen | nil, toDelete
+-- Pure host gate shared by boot selection and the download worker. Missing
+-- payloadHost fields mean "love" so payloads made before this contract remain
+-- compatible with ordinary LOVE packages.
+function Boot.canHost(info, bundledShell, bundledPayloadHost)
+  if type(info) ~= "table" then return false end
+  local payloadHost = type(info.payloadHost) == "string"
+    and info.payloadHost or "love"
+  local host = type(bundledPayloadHost) == "string"
+    and bundledPayloadHost or "love"
+  return payloadHost == host and (tonumber(info.minShell) or 1)
+    <= (tonumber(bundledShell) or 1)
+end
+
+local function samePayloadHost(info, bundledPayloadHost)
+  local payloadHost = type(info.payloadHost) == "string"
+    and info.payloadHost or "love"
+  local host = type(bundledPayloadHost) == "string"
+    and bundledPayloadHost or "love"
+  return payloadHost == host
+end
+
+-- Boot.select(candidates, bundledEngine, bundledShell, bundledPayloadHost)
+--   -> chosen | nil, toDelete
 --
 -- Pure (no love.*): decide which payload to run and which to delete.
--- candidates is a list of { name = , engine = , minShell = }.
+-- candidates is a list of { name = , engine = , minShell = , payloadHost = }.
 --   * chosen: the highest engine that is STRICTLY newer than bundledEngine and
---     whose minShell <= bundledShell (a payload the running shell can host).
+--     whose payloadHost matches and minShell <= bundledShell.
 --   * toDelete: stale payloads -- engine <= bundled (old or the same as what we
 --     already ship), or superseded by the chosen one (not newer than chosen).
---     A payload newer than the chosen one but unrunnable here (minShell too
---     high) is kept: a future shell upgrade may be able to run it.
-function Boot.select(candidates, bundledEngine, bundledShell)
+--     A newer incompatible payload is kept: a matching host or future shell
+--     may be able to run it.
+function Boot.select(candidates, bundledEngine, bundledShell, bundledPayloadHost)
   local chosen
   for _, c in ipairs(candidates) do
     local newer = Semver.compare(c.engine, bundledEngine) > 0
-    local runnable = (c.minShell or 1) <= bundledShell
+    local runnable = Boot.canHost(c, bundledShell, bundledPayloadHost)
     if newer and runnable then
       if not chosen or Semver.compare(c.engine, chosen.engine) > 0 then
         chosen = c
@@ -132,9 +159,15 @@ function Boot.select(candidates, bundledEngine, bundledShell)
   local toDelete = {}
   for _, c in ipairs(candidates) do
     if not (chosen and c.name == chosen.name) then
-      local stale = Semver.compare(c.engine, bundledEngine) <= 0
-      if chosen and Semver.compare(c.engine, chosen.engine) <= 0 then
-        stale = true
+      local stale = false
+      -- Never clean up another host family's payloads. A shared save directory
+      -- may be opened by multiple native packages, and only the matching host
+      -- can decide whether one of its own archives is stale.
+      if samePayloadHost(c, bundledPayloadHost) then
+        stale = Semver.compare(c.engine, bundledEngine) <= 0
+        if chosen and Semver.compare(c.engine, chosen.engine) <= 0 then
+          stale = true
+        end
       end
       if stale then toDelete[#toDelete + 1] = c.name end
     end
@@ -223,6 +256,7 @@ local function runInner(args)
             name = entry,
             engine = info.engine,
             minShell = info.minShell,
+            payloadHost = info.payloadHost,
           }
         end
       end
@@ -230,7 +264,8 @@ local function runInner(args)
   end
 
   local Version = require("src.core.Version")
-  local chosen, toDelete = Boot.select(candidates, Version.engine, Version.shell)
+  local chosen, toDelete = Boot.select(candidates, Version.engine,
+    Version.shell, Version.payloadHost)
 
   for _, victim in ipairs(toDelete) do
     love.filesystem.remove(PAYLOAD_DIR .. "/" .. victim)

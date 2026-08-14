@@ -64,6 +64,17 @@ local function freshGame(mapX, mapY)
     worldViewSize = function() return 160, 144 end,
     setSGBZones = function() end,
   }
+  -- OverworldState is a singleton and :enter does not clear the movement
+  -- latches, so a scenario that runs after a few thousand other checks can
+  -- inherit a half-finished script and never walk.  Reset them here: this
+  -- suite asserts a frame budget, so it has to start from a known state.
+  OverworldState.scriptMoves = {}
+  OverworldState.pendingScripts = {}
+  OverworldState.emote = nil
+  OverworldState.engaging = false
+  OverworldState.teleportOut = nil
+  OverworldState.transitioning = nil
+  OverworldState.wildEncounterGraceSteps = 0
   StateStack:push(OverworldState, "PALLET_TOWN", mapX, mapY, "up")
   Game.overworld = OverworldState
   return pressed
@@ -114,6 +125,11 @@ end
 -- keeps running straight into the lab.
 -- =====================================================================
 scenario(function()
+  -- The trigger tile is in Pallet's north grass, so the escort walk rolls for
+  -- wild encounters as it goes.  Pin the stream: run standalone this suite got
+  -- one draw sequence and run inside tests/run_tests.lua another, and one of
+  -- them dropped a battle on top of the escort and ate the frame budget.
+  math.randomseed(require("tests.harness").SEED)
   GameVersion.set("red")
   local pressed = freshGame(8, 2)
   local played = {}

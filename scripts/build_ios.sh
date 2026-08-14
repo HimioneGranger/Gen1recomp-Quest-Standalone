@@ -20,9 +20,9 @@
 #   - macOS + Xcode (xcodebuild)
 #   - mobile/ios/love-src/ (see --fetch / mobile/ios/README.md)
 #
-# Output: dist/ios/<Config>-<sdk>/gen1recomp.app (convenience copy)
-#         dist/ios/gen1recomp.ipa                 (device builds only)
-#         mobile/ios/build/Build/Products/<Config>-<sdk>/gen1recomp.app
+# Output: dist/ios/<Config>-<sdk>/gen1recomp++.app (convenience copy)
+#         dist/ios/gen1recomp++.ipa                 (device builds only)
+#         mobile/ios/build/Build/Products/<Config>-<sdk>/gen1recomp++.app
 
 set -euo pipefail
 
@@ -39,8 +39,9 @@ RESOURCES_DIR="$XCODE_DIR/ios/resources"
 LOVE_FILE="$RESOURCES_DIR/game.love"
 LIBS_DIR="$XCODE_DIR/ios/libraries"
 
-APP_NAME="gen1recomp"
-DISPLAY_NAME="gen1recomp"
+APP_NAME="gen1recomp++"
+DISPLAY_NAME="gen1recomp++"
+PRODUCT_NAME="gen1recomp++"
 # Bundle ID resolution, most specific wins:
 #   1. GEN1_BUNDLE_ID env var
 #   2. mobile/ios/bundle_id.local (one line, gitignored — pins YOUR install
@@ -50,7 +51,7 @@ DISPLAY_NAME="gen1recomp"
 #      capabilities like HealthKit are involved), so a per-team default
 #      lets anyone build without colliding with someone else's app
 #   4. simulator: the project default (no App ID registration involved)
-BUNDLE_ID="${GEN1_BUNDLE_ID:-com.theboisclub.gen1recomp}"
+BUNDLE_ID="${GEN1_BUNDLE_ID:-}"
 if [ -z "$BUNDLE_ID" ] && [ -f "$IOS_DIR/bundle_id.local" ]; then
   BUNDLE_ID="$(tr -d '[:space:]' < "$IOS_DIR/bundle_id.local")"
 fi
@@ -138,11 +139,7 @@ if $DEVICE && [ -z "${DEVELOPMENT_TEAM:-}" ]; then
   fi
 fi
 if [ -z "$BUNDLE_ID" ]; then
-  if $DEVICE; then
-    BUNDLE_ID="com.gen1recomp.t$(printf '%s' "$DEVELOPMENT_TEAM" | tr '[:upper:]' '[:lower:]')"
-  else
-    BUNDLE_ID="com.theboisclub.pokemonred"
-  fi
+  BUNDLE_ID="com.theboisclub.gen1recompplusplus"
 fi
 
 # --------------------------------------------------------------- host checks
@@ -226,13 +223,26 @@ verify_documents_overlay() {
 }
 
 apply_ios_icon() {
-  local source="$ROOT/assets/logo/gen1recomp_cover.png"
+  local source="$ROOT/assets/logo/logo.png"
   local target="$XCODE_DIR/Images.xcassets/iOS AppIcon.appiconset"
   [ -f "$source" ] || fail "missing iOS icon source: $source"
   [ -d "$target" ] || fail "missing iOS app icon set: $target"
+  local icon="$BUILD_DIR/gen1recomp-ios-icon.png"
+  mkdir -p "$BUILD_DIR"
+  if command -v magick >/dev/null 2>&1; then
+    magick -size 1024x1024 xc:black \
+      \( "$source" -resize 900x900 \) -gravity center -composite \
+      -alpha off "$icon" || fail "could not create iOS app icon: $source"
+  else
+    local scaled="$BUILD_DIR/gen1recomp-logo.png"
+    sips -Z 900 "$source" --out "$scaled" >/dev/null \
+      || fail "could not resize iOS app icon source: $source"
+    sips -p 1024 1024 --padColor 000000 "$scaled" --out "$icon" >/dev/null \
+      || fail "could not center iOS app icon source: $source"
+  fi
   local entry name size
   while IFS=: read -r name size; do
-    sips -z "$size" "$size" "$source" --out "$target/$name" >/dev/null
+    sips -z "$size" "$size" "$icon" --out "$target/$name" >/dev/null
   done <<'EOF'
 icon-1024pt@1x.png:1024
 icon-29pt@1x.png:29
@@ -647,6 +657,7 @@ run_xcodebuild() {
     CURRENT_PROJECT_VERSION="$project_version"
     INFOPLIST_KEY_UIFileSharingEnabled=YES
     INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace=YES
+    IPHONEOS_DEPLOYMENT_TARGET=15.0
     ONLY_ACTIVE_ARCH=NO
     DISABLE_MANUAL_TARGET_ORDER_BUILD_WARNING=YES
   )
@@ -665,6 +676,9 @@ run_xcodebuild() {
     fi
     if [ -n "${CODE_SIGN_IDENTITY:-}" ]; then
       args+=(CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY")
+    fi
+    if [ "${GEN1_DISABLE_HEALTHKIT:-0}" = "1" ]; then
+      args+=(CODE_SIGN_ENTITLEMENTS=)
     fi
   fi
 
@@ -708,18 +722,22 @@ run_xcodebuild() {
   fi
 
   local products="$BUILD_DIR/Build/Products/${config}-${sdk}"
-  local app="$products/$APP_NAME.app"
-  if [ ! -d "$app" ]; then
-    # PRODUCT_NAME override can still leave love.app on older projects
-    if [ -d "$products/love.app" ]; then
-      app="$products/$APP_NAME.app"
-      mv "$products/love.app" "$app"
-      warn "renamed love.app to $APP_NAME.app"
-    else
-      warn "xcodebuild finished but no .app under $products"
-      find "$BUILD_DIR/Build/Products" -name '*.app' 2>/dev/null | head -20 || true
-      return 0
+  local app=""
+  local candidate
+  for candidate in "$products/$PRODUCT_NAME.app" "$products/$APP_NAME.app" "$products/love.app"; do
+    if [ -d "$candidate" ]; then
+      app="$candidate"
+      break
     fi
+  done
+  if [ -z "$app" ]; then
+    warn "xcodebuild finished but no .app under $products"
+    find "$BUILD_DIR/Build/Products" -name '*.app' 2>/dev/null | head -20 || true
+    return 0
+  fi
+  if [ "$app" != "$products/$APP_NAME.app" ]; then
+    mv "$app" "$products/$APP_NAME.app"
+    app="$products/$APP_NAME.app"
   fi
 
   verify_documents_configuration "$app"
@@ -760,7 +778,7 @@ run_xcodebuild() {
   fi
 }
 
-# Pack Payload/<app>.app into dist/ios/gen1recomp.ipa for release / sideload tools.
+# Pack Payload/<app>.app into dist/ios/gen1recomp++.ipa for release / sideload tools.
 package_ipa() {
   local app="$1"
   local ipa="$DIST/$APP_NAME.ipa"

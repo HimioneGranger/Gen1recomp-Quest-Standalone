@@ -179,9 +179,9 @@ end
 
 -- --------------------------------------------------------------- fixed damage
 
--- BattleCommand_LevelDamage / SuperFang / Psywave, all of which skip the
--- damage formula entirely.
-function Effects.fixedDamage(effect, attacker, defender, random)
+-- BattleCommand_ConstantDamage (engine/battle/effect_commands.asm:3131-3205),
+-- one command for the whole SuperFang / Psywave / StaticDamage list.
+function Effects.fixedDamage(effect, attacker, defender, random, power)
   if effect == "EFFECT_LEVEL_DAMAGE" then
     return math.max(1, attacker.level or 1)
   end
@@ -189,9 +189,17 @@ function Effects.fixedDamage(effect, attacker, defender, random)
     return math.max(1, math.floor((defender.hp or 1) / 2))
   end
   if effect == "EFFECT_PSYWAVE" then
-    -- 1..(level * 1.5), rerolled until it is in range; one roll is enough here.
-    local ceiling = math.max(1, math.floor((attacker.level or 1) * 3 / 2))
-    return math.max(1, (random and random(ceiling) or 0) + 1)
+    -- .psywave rerolls until the byte is nonzero AND below level * 1.5, so the
+    -- top of the range is that ceiling minus one (effect_commands.asm:3163).
+    local ceiling = math.max(2, math.floor((attacker.level or 1) * 3 / 2))
+    return math.max(1, (random and random(ceiling - 1) or 0) + 1)
+  end
+  -- SONIC BOOM and DRAGON RAGE share EFFECT_STATIC_DAMAGE, whose arm reads
+  -- BATTLE_VARS_MOVE_POWER straight into the damage word: their stored power
+  -- (20 and 40) IS the damage, never a formula input
+  -- (effect_commands.asm:3157-3161).
+  if effect == "EFFECT_STATIC_DAMAGE" then
+    return math.max(1, math.floor(power or 0))
   end
   return nil
 end

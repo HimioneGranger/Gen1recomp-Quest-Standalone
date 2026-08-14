@@ -159,10 +159,16 @@ local function newScreen(opts)
   return screen, battle, player, save, pushed
 end
 
+-- Battle lines end in `prompt`, and PromptButton waits on A or B with no
+-- frame countdown (home/joypad.asm:383-412), so a drain has to press like a
+-- player does rather than wait for a timer that never runs out.
 local function runToMenu(screen, cap)
   for _ = 1, (cap or 3000) do
+    local waiting = (screen.messageTimer or 0) > 0
+    if waiting then Input:overlayPressed("a") end
     Input:step()
     screen:update(1 / 60)
+    if waiting then Input:overlayReleased("a") end
     if screen.phase == "menu" then return true end
   end
   return false

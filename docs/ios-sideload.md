@@ -1,6 +1,6 @@
 # Sideload the iOS build with AltStore
 
-Every GitHub Release ships an IPA (`gen1recomp-*-ios.ipa`). Install it on
+Every GitHub Release ships an IPA (`gen1recomp++-*-ios.ipa`). Install it on
 your iPhone or iPad with [AltStore Classic](https://altstore.io/) — AltStore
 re-signs the app with **your** free Apple ID so you do not need a Mac or
 Xcode.
@@ -23,7 +23,7 @@ Stuck? Start here:
 
 ## 2. Install the game
 
-1. Download `gen1recomp-*-ios.ipa` from
+1. Download `gen1recomp++-*-ios.ipa` from
    [Releases](https://github.com/bryanthaboi/gen1recomp/releases).
 2. Open **AltStore** on the phone (AltServer must be running on the same
    Wi‑Fi, or keep the phone plugged into the computer).

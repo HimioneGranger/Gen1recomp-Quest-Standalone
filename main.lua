@@ -198,14 +198,19 @@ end
 local touchEditorHost
 local closeTouchControlsEditor  -- forward declaration
 
-local function openTouchControlsEditor()
+-- `version` is the launcher tab the gear was opened on, and it decides which
+-- option block the layout lands in (src/ui/TouchControlsEditor.lua persist).
+local function openTouchControlsEditor(version)
   touchEditorHost = Importer
   if Importer and Importer.prepareOverlayHandoff then
     Importer:prepareOverlayHandoff()
   end
   Importer = nil
   TouchEditor = require("src.ui.TouchControlsEditor")
-  TouchEditor.load({ onClose = function() closeTouchControlsEditor() end })
+  TouchEditor.load({
+    version = version,
+    onClose = function() closeTouchControlsEditor() end,
+  })
 end
 
 function closeTouchControlsEditor()

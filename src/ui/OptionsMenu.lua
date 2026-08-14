@@ -501,7 +501,7 @@ local function buildRows(game)
         return true
       end },
     -- Haptic feedback for on-screen pad presses (#806): OFF / LIGHT /
-    -- MEDIUM / HEAVY, where the intensity is a vibration duration --
+    -- NORMAL / STRONG, where the intensity is a vibration duration --
     -- love.system.vibrate takes nothing else.  Hidden with TOUCH PAD below,
     -- since the only thing that buzzes is a virtual button press.
     { id = "haptics", label = Strings("VIBRATION"),
@@ -515,7 +515,7 @@ local function buildRows(game)
         o.haptics = TC.cycleHaptics(o.haptics, dir)
         TC:applyOptions(o)
         -- sample the level being selected: stepping the row is the only way
-        -- to compare LIGHT against HEAVY without leaving the menu
+        -- to compare LIGHT against STRONG without leaving the menu
         TC.buzz(o.haptics)
         return true
       end },

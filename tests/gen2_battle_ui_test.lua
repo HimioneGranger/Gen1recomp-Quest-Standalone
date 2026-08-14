@@ -262,10 +262,21 @@ local function run(screen, frames)
   end
 end
 
+-- One frame of a drain.  Battle lines end in `prompt` and PromptButton waits
+-- on A or B with no countdown (home/joypad.asm:383-412); the stats box waits
+-- the same way (engine/battle/core.asm:7069), so a drain presses rather than
+-- idling for a timer that never runs out.
+local function drainStep(screen)
+  local waiting = (screen.messageTimer or 0) > 0 or screen.phase == "stats-box"
+  if waiting then Input:overlayPressed("a") end
+  Input:step()
+  screen:update(1 / 60)
+  if waiting then Input:overlayReleased("a") end
+end
+
 local function runToMenu(screen, cap)
   for _ = 1, (cap or 3000) do
-    Input:step()
-    screen:update(1 / 60)
+    drainStep(screen)
     if screen.phase == "menu" then return true end
   end
   return false
@@ -366,8 +377,7 @@ do
 
   local crawled, restarted = false, false
   for _ = 1, 3000 do
-    Input:step()
-    screen:update(1 / 60)
+    drainStep(screen)
     if screen.shownLevel == 5 and (screen.shownExp or 0) > startExp then
       crawled = true
     end
@@ -404,8 +414,7 @@ do
   local maxBefore = player.maxHp
   screen:submit({ kind = "move", move = "TACKLE" })
   for _ = 1, 3000 do
-    Input:step()
-    screen:update(1 / 60)
+    drainStep(screen)
     if screen.phase == "done" then break end
   end
   check(player.maxHp > maxBefore, "the level-up raised the maximum")
@@ -601,8 +610,7 @@ do
 
   local function runToPhase(screen, phase, cap)
     for _ = 1, (cap or 4000) do
-      Input:step()
-      screen:update(1 / 60)
+      drainStep(screen)
       if screen.phase == phase then return true end
     end
     return false
@@ -622,9 +630,15 @@ do
   noBattle.enemy.hp = 1
   local noTurn = noBattle.turn
   noScreen:submit({ kind = "move", move = "TACKLE" })
-  check(runToPhase(noScreen, "ask-shift"), "the KO stops on OfferSwitch")
+  -- The `para` in BattleText_EnemyIsAboutToUseWillPlayerChangeMon splits the
+  -- offer (data/text/battle.asm:222-231): the incoming mon is named on an
+  -- earlier page, and only the last one carries the yes/no box (#1158).
+  check(runToPhase(noScreen, "shift-intro"), "the KO stops on OfferSwitch")
   check((noScreen.message or ""):find("is about to use"),
     "with BattleText_EnemyIsAboutToUseWillPlayerChangeMon")
+  check(runToPhase(noScreen, "ask-shift"), "and its pages reach the question")
+  check((noScreen.message or ""):find("change POK"),
+    "whose last page is the one YesNoBox opens over")
 
   -- NO falls through to the send-out with nothing switched and nothing spent.
   noScreen.messageTimer = 0
@@ -1083,8 +1097,7 @@ do
   -- not ring is anything from the faint onward.
   local latched, rangAfterFaint, sawExpLine = false, false, false
   for _ = 1, 3000 do
-    Input:step()
-    screen:update(1 / 60)
+    drainStep(screen)
     if screen.lowHealthAlarmDisabled then latched = true end
     if latched and siren then rangAfterFaint = true end
     if latched and (screen.message or ""):find("EXP") then sawExpLine = true end
@@ -1155,7 +1168,9 @@ do
   eq(screen.phase, "refuse-move", "the disabled row is refused")
   eq(screen.message, "The move is DISABLED!", "with BattleText_TheMoveIsDisabled")
   eq(wild.hp, before, "and the enemy got no free turn")
-  run(screen, 120)
+  -- Both refusal lines end in `prompt` (data/text/battle.asm:315-323), so the
+  -- list comes back on a press, not on a timer.
+  tap("a")
   eq(screen.phase, "moves", "the list comes back")
 
   -- The same for a spent row.
@@ -1168,7 +1183,7 @@ do
   eq(screen.message, "There's no PP left for this move!",
      "with BattleText_TheresNoPPLeftForThisMove")
   eq(wild.hp, before, "and still no enemy turn")
-  run(screen, 120)
+  tap("a")
   eq(screen.phase, "moves", "and the list comes back again")
 end
 
@@ -1221,8 +1236,7 @@ end
 -- so the question is reached by pages rather than by one button.
 local function runToPhase(screen, phase, cap)
   for _ = 1, (cap or 900) do
-    Input:step()
-    screen:update(1 / 60)
+    drainStep(screen)
     if screen.phase == phase then return true end
   end
   return false
@@ -1236,11 +1250,15 @@ do
   check(runToPhase(screen, "ask-forget"), "and its pages run into the question")
   eq(screen.message, "move to make room\nfor EMBER?",
     "whose last page is the one YesNoBox opens over")
-  run(screen, 60)
   local tap = tapper(screen)
+  -- The question's own `prompt` is read first and YesNoBox opens after it,
+  -- exactly as OfferSwitch does (engine/battle/core.asm:3298-3305), so the
+  -- answer is the second press, not the first.
+  tap("a")
+  eq(screen.phase, "ask-forget", "the last page holds until it is read")
   tap("b")
   eq(screen.phase, "stop-learning", "NO there asks whether to stop learning")
-  run(screen, 60)
+  tap("a")
   tap("b")
   eq(screen.phase, "learn-intro", "and NO to THAT reprints the ask")
   check(runToPhase(screen, "ask-forget"), "which is a loop, not an exit")
@@ -1251,8 +1269,8 @@ end
 do
   local screen, lead = learnScreen()
   check(runToPhase(screen, "ask-forget"), "the pages reach the question")
-  run(screen, 60)
   local tap = tapper(screen)
+  tap("a")                      -- read the question
   tap("a")                      -- YES
   eq(screen.phase, "choose-forget", "YES opens the picker")
   tap("a")                      -- slot 1
@@ -1263,9 +1281,9 @@ end
 do
   local screen, lead = learnScreen()
   check(runToPhase(screen, "ask-forget"), "the pages reach the question")
-  run(screen, 60)
   local tap = tapper(screen)
-  tap("a")
+  tap("a")                      -- read the question
+  tap("a")                      -- YES
   eq(screen.phase, "choose-forget", "the picker is up")
   screen.forgetIndex = 4
   tap("a")
@@ -1273,7 +1291,7 @@ do
   eq(screen.message, "HM moves can't be\nforgotten now.",
     "with MoveCantForgetHMText")
   eq(screen.forgetIndex, 1, "and `jr .loop` puts the cursor back on slot 1")
-  run(screen, 60)
+  tap("a")
   eq(screen.phase, "choose-forget", "the picker is still up after the line")
   eq(lead.moves[4].id, "SURF", "and SURF is still there")
 end

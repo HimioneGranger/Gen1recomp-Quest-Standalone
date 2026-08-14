@@ -105,17 +105,21 @@ end
 -- would be dropped on every editor save.
 -- love.system.vibrate takes a duration and nothing else, so "intensity" is a
 -- duration preset: Android runs the platform vibrator for exactly that long,
--- while iOS ignores the duration and fires the fixed system vibration, so
--- there the three levels all read as simply on.
-TouchControls.HAPTICS = { "off", "light", "medium", "heavy" }
+-- while iOS maps each duration to a matching Taptic Engine impact.
+TouchControls.HAPTICS = { "off", "light", "normal", "strong" }
 TouchControls.HAPTIC_DEFAULT = "light"
 
-local HAPTIC_SECONDS = { off = 0, light = 0.012, medium = 0.025, heavy = 0.045 }
+local HAPTIC_SECONDS = {
+  off = 0, light = 0.012, normal = 0.025, strong = 0.045,
+}
 local HAPTIC_LABELS = {
-  off = "OFF", light = "LIGHT", medium = "MEDIUM", heavy = "HEAVY",
+  off = "OFF", light = "LIGHT", normal = "NORMAL", strong = "STRONG",
 }
 
 function TouchControls.normalizeHaptics(level)
+  if level == "physical" then return "light" end
+  if level == "medium" then return "normal" end
+  if level == "heavy" then return "strong" end
   if HAPTIC_SECONDS[level] then return level end
   return TouchControls.HAPTIC_DEFAULT
 end

@@ -1604,9 +1604,25 @@ function Battle:useMove(attacker, defender, moveId)
     return
   end
 
-  -- Damage that skips the formula entirely.
-  local fixed = Effects.fixedDamage(def.effect, attacker, defender, self.random)
+  -- Damage that skips the formula entirely.  The move's own power goes with
+  -- it: EFFECT_STATIC_DAMAGE's arm of BattleCommand_ConstantDamage reads
+  -- BATTLE_VARS_MOVE_POWER as the damage (effect_commands.asm:3157-3161).
+  local fixed = Effects.fixedDamage(def.effect, attacker, defender, self.random,
+    def.power)
   if fixed then
+    -- The constant-damage effect list carries `resettypematchup` instead of
+    -- `stab`, and that command misses the move outright when the matchup byte
+    -- is 0 (effect_commands.asm:1480-1493) -- an immune target is the one
+    -- thing that stops SONIC BOOM, NIGHT SHADE or SUPER FANG.
+    local defenderTypes = (self:speciesDef(defender) or {}).types
+      or defender.types
+    local matchups = self.data.type_chart and self.data.type_chart.matchups
+    if Damage.typeMultiplier(def.type, defenderTypes, matchups) == 0 then
+      self:markMissed()
+      self:emit({ kind = "message",
+        text = "It doesn't affect " .. self:monName(defender) .. "..." })
+      return
+    end
     self:dealDamage(attacker, defender, fixed, { move = def, moveId = moveId })
     return
   end

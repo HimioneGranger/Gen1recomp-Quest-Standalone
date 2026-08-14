@@ -3946,7 +3946,8 @@ function World:rollEncounter(kind, terrain, tables, vanilla)
   local ctx = {
     mapId = map and map.id,
     terrain = terrain,
-    rng = love.math.random,
+    -- Same guard World:rockRandom uses: a headless suite has no love global.
+    rng = (love and love.math and love.math.random) or math.random,
     kind = kind,
     daytime = self.daytime,
     environment = map and map.def and map.def.environment,

@@ -62,6 +62,68 @@ local FILTERS = { "OFF", "1X", "2X", "3X" }
 -- The core rows.  Helper modules are required lazily under pcall: they are
 -- pure label/cycle tables, but the launcher must never die because a render
 -- module grew a dependency on live game data.
+-- TOUCH PAD, VIBRATION and the layout editor, shared by both row sets.
+--
+-- Gold reads these out of its own `gold` block (src/core/gen2/Save.lua:297),
+-- so `opts` is whichever table the gear is editing and the rows never have to
+-- know which game they belong to.  #1100 / #1135: the Gold gear carried none
+-- of them, so a phone player could turn the pad and the buzz off in Red and
+-- had no way to reach either in Gold.
+local function addTouchRows(rows, add, opts, hooks)
+  -- TOUCH PAD only where the overlay can appear, mirroring OptionsMenu's
+  -- gate (mobile, or desktop forced by POKEPORT_TOUCH=1).
+  local env = os.getenv("POKEPORT_TOUCH")
+  local osName = love.system and love.system.getOS and love.system.getOS()
+  local show = env == "1"
+    or (env ~= "0" and (osName == "Android" or osName == "iOS"))
+  if show then
+    add(Strings("TOUCH PAD"),
+      function()
+        local tc = opts.touchControls
+        local on = not (type(tc) == "table" and tc.enabled == false)
+        return on and Strings("ON") or Strings("OFF")
+      end,
+      function()
+        local tc = type(opts.touchControls) == "table" and opts.touchControls or {}
+        tc.enabled = tc.enabled == false
+        opts.touchControls = tc
+        return true
+      end)
+    -- VIBRATION sits with it (#806): same gate, same subsystem.  Stepping
+    -- the row buzzes once at the level being selected.
+    local okTC, TC = pcall(require, "src.core.TouchControls")
+    if okTC then
+      add(Strings("VIBRATION"),
+        function() return Strings(TC.hapticLabel(opts.haptics)) end,
+        function(dir)
+          opts.haptics = TC.cycleHaptics(opts.haptics, dir)
+          TC.buzz(opts.haptics)
+          return true
+        end)
+    end
+  end
+
+  -- TOUCH CONTROLS, the on-screen pad's layout editor.  It used to be a
+  -- button on the game panel, once per game -- but the overlay layout is
+  -- global (options.touchControls.layouts), so three tabs offered three
+  -- buttons that edited the same thing while crowding the column that has to
+  -- hold Play.  It belongs with the other control rows, behind the gear.
+  -- The host owns the editor screen, so the row only fires when a hook was
+  -- supplied (the standalone save editor opens this model with none).
+  if hooks and hooks.editTouchControls then
+    rows[#rows + 1] = {
+      label = Strings("TOUCH CONTROLS"),
+      actionLabel = Strings("Edit"),
+      action = function()
+        hooks.editTouchControls()
+        -- The editor replaces the whole screen: nothing left to persist here
+        -- beyond what the caller already saved on the way out.
+        return false
+      end,
+    }
+  end
+end
+
 local function coreRows(opts, hooks)
   local rows = {}
   local function add(label, value, step)
@@ -236,60 +298,7 @@ local function coreRows(opts, hooks)
       end)
   end
 
-  -- TOUCH PAD only where the overlay can appear, mirroring OptionsMenu's
-  -- gate (mobile, or desktop forced by POKEPORT_TOUCH=1).
-  do
-    local env = os.getenv("POKEPORT_TOUCH")
-    local osName = love.system and love.system.getOS and love.system.getOS()
-    local show = env == "1"
-      or (env ~= "0" and (osName == "Android" or osName == "iOS"))
-    if show then
-      add(Strings("TOUCH PAD"),
-        function()
-          local tc = opts.touchControls
-          local on = not (type(tc) == "table" and tc.enabled == false)
-          return on and Strings("ON") or Strings("OFF")
-        end,
-        function()
-          local tc = type(opts.touchControls) == "table" and opts.touchControls or {}
-          tc.enabled = tc.enabled == false
-          opts.touchControls = tc
-          return true
-        end)
-      -- VIBRATION sits with it (#806): same gate, same subsystem.  Stepping
-      -- the row buzzes once at the level being selected.
-      local okTC, TC = pcall(require, "src.core.TouchControls")
-      if okTC then
-        add(Strings("VIBRATION"),
-          function() return Strings(TC.hapticLabel(opts.haptics)) end,
-          function(dir)
-            opts.haptics = TC.cycleHaptics(opts.haptics, dir)
-            TC.buzz(opts.haptics)
-            return true
-          end)
-      end
-    end
-  end
-
-  -- TOUCH CONTROLS, the on-screen pad's layout editor.  It used to be a
-  -- button on the game panel, once per game -- but the overlay layout is
-  -- global (options.touchControls.layouts), so three tabs offered three
-  -- buttons that edited the same thing while crowding the column that has to
-  -- hold Play.  It belongs with the other control rows, behind the gear.
-  -- The host owns the editor screen, so the row only fires when a hook was
-  -- supplied (the standalone save editor opens this model with none).
-  if hooks and hooks.editTouchControls then
-    rows[#rows + 1] = {
-      label = Strings("TOUCH CONTROLS"),
-      actionLabel = Strings("Edit"),
-      action = function()
-        hooks.editTouchControls()
-        -- The editor replaces the whole screen: nothing left to persist here
-        -- beyond what the caller already saved on the way out.
-        return false
-      end,
-    }
-  end
+  addTouchRows(rows, add, opts, hooks)
 
   -- RESET REBINDS, directly under the touch-pad row.  Rebinds are additive
   -- (src/core/Input.lua:applyBindings layers options.bindings over the
@@ -462,7 +471,7 @@ end
 -- src/ui/gen2/OptionsMenu.lua's ROWS; when editing one, keep the two in sync.
 local GEN2_KEY = "gold"
 
-local function gen2Rows(opts)
+local function gen2Rows(opts, hooks)
   local rows = {}
   local function add(label, value, step)
     rows[#rows + 1] = { label = label, value = value, step = step }
@@ -551,6 +560,8 @@ local function gen2Rows(opts)
       end)
   end
 
+  addTouchRows(rows, add, opts, hooks)
+
   return rows
 end
 
@@ -574,7 +585,7 @@ function LauncherSettings.open(hooks, version)
       opts[GEN2_KEY] = block
     end
     sections = {
-      { title = Strings("OPTIONS"), rows = gen2Rows(block) },
+      { title = Strings("OPTIONS"), rows = gen2Rows(block, hooks) },
     }
   else
     sections = {

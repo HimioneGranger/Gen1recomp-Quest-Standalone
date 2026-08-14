@@ -2652,11 +2652,14 @@ function RomImporter:_openSettings()
   -- hook rather than reaching for main.lua's handler itself.  Closing the
   -- settings panel FIRST persists the pending edits (_closeSettings saves)
   -- and leaves no modal behind the editor to return to.
+  -- The tab rides along: the editor persists the layout into that game's own
+  -- option block, and Gold's is not the flat Gen 1 one (#1100).
   local hooks = {}
   if self.onEditTouchControls then
+    local version = self.tab
     hooks.editTouchControls = function()
       self:_closeSettings()
-      self.onEditTouchControls()
+      self.onEditTouchControls(version)
     end
   end
   -- The tab the gear was opened on decides the row set: Gold reads a

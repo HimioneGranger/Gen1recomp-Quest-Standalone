@@ -21,6 +21,7 @@ local Net = require("src.link.Net")
 local Pokemon = require("src.pokemon.Pokemon")
 local Protocol = require("src.link.Protocol")
 local Runtime = require("src.mods.Runtime")
+local Session = require("src.link.Session")
 
 local S = require("tests.harness").suite("mod link")
 local check, eq = S.check, S.eq
@@ -529,11 +530,19 @@ local function linkGame(name, species, data)
   return { data = data or Data, save = save, stack = stack, input = mkInput() }
 end
 
+-- LinkState talks to a Session, not to a raw transport (src/link/LinkState.lua
+-- :75 wraps every backend the same way), so a loopback end has to be wrapped
+-- here too or :update reaches for a getStatus the transport does not have.
+local function linkSession(transport, role)
+  return Session.new(transport, { role = role, kind = "link" })
+end
+
 -- two paired states, host already listening and guest already dialling
 local function pairStates(gameA, gameB)
   local netA, netB = Net.loopbackPair()
   local host, guest = LinkState.new(gameA), LinkState.new(gameB)
-  host.net, guest.net = netA, netB
+  host.net = linkSession(netA, "host")
+  guest.net = linkSession(netB, "guest")
   host.stage, guest.stage = "hosting", "joining"
   gameA.stack:push(host)
   gameB.stack:push(guest)
@@ -573,7 +582,7 @@ check(host.trade.strict, "a v2 verdict unpacks strictly")
 local gameOld = linkGame("RED", "PIDGEY")
 local oldNet, peerNet = Net.loopbackPair()
 local v1guest = LinkState.new(gameOld)
-v1guest.net = oldNet
+v1guest.net = linkSession(oldNet, "guest")
 v1guest.stage = "joining"
 gameOld.stack:push(v1guest)
 v1guest:update(1 / 60)
@@ -591,7 +600,7 @@ check(not v1guest.trade.strict, "the v1 path keeps the old unpack rules")
 local gameLone = linkGame("RED", "PIDGEY")
 local loneNet, silentNet = Net.loopbackPair()
 local v1host = LinkState.new(gameLone)
-v1host.net = loneNet
+v1host.net = linkSession(loneNet, "host")
 v1host.stage = "hosting"
 gameLone.stack:push(v1host)
 v1host:update(1 / 60)
