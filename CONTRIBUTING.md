@@ -8,7 +8,7 @@ the decision; a branch contains the work; a pull request is the handoff.
 
 1. Pick or open an issue and write the intended outcome in one sentence.
 2. Assign one driver and add the other partner as reviewer.
-3. Branch from `quest-openxr` using `feature/<topic>`, `fix/<topic>`, or
+3. Branch from `quest-stable` using `feature/<topic>`, `fix/<topic>`, or
    `release/<version>`.
 4. Make one concern per pull request. Draft pull requests are encouraged for
    work that needs early testing or design input.
@@ -29,6 +29,9 @@ the decision; a branch contains the work; a pull request is the handoff.
 
 Changes may cross lanes, but the pull request must name the affected lanes so
 the right person reviews each boundary.
+
+`quest-openxr` preserves the earlier experimental mesher and panel work. Treat
+it as a research/archive branch; do not use it as the base for public releases.
 
 ## Local checks
 

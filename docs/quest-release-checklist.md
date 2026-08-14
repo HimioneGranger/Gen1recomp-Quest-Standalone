@@ -6,7 +6,7 @@ without guessing what has already happened.
 
 ## 1. Prepare
 
-- [ ] Create `release/<version>` from the current `quest-openxr` branch.
+- [ ] Create `release/<version>` from the current `quest-stable` branch.
 - [ ] Merge the intended upstream Gen1Recomp tag and resolve conflicts without
       dropping the packaged Quest display backend or completed-frame hook.
 - [ ] Update the version, release notes, README download name, and launcher
