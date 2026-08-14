@@ -114,6 +114,21 @@ local TEST_MODS = outer("PK\3\4test-mods", {
   ["alpha.modpkg"] = A,
   ["bravo.zip"] = B,
 })
+-- Same top-level carrier shape as the user-present TestMods.zip: unrelated
+-- README plus ten nested package archives, and no outer manifest.
+local exactNames = { "BATTLE_ART_VOXEL_FORK-1.8.6-clean.zip",
+  "CRYSTAL251_ROM_SPRITE_PROVIDER-0.1.5.zip", "CRYSTAL_251-0.10.3.zip",
+  "HGSS_QUEST_CACHE_BRIDGE-0.1.0.zip", "HGSS_SPRITES-0.3.0.zip",
+  "IMPORT_ME__WILDS_OF_KANTO_QUEST__v2.0.1-quest.11.zip",
+  "KANTO_FIRST_PERSON-1.60.0-quest.7.zip", "ROM_CACHE_PIDGEY_FLYER_PROVIDER-0.1.0.zip",
+  "wild_skies-1.8.0.zip" }
+local exactTree = { ["README.md"] = "bundle notes" }
+for i, name in ipairs(exactNames) do
+  local data = "PK\3\4exact-" .. i
+  archives[data] = pkg("exact_" .. i)
+  exactTree[name] = data
+end
+local EXACT_SHAPE = outer("PK\3\4exact-test-mods", exactTree)
 
 local savedFs = love.filesystem
 local SaveData = require("src.core.SaveData")
@@ -167,6 +182,11 @@ for _, event in ipairs(checkEvents) do
   cancelledWrites = cancelledWrites and event[1] ~= "installing"
 end
 check(cancelledWrites, "cancel after confirmation leaves no partial import or install progress")
+
+files["imports/exact-TestMods.zip"] = EXACT_SHAPE
+local exactPlan, exactErr = LauncherMods.prepareBundle("imports/exact-TestMods.zip")
+check(exactPlan ~= nil and #(exactPlan.members or {}) == 9,
+  "exact TestMods top-level carrier routes to bundle preflight (" .. tostring(exactErr) .. ")")
 check(checkEvents[1] and checkEvents[1][1] == "scanning"
   and checkEvents[2] and checkEvents[2][1] == "checking"
   and checkEvents[2][2] == 1 and checkEvents[2][3] == 2

@@ -1756,11 +1756,6 @@ function RomImporter:_installMod(source, done)
       self:_setModProgress(...)
       coroutine.yield()
     end
-    local installed, res = LauncherMods._installZipInner(source, { progress = progress })
-    if installed then
-      self:_finishModWork(true, "Installed " .. tostring(res), done)
-      return
-    end
     local plan, bundleErr = LauncherMods._prepareBundleInner(source, progress)
     if plan then
       local lines = { "Found " .. tostring(#plan.members) .. " valid mod packages:" }
@@ -1778,9 +1773,19 @@ function RomImporter:_installMod(source, done)
         lines = lines, done = done }
       return
     end
-    local reason = bundleErr
-    if reason == "this archive is already a mod package" then reason = res end
-    self:_finishModWork(false, tostring(reason), done)
+    -- A valid direct package reaches this point with the explicit marker
+    -- below.  Assess bundles first so a manifest-less SAF carrier can never
+    -- be stranded on the direct importer's "no manifest" result.
+    if bundleErr ~= "this archive is already a mod package" then
+      self:_finishModWork(false, tostring(bundleErr), done)
+      return
+    end
+    local installed, res = LauncherMods._installZipInner(source, { progress = progress })
+    if installed then
+      self:_finishModWork(true, "Installed " .. tostring(res), done)
+    else
+      self:_finishModWork(false, tostring(res), done)
+    end
   end)
 end
 
