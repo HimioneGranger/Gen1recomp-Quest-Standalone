@@ -42,6 +42,7 @@ body:
         - Windows
         - Linux
         - Android
+        - Meta Quest
         - iOS
         - Multiple platforms
     validations:

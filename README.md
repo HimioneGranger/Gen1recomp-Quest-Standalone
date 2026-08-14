@@ -45,6 +45,14 @@ import and voxel mesh preparation can take longer than later launches.
 For updates, install the new APK with `adb install -r` so Android keeps the
 existing app data. Back up important saves before upgrading.
 
+### Collaborating
+
+Development is coordinated in GitHub issues and pull requests so either
+partner can see the current decision, reproduce the work, and take over when
+needed. Start with [CONTRIBUTING.md](CONTRIBUTING.md); Quest releases use the
+[Quest release checklist](docs/quest-release-checklist.md). Mod and mod-API
+changes also follow [CONTRIBUTING-mods.md](CONTRIBUTING-mods.md).
+
 **SUPPORT / ANNOUNCEMENTS / MODS:** [Discord](https://bois.icu)
 
 <p align="center">
