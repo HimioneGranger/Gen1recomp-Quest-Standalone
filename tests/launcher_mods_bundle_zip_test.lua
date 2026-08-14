@@ -139,27 +139,82 @@ local LauncherMods = freshMods()
 -- A direct package remains the old one-package flow.
 reset()
 files["imports/direct.zip"] = A
-local ok, id = LauncherMods.installZip("imports/direct.zip")
+local directEvents = {}
+local ok, id = LauncherMods.installZip("imports/direct.zip", { progress = function(phase, index, total, modId)
+  directEvents[#directEvents + 1] = { phase, index, total, modId }
+end })
 check(ok == true and id == "alpha", "direct package keeps normal import behavior")
 check(files["mods/alpha/manifest.json"] ~= nil, "direct package lands in its normal destination")
+check(directEvents[1] and directEvents[1][1] == "checking"
+  and directEvents[2] and directEvents[2][1] == "installing"
+  and directEvents[2][2] == 1 and directEvents[2][3] == 1
+  and directEvents[#directEvents][1] == "complete",
+  "direct package reports truthful single-package stages")
 
 -- TestMods-style carrier: README is ignored, both root package files are
 -- checked before confirmation, and prepare itself makes no change.
 reset()
 files["imports/TestMods.zip"] = TEST_MODS
-local plan, err = LauncherMods.prepareBundle("imports/TestMods.zip")
+local checkEvents = {}
+local plan, err = LauncherMods.prepareBundle("imports/TestMods.zip", function(phase, index, total, modId, bytes, totalBytes, fileCount, totalFiles)
+  checkEvents[#checkEvents + 1] = { phase, index, total, modId, bytes, totalBytes, fileCount, totalFiles }
+end)
 check(plan ~= nil, "bundle with README and valid packages prepares (" .. tostring(err) .. ")")
 eq(#(plan and plan.members or {}), 2, "README is ignored and two packages are found")
 check(files["mods/alpha/manifest.json"] == nil, "prepare/cancel leaves mod storage unchanged")
-ok, id = LauncherMods.installBundle(plan)
+local cancelledWrites = files["mods/alpha/manifest.json"] == nil
+for _, event in ipairs(checkEvents) do
+  cancelledWrites = cancelledWrites and event[1] ~= "installing"
+end
+check(cancelledWrites, "cancel after confirmation leaves no partial import or install progress")
+check(checkEvents[1] and checkEvents[1][1] == "scanning"
+  and checkEvents[2] and checkEvents[2][1] == "checking"
+  and checkEvents[2][2] == 1 and checkEvents[2][3] == 2
+  and checkEvents[#checkEvents][2] == 2,
+  "bundle assessment reports count-based checking progress")
+local installEvents = {}
+ok, id = LauncherMods.installBundle(plan, function(phase, index, total, modId, bytes, totalBytes, fileCount, totalFiles)
+  installEvents[#installEvents + 1] = { phase, index, total, modId, bytes, totalBytes, fileCount, totalFiles }
+end)
 check(ok == true, "prepared TestMods bundle installs atomically (" .. tostring(id) .. ")")
 check(files["mods/alpha/manifest.json"] ~= nil and files["mods/bravo/manifest.json"] ~= nil,
   "valid bundle imports each package through the normal mod tree")
+local sawInstallBytes, sawSecondInstall, sawComplete = false, false, false
+for _, event in ipairs(installEvents) do
+  if event[1] == "installing" and event[2] == 1 and event[5] and event[6]
+      and event[5] > 0 and event[6] > 0 then sawInstallBytes = true end
+  if event[1] == "installing" and event[2] == 2 and event[3] == 2 then sawSecondInstall = true end
+  if event[1] == "complete" then sawComplete = true end
+end
+check(sawInstallBytes and sawSecondInstall and sawComplete,
+  "bundle install reports measured file work, overall count, and completion")
+
+-- The launcher calls the internal form from a coroutine.  This proves the
+-- progress hooks may yield between real archive operations (rather than only
+-- changing state during one frozen frame), while still doing no writes before
+-- the user confirms the plan.
+reset()
+files["imports/yielding-preflight.zip"] = TEST_MODS
+local yieldedPlan, yieldedErr, yieldCount
+local co = coroutine.create(function()
+  yieldedPlan, yieldedErr = LauncherMods._prepareBundleInner("imports/yielding-preflight.zip", function()
+    yieldCount = (yieldCount or 0) + 1
+    coroutine.yield()
+  end)
+end)
+while coroutine.status(co) ~= "dead" do
+  local resumed, resumeErr = coroutine.resume(co)
+  check(resumed, "coroutine preflight resumes (" .. tostring(resumeErr) .. ")")
+end
+check(yieldedPlan ~= nil and yieldedErr == nil and (yieldCount or 0) >= 4,
+  "preflight yields through real progress points")
+check(files["mods/alpha/manifest.json"] == nil,
+  "yielding preflight still writes nothing before confirmation")
 
 reset()
 files["imports/bad-inner.zip"] = outer("PK\3\4bad-inner", { ["bad.zip"] = BAD })
 plan, err = LauncherMods.prepareBundle("imports/bad-inner.zip")
-check(not plan and tostring(err):find("invalid package", 1, true), "invalid inner ZIP fails before confirmation")
+check(not plan and tostring(err):find("package is invalid", 1, true), "invalid inner ZIP fails before confirmation")
 
 reset()
 files["imports/duplicate.zip"] = outer("PK\3\4duplicate-bundle", { ["a.zip"] = A, ["b.zip"] = DUP })
@@ -176,10 +231,14 @@ reset()
 files["imports/rollback.zip"] = TEST_MODS
 plan = assert(LauncherMods.prepareBundle("imports/rollback.zip"))
 failPrefix = "mods/bravo/"
-ok, err = LauncherMods.installBundle(plan)
+local rollbackEvents = {}
+ok, err = LauncherMods.installBundle(plan, function(phase)
+  rollbackEvents[#rollbackEvents + 1] = phase
+end)
 check(not ok and tostring(err):find("no mods were installed", 1, true), "partial copy reports rollback")
 check(files["mods/alpha/manifest.json"] == nil and files["mods/bravo/manifest.json"] == nil,
   "partial copy leaves no new active mod state")
+check(rollbackEvents[#rollbackEvents] == "rollback", "failed bundle finishes progress in rollback")
 
 reset()
 files["imports/readme-only.zip"] = outer("PK\3\4readme-only", { ["README.md"] = "nothing here" })
