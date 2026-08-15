@@ -327,8 +327,8 @@ check(not plan and tostring(err):find("larger than", 1, true), "outer archive si
 -- byte is refused before any package is copied.
 reset()
 local atTotalMemberBytes = math.floor(LauncherMods.BUNDLE_LIMITS.maxTotalMemberBytes / 2)
-local AT_MEMBER_A, AT_MEMBER_B = "PKa", "PKb"
-local ONE_MORE_MEMBER = "PKc"
+local AT_MEMBER_A, AT_MEMBER_B = "PK\3\4a", "PK\3\4b"
+local ONE_MORE_MEMBER = "PK\3\4c"
 archives[AT_MEMBER_A] = pkg("at_member_a")
 archives[AT_MEMBER_B] = pkg("at_member_b")
 archives[ONE_MORE_MEMBER] = pkg("one_more_member")
@@ -342,7 +342,7 @@ check(plan ~= nil and #(plan.members or {}) == 2,
   "nested archives exactly at the total byte limit prepare (" .. tostring(err) .. ")")
 
 reset()
-local AT_MEMBER_LIMIT = "PKd"
+local AT_MEMBER_LIMIT = "PK\3\4d"
 archives[AT_MEMBER_LIMIT] = pkg("at_member_limit")
 sizeHints[AT_MEMBER_LIMIT] = LauncherMods.BUNDLE_LIMITS.maxMemberBytes
 files["imports/at-member-limit.zip"] = outer("PK\3\4at-member-limit-outer", {
@@ -364,7 +364,7 @@ check(not plan and tostring(err):find("exceed", 1, true),
   "nested archive total one byte over the limit is refused before confirmation")
 
 reset()
-local TOO_LARGE_MEMBER = "PKm"
+local TOO_LARGE_MEMBER = "PK\3\4m"
 archives[TOO_LARGE_MEMBER] = pkg("too_large_member")
 sizeHints[TOO_LARGE_MEMBER] = LauncherMods.BUNDLE_LIMITS.maxMemberBytes + 1
 files["imports/too-large-member.zip"] = outer("PK\3\4too-large-member-outer", {
