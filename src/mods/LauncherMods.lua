@@ -580,13 +580,28 @@ end
 -- import.  This keeps README files harmless and gives nested packages no path
 -- outside the game's controlled filesystem.
 local BUNDLE_LIMITS = {
-  maxOuterBytes = 40 * 1024 * 1024,
+  -- The outer carrier and the sum of its immediate package archives may each
+  -- be at most 100 MiB. Bundle handling mounts the carrier from storage and
+  -- stages one inner archive at a time, so it never retains the carrier plus
+  -- every nested archive in Lua memory. This is a product limit, not a
+  -- measured Quest storage maximum; a user-present capacity benchmark still
+  -- validates practical headroom.
+  maxOuterBytes = 100 * 1024 * 1024,
   maxMembers = 16,
-  maxMemberBytes = 8 * 1024 * 1024,
-  maxTotalMemberBytes = 32 * 1024 * 1024,
-  maxFilesPerMember = 256,
-  maxMemberFileBytes = 4 * 1024 * 1024,
-  maxMemberExpandedBytes = 32 * 1024 * 1024,
+  -- Do not set a smaller compressed-member cap: one legitimate member may
+  -- use the whole bundle budget. The aggregate cap remains the hard bound.
+  maxMemberBytes = 100 * 1024 * 1024,
+  maxTotalMemberBytes = 100 * 1024 * 1024,
+  maxFilesPerMember = 16 * 1024,
+  maxTotalFiles = 32 * 1024,
+  -- Files are copied one at a time. These independent expanded-data bounds
+  -- block zip bombs and reserve disk space before any install is written.
+  maxMemberFileBytes = 8 * 1024 * 1024,
+  maxMemberExpandedBytes = 128 * 1024 * 1024,
+  maxTotalExpandedBytes = 192 * 1024 * 1024,
+  -- Do not consume the final free bytes: Android needs working storage for
+  -- the app, PhysFS, and the system while a confirmed import writes files.
+  minFreeBytes = 64 * 1024 * 1024,
   maxPathDepth = 8,
   maxPathBytes = 240,
 }
@@ -621,6 +636,73 @@ local function mountArchiveBytes(data, tag)
     pcall(fs.unmount, mountKey)
     if tmp then pcall(fs.remove, tmp) end
   end
+end
+
+-- Mount an archive that already exists in LOVE's writable filesystem. This is
+-- the bundle path on Android: SAF has copied the carrier to picked_mod.zip,
+-- so PhysFS can read its central directory and entries from disk without a
+-- second Lua copy of the whole outer ZIP.
+local function mountArchivePath(path, tag)
+  local fs = love and love.filesystem
+  if not fs or type(path) ~= "string" then return nil, "mod import needs a staged archive" end
+  bundleMountSerial = bundleMountSerial + 1
+  local mount = "mod_" .. tag .. "_mount_" .. tostring(os.time()) .. "_" .. tostring(bundleMountSerial)
+  if not fs.mount(path, mount) then return nil, "that archive could not be opened" end
+  return mount, function() pcall(fs.unmount, path) end
+end
+
+local function newBundleStageName(tag)
+  bundleMountSerial = bundleMountSerial + 1
+  return "mod_bundle_stage_" .. tostring(tag) .. "_" .. tostring(os.time())
+    .. "_" .. tostring(bundleMountSerial) .. ".zip"
+end
+
+-- Copy one mounted inner archive to a temporary file in 64 KiB blocks. The
+-- temporary archive is then mounted and validated. This is deliberately a
+-- disk stage, not love.filesystem.read: an outer 100 MiB bundle with one 100
+-- MiB member must not create two large Lua strings.
+local function stageMountedArchive(sourcePath, tag, maxBytes, progress)
+  local fs = love and love.filesystem
+  if not fs then return nil, "mod import needs LOVE" end
+  local info = fs.getInfo(sourcePath, "file")
+  if not info then return nil, "could not read a bundle package" end
+  if info.size and info.size > maxBytes then
+    return nil, "a bundle package is larger than " .. tostring(maxBytes) .. " bytes"
+  end
+  if not fs.newFile then
+    -- Test doubles before LOVE 11's streaming File API keep this small-data
+    -- fallback. Production Quest builds always have newFile.
+    local data = fs.read(sourcePath)
+    if type(data) ~= "string" then return nil, "could not read a bundle package" end
+    local logicalBytes = info.size or #data
+    if logicalBytes > maxBytes then
+      return nil, "a bundle package is larger than " .. tostring(maxBytes) .. " bytes"
+    end
+    return data, function() end, logicalBytes, true
+  end
+  local input, output
+  local stage = newBundleStageName(tag)
+  local ok, err = pcall(function()
+    input = assert(fs.newFile(sourcePath, "r"))
+    output = assert(fs.newFile(stage, "w"))
+    local copied = 0
+    while true do
+      local chunk, size = input:read(64 * 1024)
+      size = size or (type(chunk) == "string" and #chunk or 0)
+      if size == 0 then break end
+      if type(chunk) ~= "string" or not output:write(chunk) then
+        error("could not stage a bundle package")
+      end
+      copied = copied + size
+      if copied > maxBytes then error("a bundle package is larger than " .. tostring(maxBytes) .. " bytes") end
+      if progress then progress(copied, info.size) end
+    end
+    if info.size and copied ~= info.size then error("bundle package changed while it was read") end
+  end)
+  if input then pcall(input.close, input) end
+  if output then pcall(output.close, output) end
+  if not ok then pcall(fs.remove, stage); return nil, tostring(err) end
+  return stage, function() pcall(fs.remove, stage) end, info.size or 0, false
 end
 
 local function safeArchiveName(name)
@@ -662,7 +744,8 @@ local function scanPackageTree(root, onFile)
         if state.files > BUNDLE_LIMITS.maxFilesPerMember then
           return nil, "package has more than " .. BUNDLE_LIMITS.maxFilesPerMember .. " files"
         end
-        if info.size and info.size > BUNDLE_LIMITS.maxMemberFileBytes then
+        local fileBytes = info.size
+        if fileBytes and fileBytes > BUNDLE_LIMITS.maxMemberFileBytes then
           return nil, "package file is larger than " .. BUNDLE_LIMITS.maxMemberFileBytes .. " bytes"
         end
         local data = fs.read(child)
@@ -670,7 +753,11 @@ local function scanPackageTree(root, onFile)
         if #data > BUNDLE_LIMITS.maxMemberFileBytes then
           return nil, "package file is larger than " .. BUNDLE_LIMITS.maxMemberFileBytes .. " bytes"
         end
-        state.bytes = state.bytes + #data
+        -- PhysFS reports the uncompressed entry size before this bounded read.
+        -- Use it for the aggregate bomb budget so an archive cannot hide its
+        -- expansion behind a short read from a broken provider.
+        fileBytes = fileBytes or #data
+        state.bytes = state.bytes + fileBytes
         if state.bytes > BUNDLE_LIMITS.maxMemberExpandedBytes then
           return nil, "package expands beyond " .. BUNDLE_LIMITS.maxMemberExpandedBytes .. " bytes"
         end
@@ -686,10 +773,7 @@ local function scanPackageTree(root, onFile)
   return true, nil, state
 end
 
-local function openValidatedPackage(data, tag, onFile)
-  if not zipLooksValid(data) then return nil, "not a zip file" end
-  local mount, cleanup = mountArchiveBytes(data, tag)
-  if not mount then return nil, cleanup end
+local function validateMountedPackage(mount, cleanup, onFile)
   local function fail(err)
     cleanup()
     return nil, err
@@ -716,6 +800,19 @@ local function openValidatedPackage(data, tag, onFile)
     tree = treeState }
 end
 
+local function openValidatedPackage(data, tag, onFile)
+  if not zipLooksValid(data) then return nil, "not a zip file" end
+  local mount, cleanup = mountArchiveBytes(data, tag)
+  if not mount then return nil, cleanup end
+  return validateMountedPackage(mount, cleanup, onFile)
+end
+
+local function openValidatedPackageFile(path, tag, onFile)
+  local mount, cleanup = mountArchivePath(path, tag)
+  if not mount then return nil, cleanup end
+  return validateMountedPackage(mount, cleanup, onFile)
+end
+
 local function compatibleConflict(a, b)
   for _, spec in ipairs(a.conflictSpecs or {}) do
     if spec.id == b.id and (not spec.range or Semver.satisfies(b.version, spec.range)) then
@@ -729,8 +826,55 @@ local function emitProgress(progress, phase, index, total, id, bytes, totalBytes
   if progress then progress(phase, index, total, id, bytes, totalBytes, files, totalFiles) end
 end
 
+local function bundleFreeBytes()
+  if not (love and love.system and love.system.getOS and love.system.getOS() == "Android") then
+    return nil
+  end
+  local fn = love.system.getStorageFreeBytes
+  if type(fn) ~= "function" then return false end
+  local path = love.filesystem and love.filesystem.getSaveDirectory
+    and love.filesystem.getSaveDirectory() or ""
+  local ok, bytes = pcall(fn, path)
+  return ok and type(bytes) == "number" and bytes >= 0 and bytes or false
+end
+
+local function ensureBundleSpace(required)
+  local free = bundleFreeBytes()
+  if free == nil then return true end -- desktop / test runtime
+  if free == false then return nil, "could not check free storage for the bundle import" end
+  if free < required then
+    return nil, "not enough free storage for the bundle import (need "
+      .. tostring(required) .. " bytes free)"
+  end
+  return true
+end
+
+local function openBundleMember(outerMount, member, tag, index, total, progress, onFile)
+  local source = outerMount .. "/" .. member.name
+  local staged, stageCleanup, bytes, inMemory = stageMountedArchive(source, tag,
+    BUNDLE_LIMITS.maxMemberBytes, function(done, expected)
+      emitProgress(progress, "staging", index, total, nil, done, expected)
+    end)
+  if not staged then return nil, stageCleanup end
+  if member.size and bytes ~= member.size then
+    stageCleanup()
+    return nil, "bundle package changed while it was read"
+  end
+  local opened, err
+  if inMemory then opened, err = openValidatedPackage(staged, tag, onFile)
+  else opened, err = openValidatedPackageFile(staged, tag, onFile) end
+  if not opened then stageCleanup(); return nil, err end
+  local cleanup = opened.cleanup
+  opened.cleanup = function()
+    cleanup()
+    stageCleanup()
+  end
+  return opened, nil, bytes
+end
+
 local function validateBundlePlan(plan, progress)
-  if type(plan) ~= "table" or type(plan.members) ~= "table" or #plan.members == 0 then
+  if type(plan) ~= "table" or type(plan.source) ~= "string"
+      or type(plan.members) ~= "table" or #plan.members == 0 then
     return nil, "bundle import has no prepared packages"
   end
   if #plan.members > BUNDLE_LIMITS.maxMembers then
@@ -738,38 +882,69 @@ local function validateBundlePlan(plan, progress)
   end
   local fs = love and love.filesystem
   if not fs then return nil, "mod import needs LOVE" end
-  local byId, total = {}, 0
+  local outer, outerCleanup = mountArchivePath(plan.source, "bundle_validate")
+  if not outer then return nil, outerCleanup end
+  local function fail(reason)
+    outerCleanup()
+    return nil, reason
+  end
+  local largestMember, totalDeclared = 0, 0
+  for _, member in ipairs(plan.members) do
+    if type(member.name) ~= "string" or type(member.size) ~= "number" or member.size < 0 then
+      return fail("bundle package metadata is invalid")
+    end
+    if member.size > BUNDLE_LIMITS.maxMemberBytes then
+      return fail("bundle package is larger than " .. BUNDLE_LIMITS.maxMemberBytes .. " bytes")
+    end
+    largestMember = math.max(largestMember, member.size)
+    totalDeclared = totalDeclared + member.size
+    if totalDeclared > BUNDLE_LIMITS.maxTotalMemberBytes then
+      return fail("bundle packages exceed " .. BUNDLE_LIMITS.maxTotalMemberBytes .. " bytes")
+    end
+  end
+  local stageOk, stageErr = ensureBundleSpace(largestMember + BUNDLE_LIMITS.minFreeBytes)
+  if not stageOk then return fail(stageErr) end
+  local byId, total, totalFiles, totalExpanded = {}, 0, 0, 0
   for index, member in ipairs(plan.members) do
     emitProgress(progress, "checking", index, #plan.members)
-    if type(member.data) ~= "string" then return nil, "bundle package data is missing" end
-    if #member.data > BUNDLE_LIMITS.maxMemberBytes then
-      return nil, "bundle package is larger than " .. BUNDLE_LIMITS.maxMemberBytes .. " bytes"
-    end
-    total = total + #member.data
+    local opened, err, bytes = openBundleMember(outer, member, "bundle_check", index,
+      #plan.members, progress, function(state)
+        emitProgress(progress, "validating", index, #plan.members, nil,
+          state.bytes, nil, state.files, nil)
+      end)
+    if not opened then return fail("a bundle package is invalid: " .. tostring(err)) end
+    total = total + bytes
     if total > BUNDLE_LIMITS.maxTotalMemberBytes then
-      return nil, "bundle packages exceed " .. BUNDLE_LIMITS.maxTotalMemberBytes .. " bytes"
+      opened.cleanup()
+      return fail("bundle packages exceed " .. BUNDLE_LIMITS.maxTotalMemberBytes .. " bytes")
     end
-    local opened, err = openValidatedPackage(member.data, "bundle_check", function(state)
-      emitProgress(progress, "validating", index, #plan.members, nil,
-        state.bytes, nil, state.files, nil)
-    end)
-    if not opened then return nil, "a bundle package is invalid: " .. tostring(err) end
     local manifest = opened.manifest
     opened.cleanup()
     if byId[manifest.id] then
-      return nil, "bundle contains duplicate mod id '" .. manifest.id .. "'"
+      return fail("bundle contains duplicate mod id '" .. manifest.id .. "'")
     end
     if member.id and (member.id ~= manifest.id or member.version ~= manifest.version) then
-      return nil, "bundle package changed after it was checked"
+      return fail("bundle package changed after it was checked")
     end
     member.id, member.version, member.manifest = manifest.id, manifest.version, manifest
     member.files, member.bytes = opened.tree.files, opened.tree.bytes
+    totalFiles = totalFiles + opened.tree.files
+    if totalFiles > BUNDLE_LIMITS.maxTotalFiles then
+      return fail("bundle packages have more than " .. BUNDLE_LIMITS.maxTotalFiles .. " files")
+    end
+    totalExpanded = totalExpanded + opened.tree.bytes
+    if totalExpanded > BUNDLE_LIMITS.maxTotalExpandedBytes then
+      return fail("bundle packages expand beyond "
+        .. BUNDLE_LIMITS.maxTotalExpandedBytes .. " bytes")
+    end
     emitProgress(progress, "validating", index, #plan.members, manifest.id,
       opened.tree.bytes, opened.tree.bytes, opened.tree.files, opened.tree.files)
     byId[manifest.id] = member
     local _, installed = sameIdTrees(fs, manifest.id)
-    if installed then return nil, "a mod named '" .. manifest.id .. "' is already installed" end
+    if installed then return fail("a mod named '" .. manifest.id .. "' is already installed") end
   end
+  local spaceOk, spaceErr = ensureBundleSpace(totalExpanded + largestMember + BUNDLE_LIMITS.minFreeBytes)
+  if not spaceOk then return fail(spaceErr) end
   local all = {}
   for _, manifest in ipairs(discover()) do all[manifest.id] = manifest end
   for id, member in pairs(byId) do all[id] = member.manifest end
@@ -777,10 +952,11 @@ local function validateBundlePlan(plan, progress)
     for otherId, other in pairs(all) do
       if otherId ~= id and (compatibleConflict(member.manifest, other)
           or compatibleConflict(other, member.manifest)) then
-        return nil, "bundle mod '" .. id .. "' conflicts with '" .. otherId .. "'"
+        return fail("bundle mod '" .. id .. "' conflicts with '" .. otherId .. "'")
       end
     end
   end
+  outerCleanup()
   return true
 end
 
@@ -798,10 +974,20 @@ end
 -- for normal callers and tests which do not yield.
 function LauncherMods._prepareBundleInner(source, progress)
     if not (love and love.filesystem) then return nil, "mod import needs LOVE" end
-    local data, readErr = readArchive(source, BUNDLE_LIMITS.maxOuterBytes, "mod bundle")
-    if not data then return nil, readErr end
-    if not zipLooksValid(data) then return nil, "not a zip file" end
-    local mount, cleanup = mountArchiveBytes(data, "bundle_outer")
+    local fs = love.filesystem
+    local info = type(source) == "string" and fs.getInfo(source, "file") or nil
+    if info and info.size and info.size > BUNDLE_LIMITS.maxOuterBytes then
+      return nil, "mod bundle is larger than the " .. tostring(BUNDLE_LIMITS.maxOuterBytes)
+        .. " byte import limit"
+    end
+    -- Android SAF and launcher inbox imports are save-dir paths. Mounting that
+    -- path is the bounded path: it avoids reading a 100 MiB carrier into Lua.
+    -- A dropped/host file keeps the direct importer behavior and is not treated
+    -- as a large bundle unless it can first be staged by the host integration.
+    if type(source) ~= "string" then
+      return nil, "bundle import needs a staged .zip file"
+    end
+    local mount, cleanup = mountArchivePath(source, "bundle_outer")
     if not mount then return nil, cleanup end
     local function fail(reason)
       cleanup()
@@ -811,29 +997,24 @@ function LauncherMods._prepareBundleInner(source, progress)
     local root = LauncherMods.locateRoot(topLevelPaths(mount))
     if root then return fail("this archive is already a mod package") end
     local members, total = {}, 0
-    for _, name in ipairs(love.filesystem.getDirectoryItems(mount)) do
-      local info = love.filesystem.getInfo(mount .. "/" .. name)
+    for _, name in ipairs(fs.getDirectoryItems(mount)) do
+      local memberInfo = fs.getInfo(mount .. "/" .. name)
       local lower = type(name) == "string" and name:lower() or ""
-      if info and info.type == "file" and (lower:match("%.zip$") or lower:match("%.modpkg$")) then
+      if memberInfo and memberInfo.type == "file" and (lower:match("%.zip$") or lower:match("%.modpkg$")) then
         if not safeArchiveName(name) then return fail("bundle has an unsafe package name") end
         if #members >= BUNDLE_LIMITS.maxMembers then
           return fail("bundle has more than " .. BUNDLE_LIMITS.maxMembers .. " packages")
         end
-        if info.size and info.size > BUNDLE_LIMITS.maxMemberBytes then
+        if not memberInfo.size then return fail("could not read a bundle package size") end
+        if memberInfo.size > BUNDLE_LIMITS.maxMemberBytes then
           return fail("a bundle package is larger than "
             .. BUNDLE_LIMITS.maxMemberBytes .. " bytes")
         end
-        local memberData = love.filesystem.read(mount .. "/" .. name)
-        if type(memberData) ~= "string" then return fail("could not read a bundle package") end
-        if #memberData > BUNDLE_LIMITS.maxMemberBytes then
-          return fail("a bundle package is larger than "
-            .. BUNDLE_LIMITS.maxMemberBytes .. " bytes")
-        end
-        total = total + #memberData
+        total = total + memberInfo.size
         if total > BUNDLE_LIMITS.maxTotalMemberBytes then
           return fail("bundle packages exceed " .. BUNDLE_LIMITS.maxTotalMemberBytes .. " bytes")
         end
-        members[#members + 1] = { name = name, data = memberData }
+        members[#members + 1] = { name = name, size = memberInfo.size }
       end
     end
     cleanup()
@@ -841,7 +1022,7 @@ function LauncherMods._prepareBundleInner(source, progress)
       return nil, "the .zip has no package manifest and no top-level .zip or .modpkg files"
     end
     table.sort(members, function(a, b) return a.name < b.name end)
-    local result = { members = members }
+    local result = { source = source, members = members }
     local valid, validErr = validateBundlePlan(result, progress)
     if not valid then return nil, validErr end
     return result
@@ -861,6 +1042,8 @@ function LauncherMods._installBundleInner(plan, progress)
     local valid, validErr = validateBundlePlan(plan, progress)
     if not valid then return nil, validErr end
     local created, ids = {}, {}
+    local outer, outerCleanup = mountArchivePath(plan.source, "bundle_install")
+    if not outer then return nil, outerCleanup end
     local savedPrefix = CacheFs.prefix
     CacheFs.prefix = ""
     local function rollback()
@@ -868,12 +1051,18 @@ function LauncherMods._installBundleInner(plan, progress)
       for i = #created, 1, -1 do pcall(removeTree, created[i]) end
     end
       for index, member in ipairs(plan.members) do
-        local opened, openErr = openValidatedPackage(member.data, "bundle_install")
+        local opened, openErr = openBundleMember(outer, member, "bundle_install", index,
+          #plan.members, progress, function(state)
+            emitProgress(progress, "validating", index, #plan.members, nil,
+              state.bytes, nil, state.files, nil)
+          end)
         if not opened then rollback(); CacheFs.prefix = savedPrefix
+          outerCleanup()
           return nil, "bundle import failed; no mods were installed: invalid package: " .. tostring(openErr) end
         if opened.manifest.id ~= member.id or opened.manifest.version ~= member.version then
           opened.cleanup()
           rollback(); CacheFs.prefix = savedPrefix
+          outerCleanup()
           return nil, "bundle import failed; no mods were installed: package changed after checking"
         end
         local dest = "mods/" .. member.id
@@ -889,6 +1078,7 @@ function LauncherMods._installBundleInner(plan, progress)
         if not copied then
           pcall(removeTree, dest)
           rollback(); CacheFs.prefix = savedPrefix
+          outerCleanup()
           return nil, "bundle import failed; no mods were installed: "
             .. tostring(copyErr or "could not copy bundle package")
         end
@@ -896,6 +1086,7 @@ function LauncherMods._installBundleInner(plan, progress)
         ids[#ids + 1] = member.id
       end
     CacheFs.prefix = savedPrefix
+    outerCleanup()
     emitProgress(progress, "complete", #ids, #plan.members, nil)
     return true, ids
 end

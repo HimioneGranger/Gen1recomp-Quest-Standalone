@@ -7,7 +7,7 @@ if not _G.love then _G.love = require("tests.love_stub") end
 local S = require("tests.harness").suite("launcher mods bundle import")
 local check, eq = S.check, S.eq
 
-local files, dirs, arch, mounted, archives = {}, {}, {}, {}, {}
+local files, dirs, arch, mounted, archives, sizeHints = {}, {}, {}, {}, {}, {}
 local failPrefix = nil
 
 local function clear(map)
@@ -23,7 +23,9 @@ end
 
 local function mapInfo(map, path, kind)
   if map[path] ~= nil then
-    return { type = kind or "file", size = type(map[path]) == "string" and #map[path] or nil }
+    local value = map[path]
+    return { type = kind or "file", size = type(value) == "string"
+      and (sizeHints[value] or sizeHints[path] or #value) or nil }
   end
   for key in pairs(map) do
     if child(key, path) then return { type = "directory" } end
@@ -145,6 +147,7 @@ end
 
 local function reset()
   clear(files); clear(dirs); clear(arch); clear(mounted)
+  clear(sizeHints)
   failPrefix = nil
 end
 
@@ -176,6 +179,9 @@ local plan, err = LauncherMods.prepareBundle("imports/TestMods.zip", function(ph
 end)
 check(plan ~= nil, "bundle with README and valid packages prepares (" .. tostring(err) .. ")")
 eq(#(plan and plan.members or {}), 2, "README is ignored and two packages are found")
+check(plan and plan.source == "imports/TestMods.zip"
+    and plan.members[1].data == nil and type(plan.members[1].size) == "number",
+  "preflight retains only the carrier reference and member metadata")
 check(files["mods/alpha/manifest.json"] == nil, "prepare/cancel leaves mod storage unchanged")
 local cancelledWrites = files["mods/alpha/manifest.json"] == nil
 for _, event in ipairs(checkEvents) do
@@ -187,6 +193,22 @@ files["imports/exact-TestMods.zip"] = EXACT_SHAPE
 local exactPlan, exactErr = LauncherMods.prepareBundle("imports/exact-TestMods.zip")
 check(exactPlan ~= nil and #(exactPlan.members or {}) == 9,
   "exact TestMods top-level carrier routes to bundle preflight (" .. tostring(exactErr) .. ")")
+-- Captured TestMods.zip facts: 31,265,565-byte outer ZIP, nine packages,
+-- 16,286,528-byte largest package, 34,501,237-byte nested total, 12,615
+-- files in the largest package, and 42,653,718 expanded bytes overall.
+-- These are accepted only because each remains below an explicit cap.
+check(LauncherMods.BUNDLE_LIMITS.maxOuterBytes == 100 * 1024 * 1024
+    and LauncherMods.BUNDLE_LIMITS.maxMemberBytes == 100 * 1024 * 1024
+    and LauncherMods.BUNDLE_LIMITS.maxTotalMemberBytes == 100 * 1024 * 1024
+    and LauncherMods.BUNDLE_LIMITS.maxMemberExpandedBytes == 128 * 1024 * 1024
+    and LauncherMods.BUNDLE_LIMITS.maxTotalExpandedBytes == 192 * 1024 * 1024,
+  "streamed bundle policy permits 100 MiB carriers without a smaller member cap")
+check(31265565 <= LauncherMods.BUNDLE_LIMITS.maxOuterBytes
+    and 16286528 <= LauncherMods.BUNDLE_LIMITS.maxMemberBytes
+    and 34501237 <= LauncherMods.BUNDLE_LIMITS.maxTotalMemberBytes
+    and 12615 <= LauncherMods.BUNDLE_LIMITS.maxFilesPerMember
+    and 42653718 <= LauncherMods.BUNDLE_LIMITS.maxTotalExpandedBytes,
+  "TestMods captured size and tree facts remain inside explicit bundle limits")
 check(checkEvents[1] and checkEvents[1][1] == "scanning"
   and checkEvents[2] and checkEvents[2][1] == "checking"
   and checkEvents[2][2] == 1 and checkEvents[2][3] == 2
@@ -236,6 +258,23 @@ files["imports/bad-inner.zip"] = outer("PK\3\4bad-inner", { ["bad.zip"] = BAD })
 plan, err = LauncherMods.prepareBundle("imports/bad-inner.zip")
 check(not plan and tostring(err):find("package is invalid", 1, true), "invalid inner ZIP fails before confirmation")
 
+-- A compressed carrier can be small while its mounted package tree is large.
+-- The test doubles use declared PhysFS entry sizes so this verifies the same
+-- aggregate expansion guard without allocating a zip bomb in the test host.
+reset()
+local BOMB = "PK\3\4expanded-bomb"
+local bombTree = pkg("expanded_bomb")
+for i = 1, 25 do
+  local body = "expanded-body-" .. tostring(i)
+  bombTree["expanded_bomb/payload_" .. tostring(i) .. ".bin"] = body
+  sizeHints[body] = LauncherMods.BUNDLE_LIMITS.maxMemberFileBytes
+end
+archives[BOMB] = bombTree
+files["imports/expanded-bomb.zip"] = outer("PK\3\4expanded-bomb-outer", { ["bomb.zip"] = BOMB })
+plan, err = LauncherMods.prepareBundle("imports/expanded-bomb.zip")
+check(not plan and tostring(err):find("expands beyond", 1, true),
+  "malicious expanded package is refused before confirmation")
+
 reset()
 files["imports/duplicate.zip"] = outer("PK\3\4duplicate-bundle", { ["a.zip"] = A, ["b.zip"] = DUP })
 plan, err = LauncherMods.prepareBundle("imports/duplicate.zip")
@@ -278,10 +317,62 @@ plan, err = LauncherMods.prepareBundle("imports/many.zip")
 check(not plan and tostring(err):find("more than", 1, true), "package count limit blocks unbounded bundles")
 
 reset()
-files["imports/too-large.zip"] = "PK" .. string.rep("x", LauncherMods.BUNDLE_LIMITS.maxOuterBytes)
+files["imports/too-large.zip"] = "PK\3\4small"
+sizeHints["imports/too-large.zip"] = LauncherMods.BUNDLE_LIMITS.maxOuterBytes + 1
 plan, err = LauncherMods.prepareBundle("imports/too-large.zip")
 check(not plan and tostring(err):find("larger than", 1, true), "outer archive size limit is enforced before mount")
 
+-- Boundary checks use exactly-sized valid nested archives. A package exactly
+-- at its cap, and a total exactly at its cap, are accepted. One additional
+-- byte is refused before any package is copied.
+reset()
+local atTotalMemberBytes = math.floor(LauncherMods.BUNDLE_LIMITS.maxTotalMemberBytes / 2)
+local AT_MEMBER_A, AT_MEMBER_B = "PKa", "PKb"
+local ONE_MORE_MEMBER = "PKc"
+archives[AT_MEMBER_A] = pkg("at_member_a")
+archives[AT_MEMBER_B] = pkg("at_member_b")
+archives[ONE_MORE_MEMBER] = pkg("one_more_member")
+sizeHints[AT_MEMBER_A], sizeHints[AT_MEMBER_B], sizeHints[ONE_MORE_MEMBER] =
+  atTotalMemberBytes, atTotalMemberBytes, 1
+files["imports/at-total-limit.zip"] = outer("PK\3\4at-total-limit", {
+  ["a.zip"] = AT_MEMBER_A, ["b.zip"] = AT_MEMBER_B,
+})
+plan, err = LauncherMods.prepareBundle("imports/at-total-limit.zip")
+check(plan ~= nil and #(plan.members or {}) == 2,
+  "nested archives exactly at the total byte limit prepare (" .. tostring(err) .. ")")
+
+reset()
+local AT_MEMBER_LIMIT = "PKd"
+archives[AT_MEMBER_LIMIT] = pkg("at_member_limit")
+sizeHints[AT_MEMBER_LIMIT] = LauncherMods.BUNDLE_LIMITS.maxMemberBytes
+files["imports/at-member-limit.zip"] = outer("PK\3\4at-member-limit-outer", {
+  ["at-member-limit.zip"] = AT_MEMBER_LIMIT,
+})
+plan, err = LauncherMods.prepareBundle("imports/at-member-limit.zip")
+check(plan ~= nil and #(plan.members or {}) == 1,
+  "nested archive exactly at the per-package byte limit prepares (" .. tostring(err) .. ")")
+
+reset()
+sizeHints[AT_MEMBER_A], sizeHints[AT_MEMBER_B], sizeHints[ONE_MORE_MEMBER] =
+  atTotalMemberBytes, atTotalMemberBytes, 1
+files["imports/over-total-limit.zip"] = outer("PK\3\4over-total-limit", {
+  ["a.zip"] = AT_MEMBER_A, ["b.zip"] = AT_MEMBER_B,
+  ["one-more.zip"] = ONE_MORE_MEMBER,
+})
+plan, err = LauncherMods.prepareBundle("imports/over-total-limit.zip")
+check(not plan and tostring(err):find("exceed", 1, true),
+  "nested archive total one byte over the limit is refused before confirmation")
+
+reset()
+local TOO_LARGE_MEMBER = "PKm"
+archives[TOO_LARGE_MEMBER] = pkg("too_large_member")
+sizeHints[TOO_LARGE_MEMBER] = LauncherMods.BUNDLE_LIMITS.maxMemberBytes + 1
+files["imports/too-large-member.zip"] = outer("PK\3\4too-large-member-outer", {
+  ["too-large-member.zip"] = TOO_LARGE_MEMBER,
+})
+plan, err = LauncherMods.prepareBundle("imports/too-large-member.zip")
+check(not plan and tostring(err):find("larger than", 1, true),
+  "nested archive above its byte limit is refused before confirmation")
 love.filesystem = savedFs
 SaveData.portableBaseDir = savedPortable
 package.loaded["src.import.CacheFs"] = savedCacheFs

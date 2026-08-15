@@ -59,6 +59,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.StatFs;
 import android.os.Vibrator;
 import android.util.Log;
 import android.util.DisplayMetrics;
@@ -82,6 +83,18 @@ public class GameActivity extends SDLActivity {
     public static final int RESTART_REQUEST_CODE = 7;
     /** @deprecated Prefer FILE_PICKER_REQUEST_CODE; kept for older call sites. */
     public static final int ROM_PICKER_REQUEST_CODE = FILE_PICKER_REQUEST_CODE;
+
+    /** Available writable bytes for bounded staged bundle imports. */
+    @Keep
+    public static long getStorageFreeBytes(String path) {
+        try {
+            File root = (path == null || path.isEmpty()) ? null : new File(path);
+            if (root == null) return -1;
+            return new StatFs(root.getAbsolutePath()).getAvailableBytes();
+        } catch (Exception ignored) {
+            return -1;
+        }
+    }
     // Mirrors conf.lua's t.identity ("pokemon-love2d"): where the picked file
     // is dropped so RomImporter's existing folder scan finds it -- see
     // src/import/RomImporter.lua and Filesystem::setIdentity (sets Android's

@@ -1661,9 +1661,13 @@ function RomImporter:_setModProgress(phase, index, total, id, bytes, totalBytes,
     p.title, p.detail, p.progress, p.count = "Rolling back bundle", "Removing incomplete mod files", nil, nil
   elseif phase == "complete" then
     p.title, p.detail, p.progress, p.count = "Mod import complete", "Installed packages are ready", 1, nil
-  elseif phase == "checking" or phase == "validating" then
+  elseif phase == "checking" or phase == "validating" or phase == "staging" then
     p.title = "Checking mod " .. tostring(index) .. " of " .. tostring(total)
-    p.detail = id and ("Validating " .. tostring(id)) or "Validating package"
+    if phase == "staging" then
+      p.detail = "Staging package safely"
+    else
+      p.detail = id and ("Validating " .. tostring(id)) or "Validating package"
+    end
     p.progress, p.count = total > 0 and (index - 1) / total or nil,
       total > 0 and (tostring(index) .. " of " .. tostring(total)) or nil
   else -- installing

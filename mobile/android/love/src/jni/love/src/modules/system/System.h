@@ -28,6 +28,7 @@
 
 // stdlib
 #include <string>
+#include <cstdint>
 
 namespace love
 {
@@ -148,6 +149,12 @@ public:
 	 **/
 	virtual bool httpDownload(const char *url, const char *destPath,
 		const char *userAgent = nullptr, const char *accept = nullptr) const;
+
+	/**
+	 * Gets writable storage available at path. Android returns StatFs available
+	 * bytes; unsupported platforms return -1.
+	 **/
+	virtual int64_t getStorageFreeBytes(const char *path) const;
 
 	/**
 	 * TLS client sockets (Android only; every call fails elsewhere, where

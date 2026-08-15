@@ -204,6 +204,37 @@ static const char *bridgeSaveDirectory()
 	return dir != nullptr ? dir : "";
 }
 
+int64_t getStorageFreeBytes(const char *path)
+{
+	JNIEnv *env = (JNIEnv*) SDL_AndroidGetJNIEnv();
+	if (env == nullptr)
+		return -1;
+	jclass activity = env->FindClass("org/love2d/android/GameActivity");
+	if (activity == nullptr)
+	{
+		env->ExceptionClear();
+		return -1;
+	}
+	jmethodID method = env->GetStaticMethodID(activity, "getStorageFreeBytes",
+		"(Ljava/lang/String;)J");
+	if (method == nullptr)
+	{
+		env->ExceptionClear();
+		env->DeleteLocalRef(activity);
+		return -1;
+	}
+	jstring jpath = env->NewStringUTF(path != nullptr ? path : bridgeSaveDirectory());
+	jlong bytes = env->CallStaticLongMethod(activity, method, jpath);
+	if (env->ExceptionCheck())
+	{
+		env->ExceptionClear();
+		bytes = -1;
+	}
+	env->DeleteLocalRef(jpath);
+	env->DeleteLocalRef(activity);
+	return (int64_t) bytes;
+}
+
 bool showFilePicker(const char *destFilename)
 {
 	if (destFilename == nullptr || destFilename[0] == '\0')

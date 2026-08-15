@@ -26,6 +26,7 @@
 #ifdef LOVE_ANDROID
 
 #include <string>
+#include <cstdint>
 
 namespace love
 {
@@ -97,6 +98,9 @@ bool restartApp();
  * Returns whether a complete file was written.
  **/
 bool httpDownload(const char *url, const char *destPath, const char *userAgent, const char *accept);
+
+/** Returns available bytes at the app save path, or -1 when unavailable. */
+int64_t getStorageFreeBytes(const char *path);
 
 /**
  * TLS client sockets (GameActivity.tls*, implemented by TlsSocket.java).
