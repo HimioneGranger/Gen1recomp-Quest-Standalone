@@ -93,18 +93,45 @@ check(questNative:find("GL_ACTIVE_TEXTURE", 1, true) and
 check(questNative:find("questxr_poll_pointer_axes", 1, true) and
       questNative:find("left_stick.isActive", 1, true),
   "Quest launcher exposes continuous Touch stick axes to its virtual pointer")
-check(questNative:find('"/user/hand/right/input/aim/pose"', 1, true) and
+check(questNative:find('"/user/hand/left/input/aim/pose"', 1, true) and
+      questNative:find('"/user/hand/right/input/aim/pose"', 1, true) and
+      questNative:find("left_pointer_pose_action", 1, true) and
+      questNative:find("right_pointer_pose_action", 1, true) and
       questNative:find("xrCreateActionSpace", 1, true) and
       questNative:find("questxr_poll_pointer_position", 1, true),
-  "Quest launcher projects the native Touch aim pose onto its room panel")
+  "Quest launcher projects both native Touch aim poses onto its room panel")
+check(questNative:find("Only one", 1, true) and
+      questNative:find("hover owner exists", 1, true) and
+      questNative:find("active_pointer_hand", 1, true),
+  "Quest launcher has one deterministic pointing owner and one Select event")
 check(questNative:find("uniform vec3 pointerState", 1, true) and
       questNative:find("questxr_set_panel_pointer", 1, true) and
-      questNative:find("if (panel_pointer[2] > 0.5f && questxr_ray_pointer_active)", 1, true) and
+      questNative:find("int panel_requested = panel_pointer[2] > 0.5f;", 1, true) and
+      questNative:find("if (panel_requested && native_ray_active)", 1, true) and
+      questNative:find("panel_pointer[2] = 0.0f;", 1, true) and
       questNative:find("vec2(textureSize(panel,0))", 1, true) and
       questNative:find("smoothstep(3.5-aa,3.5+aa,r)", 1, true) and
       not questNative:find("float shadow=", 1, true) and
       not questNative:find("float ring=", 1, true),
   "Quest compositor renders a crisp launcher-only selector without a halo or ring")
+check(questNative:find("XrCompositionLayerProjection", 1, true)
+      and questNative:find("end.layerCount = submitted_layer_count", 1, true)
+      and questNative:find("white environment submit rejected; reverting to one panel layer", 1, true)
+      and not questNative:find("laser_swapchain", 1, true)
+      and not questNative:find("XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT", 1, true),
+  "Quest submit list uses only a guarded core background plus the validated panel")
+check(questNative:find("environment probe extensions", 1, true)
+      and questNative:find("xrEnumerateInstanceExtensionProperties", 1, true)
+      and questNative:find("xrGetSystemProperties", 1, true)
+      and questNative:find("xrEnumerateEnvironmentBlendModes", 1, true)
+      and questNative:find("xrEnumerateViewConfigurationViews", 1, true)
+      and questNative:find("white environment renderer armed", 1, true)
+      and questNative:find("xrLocateViews", 1, true)
+      and questNative:find("background_layer.viewCount = 2", 1, true),
+  "Quest white environment uses the probed core stereo projection contract")
+check(not questNative:find("XR_KHR_COMPOSITION_LAYER_EQUIRECT_EXTENSION_NAME,", 1, true)
+      and not questNative:find("XR_KHR_COMPOSITION_LAYER_CUBE_EXTENSION_NAME,", 1, true),
+  "Quest white environment enables no equirect or cube extension")
 check(questNative:find("questxr_get_application_vm", 1, true) and
       questNative:find("questxr_get_application_context", 1, true),
   "Quest gameplay backends can inherit the Android OpenXR loader context")
