@@ -91,6 +91,28 @@ function f.rec(fields, opts)
     desc = "{" .. table.concat(parts, ", ") .. "}" }
 end
 
+-- An open record: the listed fields are typed (including f.id
+-- cross-references) and everything else on the value passes through
+-- unexamined, unlike f.rec's nested shapes, which reject any key they do
+-- not name.  Map objects are why this exists -- NPCs, signs, items, warps
+-- and static encounters all share one array, and only a full union of
+-- every kind's shape could describe it as f.rec; that is a lot of surface
+-- to keep in sync with the loader for fields nothing here needs to check.
+-- f.partial types just the field that actually names another registry and
+-- leaves every kind-specific field around it alone.
+function f.partial(fields)
+  local names = {}
+  for name in pairs(fields) do names[#names + 1] = name end
+  table.sort(names)
+  local parts = {}
+  for _, name in ipairs(names) do
+    local ft = fields[name]
+    parts[#parts + 1] = name .. (ft.kind == "opt" and "?" or "")
+  end
+  return { kind = "partial", fields = fields,
+    desc = "{" .. table.concat(parts, ", ") .. ", ...}" }
+end
+
 function f.union(alts)
   local parts = {}
   for _, alt in ipairs(alts) do parts[#parts + 1] = alt.desc end
@@ -197,6 +219,23 @@ checkValue = function(t, value, path, patchMode, errors, top)
     end
     return
   end
+  if kind == "partial" then
+    -- the open counterpart of "rec": listed fields are checked exactly
+    -- like a rec's, and any key not listed is left alone rather than
+    -- flagged, so a heterogeneous blob (map objects) can have one field
+    -- typed without every other shape sharing the array being rejected
+    if type(value) ~= "table" then return fail(errors, path, t.desc, value) end
+    for key, ft in pairs(t.fields) do
+      local sub = value[key]
+      if sub ~= nil then
+        checkValue(ft, sub, path .. "." .. tostring(key), patchMode, errors)
+      elseif ft.kind ~= "opt" and not patchMode then
+        errors[#errors + 1] = ("%s.%s: missing required field (%s)")
+          :format(path, key, ft.desc)
+      end
+    end
+    return
+  end
   if kind == "union" then
     for _, alt in ipairs(t.alts) do
       local scratch = {}
@@ -299,7 +338,7 @@ collectRefs = function(t, value, path, out)
     for k, v in pairs(value) do
       collectRefs(t.value, v, path .. "." .. tostring(k), out)
     end
-  elseif kind == "rec" and type(value) == "table" then
+  elseif (kind == "rec" or kind == "partial") and type(value) == "table" then
     for key, ft in pairs(t.fields) do
       collectRefs(ft, value[key], path .. "." .. tostring(key), out)
     end
@@ -887,7 +926,15 @@ R.maps = {
                                 destMap = f.str, destWarp = f.int(0),
                                 destGroup = f.opt(f.int(0)),
                                 destMapNum = f.opt(f.int(0)) })),
-    objects = f.opt(f.list(f.any)),
+    -- NPCs, signs, items, warps and static wild encounters all share this
+    -- one array, with no field the loader could use to tell them apart
+    -- ahead of time -- an f.rec strict enough to describe every kind would
+    -- reject the others.  f.partial types only `pokemon` (the static
+    -- encounter's species, OverworldController.lua's `d.pokemon` ->
+    -- BattleState.newWild) so a bad id is a load-time error, the same as
+    -- an encounter slot's species, instead of the crash newWild has no
+    -- guard against.  Every other object field passes through untouched.
+    objects = f.opt(f.list(f.partial{ pokemon = f.opt(f.id("pokemon")) })),
     signs = f.opt(f.list(f.any)),
     connections = f.opt(f.map(f.enum{ "north", "south", "east", "west" }, f.any)),
   },
