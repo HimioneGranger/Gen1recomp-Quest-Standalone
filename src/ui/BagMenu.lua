@@ -4,6 +4,7 @@
 
 local ItemEffects = require("src.inventory.ItemEffects")
 local ListMenu = require("src.ui.ListMenu")
+local Runtime = require("src.mods.Runtime")
 local TextBox = require("src.render.TextBox")
 
 local BagMenu = {}
@@ -46,7 +47,16 @@ end
 -- the stack, so every exit that prints has to close it afterwards.  For
 -- every other item the picker popped itself first and closePicker's identity
 -- check makes it a no-op (#252).
-local function useOn(game, battle, id, target, list, moveIndex, picker)
+--
+-- Every result string used to fall through to this one unconditional
+-- function with no seam around it: a mod could not suppress a message,
+-- delay it behind a screen of its own, or replace the outcome for one item
+-- id.  The "item.use" hook wraps the whole dispatch (not a name per
+-- result -- a mod deciding what a Poké Doll or a stone does needs the
+-- SAME reach a vanilla `if result == ...` branch has, not a narrower one),
+-- the way "battle.overlay" and "ui.party.submenu" already wrap a
+-- screen's own default behavior elsewhere in src/ui.
+local function vanillaUseOn(game, battle, id, target, list, moveIndex, picker)
   local result, payload, extra = ItemEffects.use(game.data, game.save, id, target,
                                                  battle, moveIndex, game.overworld)
   local function closePicker()
@@ -360,6 +370,11 @@ local function useOn(game, battle, id, target, list, moveIndex, picker)
   -- .healingItemNoEffect prints over the still-drawn party menu too, so the
   -- refusal closes the picker the same way (#252)
   showMessages(game, payload, closePicker) -- failed
+end
+
+local function useOn(game, battle, id, target, list, moveIndex, picker)
+  return Runtime.call("item.use", vanillaUseOn,
+    game, battle, id, target, list, moveIndex, picker)
 end
 
 local function pickTargetAndUse(game, battle, id, list)
