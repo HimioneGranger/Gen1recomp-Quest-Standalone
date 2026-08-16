@@ -498,7 +498,10 @@ function ItemEffects.use(data, save, itemId, target, battle, moveIndex, ow)
     if not target then return "failed", { noEffect(data) } end
     local speciesDef = data.pokemon[target.species]
     local ok = false
-    for _, m in ipairs(speciesDef.tmhm) do
+    -- a species record with no tmhm list at all is "teaches nothing", the
+    -- same as one whose list just does not name this move -- not a reason
+    -- to crash instead of refusing normally
+    for _, m in ipairs(speciesDef.tmhm or {}) do
       if m == itemDef.machine.move then ok = true break end
     end
     if not ok then
