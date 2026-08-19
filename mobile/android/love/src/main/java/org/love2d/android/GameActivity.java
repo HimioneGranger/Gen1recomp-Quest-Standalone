@@ -1028,8 +1028,8 @@ public class GameActivity extends SDLActivity {
             return;
         }
         if (requestCode != FILE_PICKER_REQUEST_CODE) return;
-        // Quest hosts can now wait for real window and controller readiness
-        // after DocumentsUI returns. This hook never changes SDL focus.
+        // Optional hosts can wait for real window and input readiness after
+        // DocumentsUI returns. This hook never changes SDL focus.
         onHostFilePickerReturned();
         if (resultCode != RESULT_OK || data == null || data.getData() == null) {
             Log.d("GameActivity", "file picker returned no file (cancelled?)");
