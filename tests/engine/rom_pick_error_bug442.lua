@@ -67,9 +67,10 @@ local function freshImporter(opts)
     notice = nil,
     slotScroll = {},
     activeSlot = {},
-    _installMod = function(self, name)
+    _installMod = function(self, name, done)
       self._installed = name
       self.modNotice = { ok = opts.modOk and true or false, text = "install result" }
+      if done then done(self.modNotice.ok) end
     end,
     _importSave = function(self, version, name)
       self._imported = { version = version, name = name }
