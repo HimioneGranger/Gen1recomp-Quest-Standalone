@@ -30,6 +30,7 @@ static atomic_int questxr_bootstrap_started;
 static int questxr_bootstrap_joinable;
 static atomic_int questxr_bootstrap_shutdown_requested;
 static atomic_int questxr_bootstrap_stopped = 1;
+static atomic_uint questxr_saf_return_generation;
 static pthread_mutex_t questxr_panel_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t questxr_input_mutex = PTHREAD_MUTEX_INITIALIZER;
 static uint32_t questxr_input_events;
@@ -93,6 +94,19 @@ static float questxr_dot(XrVector3f a, XrVector3f b) {
 
 #define XR_LOG(...) __android_log_print(ANDROID_LOG_INFO, "QuestXR", __VA_ARGS__)
 #define XR_FAIL(message) do { XR_LOG("native bootstrap failed: %s", message); goto done; } while (0)
+
+static void questxr_notify_activity_saf_pose_ready(JNIEnv *env) {
+    if (!env || !questxr_activity) return;
+    jclass activity_class = (*env)->GetObjectClass(env, questxr_activity);
+    if (!activity_class) return;
+    jmethodID method = (*env)->GetMethodID(env, activity_class,
+        "onQuestXrSafPoseReady", "()V");
+    if (method) {
+        (*env)->CallVoidMethod(env, questxr_activity, method);
+        if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+    }
+    (*env)->DeleteLocalRef(env, activity_class);
+}
 
 static GLuint questxr_compile_shader(GLenum type, const char *source) {
     GLuint shader = glCreateShader(type);
@@ -530,6 +544,8 @@ static void *questxr_native_bootstrap(void *unused) {
     const int room_anchor_enabled = 1;
     uint64_t anchor_after_frame = 180;
     int exit_requested = 0;
+    unsigned int seen_saf_generation =
+        atomic_load(&questxr_saf_return_generation);
 
     for (;;) {
         if (questxr_bootstrap_shutdown_requested && !exit_requested) {
@@ -760,6 +776,12 @@ static void *questxr_native_bootstrap(void *unused) {
             }
         }
         questxr_set_ray_pointer(ray_u, ray_v, ray_active);
+        unsigned int saf_generation = atomic_load(&questxr_saf_return_generation);
+        if (saf_generation != seen_saf_generation && ray_active) {
+            seen_saf_generation = saf_generation;
+            XR_LOG("SAF tracked pose ready generation=%u", saf_generation);
+            questxr_notify_activity_saf_pose_ready(env);
+        }
         if (submitted_frames == 0) XR_LOG("native first frame begun");
         uint32_t image_index = 0;
         XrSwapchainImageAcquireInfo acquire = {
@@ -1189,6 +1211,14 @@ Java_org_love2d_android_QuestGameActivity_nativeQuestXrStartBootstrap(
     }
     questxr_bootstrap_joinable = 1;
     XR_LOG("native bootstrap thread started");
+}
+
+JNIEXPORT void JNICALL
+Java_org_love2d_android_QuestGameActivity_nativeQuestXrMarkSafReturn(
+    JNIEnv *env, jclass clazz) {
+    (void) env;
+    (void) clazz;
+    atomic_fetch_add(&questxr_saf_return_generation, 1u);
 }
 
 JNIEXPORT void JNICALL

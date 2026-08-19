@@ -184,6 +184,8 @@ public class GameActivity extends SDLActivity {
     protected void onHostResume() {}
     protected void onHostPause() {}
     protected void onHostDestroy() {}
+    /** Called after Android returns from the system document picker. */
+    protected void onHostFilePickerReturned() {}
 
     @Override
     protected String getMainSharedObject() {
@@ -1026,6 +1028,9 @@ public class GameActivity extends SDLActivity {
             return;
         }
         if (requestCode != FILE_PICKER_REQUEST_CODE) return;
+        // Quest hosts can now wait for real window and controller readiness
+        // after DocumentsUI returns. This hook never changes SDL focus.
+        onHostFilePickerReturned();
         if (resultCode != RESULT_OK || data == null || data.getData() == null) {
             Log.d("GameActivity", "file picker returned no file (cancelled?)");
             return;
