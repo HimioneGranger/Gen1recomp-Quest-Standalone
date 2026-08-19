@@ -244,6 +244,16 @@ bool System::httpDownload(const char *url, const char *destPath,
 #endif
 }
 
+int64_t System::getStorageFreeBytes(const char *path) const
+{
+#ifdef LOVE_ANDROID
+	return love::android::getStorageFreeBytes(path);
+#else
+	LOVE_UNUSED(path);
+	return -1;
+#endif
+}
+
 int System::tlsOpen(const char *host, int port) const
 {
 #ifdef LOVE_ANDROID

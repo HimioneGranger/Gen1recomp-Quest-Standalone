@@ -36,6 +36,8 @@ local SCRIM_A = 0.82
 --   detail   = "index.json from ...",     -- optional second line
 --   progress = 0..1 or nil,               -- nil = indeterminate (spinner)
 --   count    = "3 of 12",                 -- optional right-aligned counter
+--   subProgress = 0..1 or nil,             -- optional measured current item
+--   subCount = "2 of 5 files",            -- truthful current-item counter
 --   onCancel = function() end,            -- optional; adds a Cancel button
 --   cancelLabel = "Cancel",
 -- }
@@ -55,7 +57,8 @@ function Loader.overlay(m, spec)
   Kit.blockClicks = true
 
   local pw = math.floor(math.min(m.w - 2 * m.pad, 460 * m.s))
-  local ph = math.floor((spec.onCancel and 210 or 160) * m.s)
+  local baseH = spec.subProgress and 215 or 160
+  local ph = math.floor((spec.onCancel and baseH + 50 or baseH) * m.s)
   local px = math.floor((W - pw) / 2)
   local py = math.floor((H - ph) / 2)
 
@@ -90,6 +93,13 @@ function Loader.overlay(m, spec)
   end
   if spec.count and spec.count ~= "" then
     Kit.textCenter("micro", spec.count, px + pad, y, pw - 2 * pad, PAL.faint)
+    y = y + Kit.textHeight("micro") + math.floor(6 * m.s)
+  end
+  if spec.subProgress ~= nil then
+    Kit.textCenter("micro", spec.subCount or "Current package", px + pad, y,
+      pw - 2 * pad, PAL.faint)
+    y = y + Kit.textHeight("micro") + math.floor(5 * m.s)
+    Kit.progress(px + pad, y, pw - 2 * pad, math.floor(8 * m.s), spec.subProgress)
   end
 
   local cancelled = false

@@ -711,8 +711,9 @@ function RomImporter:rescanModsAction()
   local lastFail = nil
   local failCount = 0
   for _, path in ipairs(candidates) do
-    -- Reuse _installMod carefully: it must not remove the inbox source.
-    self:_installMod(path)
+    -- Inbox scans are synchronous so each candidate can contribute to the
+    -- aggregate result.  Picker and drop imports use the progress worker.
+    self:_installModNow(path)
     if self.modNotice and self.modNotice.ok then
       anyOk = true
       lastOk = self.modNotice
@@ -1231,6 +1232,9 @@ function RomImporter.new(onComplete, opts)
     -- modScroll is the list scroll offset (px, clamped in draw); modNotice is
     -- the last install/delete result { ok, text } shown as a line above the list.
     mods = nil, modScroll = 0, modNotice = nil,
+    -- A bounded archive worker updates this table only at real archive/file
+    -- operations.  LauncherView renders it as the themed blocking loader.
+    modProgress = nil, modWorker = nil,
     -- Which game the MODS panel is answering for (a GameVersion id, nil =
     -- every game).  Rows resolve their enable-state and their "runs here"
     -- verdict against it (src/mods/ModTargets.lua).
@@ -1433,9 +1437,9 @@ function RomImporter:focus(f)
   end
   local modName = findPendingMod(false, self.pickSkip)
   if modName then
-    self:_installMod(modName)
-    consumePick(self, modName, "picked_mod.zip",
-      self.modNotice and self.modNotice.ok)
+    self:_installMod(modName, function(ok)
+      consumePick(self, modName, "picked_mod.zip", ok)
+    end)
     return
   end
   local savName = findPendingSav(false, self.pickSkip)
@@ -1646,7 +1650,52 @@ end
 -- result on the mods panel (switching to it so the notice is visible).  The
 -- source is whatever LauncherMods.installZip accepts: an absolute path string
 -- or a love DroppedFile.
-function RomImporter:_installMod(source)
+function RomImporter:_setModProgress(phase, index, total, id, bytes, totalBytes, files, totalFiles)
+  local p = self.modProgress or {}
+  self.modProgress = p
+  p.phase, p.index, p.total, p.id = phase, index or 0, total or 0, id
+  p.bytes, p.totalBytes, p.files, p.totalFiles = bytes, totalBytes, files, totalFiles
+  if phase == "scanning" then
+    p.title, p.detail, p.progress, p.count = "Scanning mod bundle", "Looking for mod packages", nil, nil
+  elseif phase == "rollback" then
+    p.title, p.detail, p.progress, p.count = "Rolling back bundle", "Removing incomplete mod files", nil, nil
+  elseif phase == "complete" then
+    p.title, p.detail, p.progress, p.count = "Mod import complete", "Installed packages are ready", 1, nil
+  elseif phase == "checking" or phase == "validating" or phase == "staging" then
+    p.title = "Checking mod " .. tostring(index) .. " of " .. tostring(total)
+    if phase == "staging" then
+      p.detail = "Staging package safely"
+    else
+      p.detail = id and ("Validating " .. tostring(id)) or "Validating package"
+    end
+    p.progress, p.count = total > 0 and (index - 1) / total or nil,
+      total > 0 and (tostring(index) .. " of " .. tostring(total)) or nil
+  else -- installing
+    if total > 1 then
+      p.title, p.count = "Installing mod " .. tostring(index) .. " of " .. tostring(total),
+        tostring(index) .. " of " .. tostring(total)
+      p.progress = (index - 1) / total
+    else
+      p.title, p.count, p.progress = "Installing mod", nil, nil
+    end
+    p.detail = id and ("Installing " .. tostring(id)) or "Copying selected mod package"
+  end
+  if totalBytes and totalBytes > 0 then
+    p.subProgress = math.max(0, math.min(1, (bytes or 0) / totalBytes))
+    p.subCount = tostring(files or 0) .. " of " .. tostring(totalFiles or 0) .. " files"
+  else
+    p.subProgress, p.subCount = nil, nil
+  end
+end
+
+function RomImporter:_finishModWork(ok, text, done)
+  self.modWorker, self.modProgress = nil, nil
+  if ok then pcall(self._refreshMods, self) end
+  self.modNotice = { ok = ok, text = text }
+  if done then done(ok) end
+end
+
+function RomImporter:_installModNow(source)
   if self.workState == "working" then return end
   self.tab = "mods"
   local ok, installed, res = pcall(function()
@@ -1662,8 +1711,106 @@ function RomImporter:_installMod(source)
     pcall(self._refreshMods, self)
     self.modNotice = { ok = true, text = "Installed " .. tostring(res) }
   else
-    self.modNotice = { ok = false, text = tostring(res) }
+    -- A direct package keeps its existing install path.  Only an archive with
+    -- no package manifest can become a bundle; prepareBundle performs every
+    -- nested-package check before this confirmation is shown and writes none
+    -- of them until the player explicitly accepts it.
+    local bundleOk, plan, bundleErr = pcall(function()
+      local LauncherMods = require("src.mods.LauncherMods")
+      return LauncherMods.prepareBundle(source)
+    end)
+    if bundleOk and plan then
+      local lines = { "Found " .. tostring(#plan.members) .. " valid mod packages:" }
+      local shown = math.min(#plan.members, 3)
+      for i = 1, shown do
+        local member = plan.members[i]
+        lines[#lines + 1] = member.id .. " v" .. tostring(member.version)
+      end
+      if #plan.members > shown then
+        lines[#lines + 1] = "+ " .. tostring(#plan.members - shown) .. " more packages"
+      end
+      lines[#lines + 1] = "Cancel leaves installed mods unchanged."
+      self._modConfirm = {
+        kind = "bundleImport", plan = plan,
+        title = "Import mod bundle",
+        yesLabel = "Import " .. tostring(#plan.members) .. " mods",
+        lines = lines,
+      }
+    else
+      local reason = bundleOk and bundleErr or res
+      -- A malformed direct package has a manifest, so it must keep the
+      -- ordinary install error instead of being described as a failed bundle.
+      if reason == "this archive is already a mod package" then reason = res end
+      self.modNotice = { ok = false, text = tostring(reason) }
+    end
   end
+end
+
+-- Picker and drop imports use a coroutine.  Progress callbacks yield only
+-- between bounded archive/file operations, so the UI keeps drawing while the
+-- package is assessed.  Inbox rescans keep the synchronous helper above.
+function RomImporter:_installMod(source, done)
+  if self.workState == "working" or self.modWorker then return end
+  self.tab, self.modNotice = "mods", nil
+  self:_setModProgress("scanning", 0, 0)
+  self.modWorker = coroutine.create(function()
+    coroutine.yield()
+    local LauncherMods = require("src.mods.LauncherMods")
+    local function progress(...)
+      self:_setModProgress(...)
+      coroutine.yield()
+    end
+    local plan, bundleErr = LauncherMods._prepareBundleInner(source, progress)
+    if plan then
+      local lines = { "Found " .. tostring(#plan.members) .. " valid mod packages:" }
+      local shown = math.min(#plan.members, 3)
+      for i = 1, shown do
+        local member = plan.members[i]
+        lines[#lines + 1] = member.id .. " v" .. tostring(member.version)
+      end
+      if #plan.members > shown then
+        lines[#lines + 1] = "+ " .. tostring(#plan.members - shown) .. " more packages" end
+      lines[#lines + 1] = "Cancel leaves installed mods unchanged."
+      self.modWorker, self.modProgress = nil, nil
+      self._modConfirm = { kind = "bundleImport", plan = plan,
+        title = "Import mod bundle", yesLabel = "Import " .. tostring(#plan.members) .. " mods",
+        lines = lines, done = done }
+      return
+    end
+    -- A valid direct package reaches this point with the explicit marker
+    -- below.  Assess bundles first so a manifest-less SAF carrier can never
+    -- be stranded on the direct importer's "no manifest" result.
+    if bundleErr ~= "this archive is already a mod package" then
+      self:_finishModWork(false, tostring(bundleErr), done)
+      return
+    end
+    local installed, res = LauncherMods._installZipInner(source, { progress = progress })
+    if installed then
+      self:_finishModWork(true, "Installed " .. tostring(res), done)
+    else
+      self:_finishModWork(false, tostring(res), done)
+    end
+  end)
+end
+
+function RomImporter:_installModBundle(plan)
+  if self.modWorker then return end
+  self.modNotice = nil
+  self:_setModProgress("checking", 1, #(plan.members or {}))
+  self.modWorker = coroutine.create(function()
+    coroutine.yield()
+    local LauncherMods = require("src.mods.LauncherMods")
+    local function progress(...)
+      self:_setModProgress(...)
+      coroutine.yield()
+    end
+    local installed, ids = LauncherMods._installBundleInner(plan, progress)
+    if installed then
+      self:_finishModWork(true, "Imported mods: " .. table.concat(ids or {}, ", "), plan.done)
+    else
+      self:_finishModWork(false, tostring(ids), plan.done)
+    end
+  end)
 end
 
 -- Remove an installed mod from the save-dir mods/ tree and refresh the panel.
@@ -1709,9 +1856,9 @@ function RomImporter:chooseMod()
   if self.android then
     local name = findPendingMod(true, self.pickSkip)
     if name then
-      self:_installMod(name)
-      consumePick(self, name, "picked_mod.zip",
-        self.modNotice and self.modNotice.ok)
+      self:_installMod(name, function(ok)
+        consumePick(self, name, "picked_mod.zip", ok)
+      end)
       return
     end
     if not pickFile("mod") then
@@ -2155,10 +2302,9 @@ function RomImporter:update(dt)
       self.pickerPendingKind = nil
       self.pickerPendingVersion = nil
       if kind == "mod" then
-        self:_installMod(path)
-        if Platform.isUWP() and self.modNotice and self.modNotice.ok then
-          os.remove(path)
-        end
+        self:_installMod(path, function(ok)
+          if Platform.isUWP() and ok then os.remove(path) end
+        end)
       elseif kind == "sav" then
         local target = version or self:_savedropTarget()
         self:_importSave(target, path)
@@ -2187,6 +2333,22 @@ function RomImporter:update(dt)
     end
   end
   self:_pollPickedFiles(dt)
+  if self.modWorker then
+    local started = love.timer.getTime()
+    repeat
+      local ok, workerError = coroutine.resume(self.modWorker)
+      if not ok then
+        print(debug.traceback(self.modWorker, tostring(workerError)))
+        self.modWorker, self.modProgress = nil, nil
+        self.modNotice = { ok = false, text = "Mod import failed: " .. tostring(workerError) }
+        break
+      end
+      if coroutine.status(self.modWorker) == "dead" then
+        self.modWorker = nil
+        break
+      end
+    until love.timer.getTime() - started > 0.008
+  end
   if self.workState ~= "working" or not self.worker then return end
   local started = love.timer.getTime()
   repeat

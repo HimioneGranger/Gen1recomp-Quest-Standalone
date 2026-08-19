@@ -133,6 +133,16 @@ int w_httpDownload(lua_State *L)
 	return 1;
 }
 
+int w_getStorageFreeBytes(lua_State *L)
+{
+	const char *path = luaL_optstring(L, 1, nullptr);
+	int64_t bytes = instance()->getStorageFreeBytes(path);
+	if (bytes < 0)
+		return 0;
+	lua_pushnumber(L, (lua_Number) bytes);
+	return 1;
+}
+
 int w_hasBackgroundMusic(lua_State *L)
 {
 	lua_pushboolean(L, instance()->hasBackgroundMusic());
@@ -226,6 +236,7 @@ static const luaL_Reg functions[] =
 	{ "syncHealthSteps", w_syncHealthSteps },
 	{ "restartApp", w_restartApp },
 	{ "httpDownload", w_httpDownload },
+	{ "getStorageFreeBytes", w_getStorageFreeBytes },
 	{ "tlsOpen", w_tlsOpen },
 	{ "tlsStatus", w_tlsStatus },
 	{ "tlsSend", w_tlsSend },

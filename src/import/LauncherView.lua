@@ -1738,6 +1738,8 @@ local function buildConfirmModal(imp, m)
           imp:_confirmModUpdate(c.id, c.release)
         elseif c.kind == "enableAll" then
           imp:_setAllMods(true, true)
+        elseif c.kind == "bundleImport" then
+          imp:_installModBundle(c.plan)
         elseif c.kind == "importOversize" then
           imp:_importSave(c.version, c.source, true)
         else
@@ -2455,6 +2457,14 @@ end
 -- The blocking loader.  imp.workState drives the ROM import (which reports
 -- real progress); imp._busy drives every async network operation.
 local function loaderSpec(imp)
+  if imp.modProgress then
+    local p = imp.modProgress
+    return {
+      title = p.title or Strings("Importing mod"), detail = p.detail,
+      progress = p.progress, count = p.count,
+      subProgress = p.subProgress, subCount = p.subCount,
+    }
+  end
   if imp.workState == "working" then
     return {
       title = imp.status or Strings("Working"),

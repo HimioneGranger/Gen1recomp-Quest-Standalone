@@ -33,9 +33,10 @@ end
 Platform._resetForTests()
 local importer = RomImporter.new(function() end, { launcher = true })
 importer.pickerPendingKind = "mod"
-importer._installMod = function(self, source)
+importer._installMod = function(self, source, done)
   self.installedPath = source
   self.modNotice = { ok = true, text = "Installed test-mod" }
+  if done then done(true) end
 end
 importer:update(0)
 
