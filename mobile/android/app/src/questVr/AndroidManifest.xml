@@ -1,12 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
   <uses-feature
       android:name="android.hardware.vr.headtracking"
       android:required="true"
       android:version="1" />
 
   <application>
-    <activity android:name="org.love2d.android.QuestGameActivity">
+    <!--
+      Horizon OS issues a second launch intent while it places an immersive
+      activity. singleInstance turns that into a second task and destroys the
+      first activity before OpenXR receives focus. Keep one reusable task for
+      this Quest-only host instead. Stock Android retains its existing policy.
+    -->
+    <activity
+        android:name="org.love2d.android.QuestGameActivity"
+        android:launchMode="singleTask"
+        tools:replace="android:launchMode">
       <!-- The Quest-only Activity starts the bootstrap through its generic
            Android host hook; stock GameActivity never sees this category. -->
       <intent-filter>
