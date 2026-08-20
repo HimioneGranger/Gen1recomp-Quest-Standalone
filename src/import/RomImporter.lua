@@ -2354,7 +2354,13 @@ function RomImporter:update(dt)
         self.modNotice = { ok = false, text = "Mod import failed: " .. tostring(workerError) }
         break
       end
-      if self.modWorker == modWorker and coroutine.status(modWorker) == "dead" then
+      -- _finishModWork may clear the field from inside the coroutine. Stop
+      -- this frame immediately in that case; another repeat would otherwise
+      -- resume nil after a successful install.
+      if self.modWorker ~= modWorker then
+        break
+      end
+      if coroutine.status(modWorker) == "dead" then
         self.modWorker = nil
         break
       end

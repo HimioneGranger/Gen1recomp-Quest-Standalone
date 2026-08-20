@@ -38,7 +38,9 @@ check(main:find("if Importer.safPickerActive then return true end", 1, true),
   "quit deferral is armed before DocumentsUI can enqueue its shutdown")
 check(importer:find("local modWorker = self.modWorker", 1, true),
   "completed mod worker is retained locally for its final status check")
-check(importer:find("self.modWorker == modWorker and coroutine.status(modWorker)", 1, true),
-  "completed mod worker never calls coroutine.status on cleared state")
+check(importer:find("if self.modWorker ~= modWorker then", 1, true),
+  "completed mod worker stops before another resume")
+check(importer:find("coroutine.status(modWorker)", 1, true),
+  "worker status is inspected only through its retained local value")
 
 print(("quest_saf_focus_recovery_test: %d checks passed"):format(checks))
