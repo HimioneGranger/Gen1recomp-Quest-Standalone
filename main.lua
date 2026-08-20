@@ -956,7 +956,11 @@ local function shouldDeferAndroidSafQuit()
   -- `focus(true)` can run once before GameActivity finishes copying the URI.
   -- Keep the guard for the whole native-picker handoff, rather than only the
   -- short interval where the directory poll has its pending bit armed.
-  if not (Importer.pickPending or Importer.safPickerActive) then return false end
+  -- The activity can enqueue its shutdown before pickFile returns to Lua.
+  -- safPickerActive is armed before that call and stays armed until the
+  -- delivered result is processed, so it is the authoritative handoff gate.
+  if Importer.safPickerActive then return true end
+  if not Importer.pickPending then return false end
   return love.filesystem.getInfo("picked_mod.zip", "file") ~= nil
     or love.filesystem.getInfo("picked_rom.gb", "file") ~= nil
     or love.filesystem.getInfo("picked_save.sav", "file") ~= nil
