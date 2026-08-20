@@ -32,6 +32,15 @@ public class QuestGameActivity extends GameActivity {
         Log.i(TAG, "Quest SAF return waiting for tracked pose");
     }
 
+    /**
+     * Called by the OpenXR bridge after the Quest runtime grants controller
+     * focus. The host does not synthesize input here. It only records the
+     * state transition so the bridge can safely continue after Android UI.
+     */
+    public void onQuestXrSessionFocused() {
+        Log.i(TAG, "Quest OpenXR session focused");
+    }
+
     /** Called by native code after a valid tracked pose returns. */
     public void onQuestXrSafPoseReady() {
         runOnUiThread(new Runnable() {
