@@ -105,7 +105,7 @@ yellow_manifest_is_valid() {
 import json, pathlib, sys
 
 try:
-    manifest = json.loads(pathlib.Path(sys.argv[1]).read_text())
+    manifest = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
 except (OSError, ValueError):
     raise SystemExit(1)
 
@@ -153,7 +153,7 @@ gold_manifest_is_valid() {
 import json, pathlib, sys
 
 try:
-    manifest = json.loads(pathlib.Path(sys.argv[1]).read_text())
+    manifest = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
 except (OSError, ValueError):
     raise SystemExit(1)
 
@@ -218,12 +218,48 @@ pack_game_love() {
   # a real install/upgrade/delete lifecycle.
   # The launcher UI kit lives at src/ui/kit (inside src/, packed wholesale);
   # the vendored libs/flexlove tree it replaced is gone.
-  (cd "$ROOT" && zip -q -9 -r "$LOVE_FILE" \
-    main.lua conf.lua src data assets tools/save-editor \
-    tools/rom_manifest.json tools/rom_manifest_blue.json \
-    tools/rom_manifest_yellow.json tools/rom_manifest_gold.json \
-    -x '*.DS_Store' -x '*/.git/*' -x '*/.DS_Store' \
-    -x 'data/generated/*' -x 'assets/generated/*')
+  if command -v zip >/dev/null 2>&1; then
+    (cd "$ROOT" && zip -q -9 -r "$LOVE_FILE" \
+      main.lua conf.lua src data assets tools/save-editor \
+      tools/rom_manifest.json tools/rom_manifest_blue.json \
+      tools/rom_manifest_yellow.json tools/rom_manifest_gold.json \
+      -x '*.DS_Store' -x '*/.git/*' -x '*/.DS_Store' \
+      -x 'data/generated/*' -x 'assets/generated/*')
+  else
+    # Git for Windows does not ship zip. Keep the fallback byte-for-byte
+    # equivalent in content, including the no-ROM-generated-data boundary.
+    python3 - "$ROOT" "$LOVE_FILE" <<'PY'
+import os, pathlib, sys, zipfile
+
+root = pathlib.Path(sys.argv[1])
+out = pathlib.Path(sys.argv[2])
+targets = [
+    "main.lua", "conf.lua", "src", "data", "assets", "tools/save-editor",
+    "tools/rom_manifest.json", "tools/rom_manifest_blue.json",
+    "tools/rom_manifest_yellow.json", "tools/rom_manifest_gold.json",
+]
+
+def include(rel):
+    text = rel.as_posix()
+    return not (
+        ".git/" in text or text.endswith(".DS_Store")
+        or text.startswith("data/generated/") or text.startswith("assets/generated/")
+    )
+
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+    for target in targets:
+        path = root / target
+        if path.is_file():
+            archive.write(path, path.relative_to(root).as_posix())
+        else:
+            for current, _, names in os.walk(path):
+                for name in names:
+                    candidate = pathlib.Path(current) / name
+                    rel = candidate.relative_to(root)
+                    if include(rel):
+                        archive.write(candidate, rel.as_posix())
+PY
+  fi
   # List once and match against the captured text: piping unzip straight into
   # grep under `set -o pipefail` SIGPIPEs unzip as soon as grep exits early,
   # and the pipeline's 141 outranks grep's own status.  For the generated-data
@@ -267,7 +303,15 @@ pack_game_love() {
     mkdir -p "$stamp_dir/src/core"
     sed -E "s/(engine[[:space:]]*=[[:space:]]*\")[^\"]*(\")/\1$VERSION\2/" \
       "$ROOT/src/core/Version.lua" > "$stamp_dir/src/core/Version.lua"
-    (cd "$stamp_dir" && zip -q "$LOVE_FILE" src/core/Version.lua)
+    if command -v zip >/dev/null 2>&1; then
+      (cd "$stamp_dir" && zip -q "$LOVE_FILE" src/core/Version.lua)
+    else
+      python3 - "$LOVE_FILE" "$stamp_dir/src/core/Version.lua" <<'PY'
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "a", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+    archive.write(sys.argv[2], "src/core/Version.lua")
+PY
+    fi
     local version_re
     version_re="$(printf '%s' "$VERSION" | sed 's/\./\\./g')"
     unzip -p "$LOVE_FILE" src/core/Version.lua \
@@ -310,7 +354,13 @@ require_android_sdk() {
 
   local props="$ANDROID_DIR/local.properties"
   # Always rewrite so a leftover Docker sdk.dir=/opt/android-sdk cannot stick.
-  printf 'sdk.dir=%s\n' "$sdk" > "$props"
+  local sdk_property="$sdk"
+  # Gradle's properties parser treats backslashes as escapes. Git Bash can
+  # give us a Windows SDK path, so write its forward-slash form for Java.
+  if command -v cygpath >/dev/null 2>&1; then
+    sdk_property="$(cygpath -m "$sdk")"
+  fi
+  printf 'sdk.dir=%s\n' "$sdk_property" > "$props"
 
   if ! command -v java >/dev/null 2>&1; then
     fail "java not found. Install JDK 17 (Android Studio's bundled JDK is fine)."
@@ -324,7 +374,9 @@ require_android_sdk() {
 
 # --------------------------------------------------------------- gradle
 run_gradle() {
-  local task="assembleEmbedNoRecordDebug"
+  # Quest builds must select the OpenXR activity/native bridge. The generic
+  # embed flavor is a flat Android app and cannot be used for headset tests.
+  local task="assembleQuestVrNoRecordDebug"
   local build_dir="$ANDROID_DIR"
 
   # ndk-build is GNU make underneath and cannot cope with spaces anywhere in
@@ -332,21 +384,21 @@ run_gradle() {
   # When this checkout lives at a spaced path (e.g. "~/xCode Projects/..."),
   # shadow the android tree to a space-free location and build there; the
   # shadow persists across runs so gradle/ndk builds stay incremental.
-  case "$ANDROID_DIR" in
-    *" "*)
+  if [[ "$ANDROID_DIR" == *" "* ]] || grep -q $'\r' "$ANDROID_DIR/gradlew"; then
       build_dir="${TMPDIR:-/tmp}/gen1recomp-android-shadow"
-      say "path contains spaces (ndk-build cannot handle them);"
-      say "shadow-building in: $build_dir"
+      say "using a disposable Android shadow build: $build_dir"
       mkdir -p "$build_dir"
       rsync -a --delete \
         --exclude=".gradle" --exclude="app/build" --exclude="love/build" \
         --exclude="local.properties" \
         "$ANDROID_DIR/" "$build_dir/"
+      # The vendored wrapper can retain CRLF in Windows worktrees. Normalize
+      # the disposable shadow copy, never the tracked wrapper.
+      sed -i 's/\r$//' "$build_dir/gradlew"
       if [ -f "$ANDROID_DIR/local.properties" ]; then
         cp "$ANDROID_DIR/local.properties" "$build_dir/local.properties"
       fi
-      ;;
-  esac
+  fi
 
   say "building APK ($task)"
   if ! (
@@ -359,7 +411,9 @@ run_gradle() {
       gradle_args+=("-Papp.version_name=$VERSION" \
         "-Papp.version_code=$VERSION_CODE")
     fi
-    ./gradlew "${gradle_args[@]}"
+    # Invoke through Bash. This also accepts a vendored Gradle wrapper that
+    # still has Windows line endings when the Android tree is built in WSL.
+    bash ./gradlew "${gradle_args[@]}"
   ); then
     fail "gradle $task failed.
   Packaging already wrote: $LOVE_FILE
@@ -367,7 +421,7 @@ run_gradle() {
   You can still iterate on the .love payload with: scripts/build_android.sh --package-only"
   fi
 
-  local out_dir="$build_dir/app/build/outputs/apk/embedNoRecord/debug"
+  local out_dir="$build_dir/app/build/outputs/apk/questVrNoRecord/debug"
   if [ -d "$out_dir" ]; then
     say "APK output:"
     find "$out_dir" -name '*.apk' -exec ls -lh {} \;
