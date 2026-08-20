@@ -33,5 +33,7 @@ check(main:find("shouldDeferAndroidSafQuit", 1, true),
   "LÖVE loop recognizes the Quest SAF-return quit event")
 check(main:find('love.filesystem.getInfo("picked_mod.zip", "file")', 1, true),
   "quit deferral is limited to a delivered SAF result")
+check(main:find("Importer.safPickerActive", 1, true),
+  "quit deferral covers the full native-picker return handoff")
 
 print(("quest_saf_focus_recovery_test: %d checks passed"):format(checks))
