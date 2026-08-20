@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Packages the LÖVE2D Pokémon Red port into an Android APK via love-android 11.5a.
 #
-# Usage: scripts/build_android.sh [--version X.Y.Z] [--package-only]
+# Usage: scripts/build_android.sh [--variant normal|test|diagnostic] [--version X.Y.Z] [--package-only]
 #
+#   --variant NAME  normal, test, and diagnostic builds share one source tree
 #   --version X.Y.Z  set app.version_name / app.version_code (else left as-is)
 #   --package-only   zip game.love + apply branding; skip gradle
 #
@@ -33,6 +34,8 @@ GOLD_MANIFEST_URL="${GOLD_MANIFEST_URL:-https://raw.githubusercontent.com/bryant
 
 VERSION=""
 PACKAGE_ONLY=false
+BUILD_VARIANT="normal"
+DIAGNOSTIC=false
 
 say()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mwarn:\033[0m %s\n' "$*" >&2; }
@@ -40,16 +43,27 @@ fail() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --variant) BUILD_VARIANT="$2"; shift ;;
     --version) VERSION="$2"; shift ;;
     --package-only) PACKAGE_ONLY=true ;;
     -h|--help)
       sed -n '2,20p' "$0"
       exit 0
       ;;
-    *) fail "unknown argument: $1 (try --version X.Y.Z or --package-only)" ;;
+    *) fail "unknown argument: $1 (try --variant normal|test|diagnostic, --version X.Y.Z, or --package-only)" ;;
   esac
   shift
 done
+
+case "$BUILD_VARIANT" in
+  normal) ;;
+  test) APP_NAME="Gen 1 Recomp Unplugged Test" ;;
+  diagnostic)
+    APP_NAME="Gen 1 Recomp Unplugged Diagnostic"
+    DIAGNOSTIC=true
+    ;;
+  *) fail "invalid --variant '$BUILD_VARIANT' (normal, test, or diagnostic)" ;;
+esac
 
 VERSION_CODE=""
 if [ -n "$VERSION" ]; then
@@ -178,63 +192,11 @@ ensure_gold_manifest() {
 }
 
 # --------------------------------------------------------------- branding
-# love-android 11.5+ reads app id / name / orientation from gradle.properties.
-# Manifest still gets permission trims. Re-applied every build so refreshing
-# the vendored love-android tree does not lose project settings.
+# Build variants pass their label and diagnostic setting directly to Gradle.
+# The script must not rewrite tracked launcher configuration, because that
+# made a local test build look like a source change and let variants drift.
 apply_android_branding() {
-  local props="$ANDROID_DIR/gradle.properties"
-  local manifest="$ANDROID_DIR/app/src/main/AndroidManifest.xml"
-  [ -f "$props" ] || fail "missing $props"
-  [ -f "$manifest" ] || fail "missing $manifest"
-
-  say "applying Android branding (gradle.properties + permission trim)"
-
-  python3 - "$props" "$APPLICATION_ID" "$APP_NAME" "$VERSION" "$VERSION_CODE" <<'PY'
-import pathlib, re, sys
-path = pathlib.Path(sys.argv[1])
-app_id, name, version, version_code = sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
-text = path.read_text()
-
-def set_prop(text, key, value):
-    pat = re.compile(rf"(?m)^{re.escape(key)}=.*$")
-    line = f"{key}={value}"
-    if pat.search(text):
-        return pat.sub(line, text)
-    return text.rstrip() + "\n" + line + "\n"
-
-# Prefer plain app.name; clear byte-array form so it cannot win.
-text = re.sub(r"(?m)^app\.name_byte_array=.*\n?", "", text)
-text = set_prop(text, "app.name", name)
-text = set_prop(text, "app.application_id", app_id)
-text = set_prop(text, "app.orientation", "fullUser")
-if version:
-    text = set_prop(text, "app.version_name", version)
-    text = set_prop(text, "app.version_code", version_code)
-path.write_text(text)
-PY
-
-  python3 - "$manifest" <<'PY'
-import pathlib, re, sys
-path = pathlib.Path(sys.argv[1])
-text = path.read_text()
-
-# Drop mic / legacy storage, not needed by this game.
-# Keep VIBRATE (love.system.vibrate), BLUETOOTH (optional gamepads) and
-# INTERNET: link play is not offline-only any more, and stripping INTERNET
-# made every LAN host and every relay connect fail with EPERM (issue #287).
-# Orientation / label come from gradle.properties placeholders.
-for perm in (
-    "android.permission.RECORD_AUDIO",
-    "android.permission.WRITE_EXTERNAL_STORAGE",
-):
-    text = re.sub(
-        rf'\s*<uses-permission android:name="{re.escape(perm)}"[^/]*/>\s*',
-        "\n",
-        text,
-    )
-text = re.sub(r'\s*android:usesCleartextTraffic="true"', "", text)
-path.write_text(text)
-PY
+  say "using build-time Android label: $APP_NAME"
 }
 
 # --------------------------------------------------------------- game.love
@@ -385,7 +347,14 @@ run_gradle() {
   say "building APK ($task)"
   if ! (
     cd "$build_dir"
-    ./gradlew --no-daemon "$task"
+    gradle_args=(--no-daemon "$task" \
+      "-Papp.display_name=$APP_NAME" \
+      "-Papp.diagnostic=$DIAGNOSTIC")
+    if [ -n "$VERSION" ]; then
+      gradle_args+=("-Papp.version_name=$VERSION" \
+        "-Papp.version_code=$VERSION_CODE")
+    fi
+    ./gradlew "${gradle_args[@]}"
   ); then
     fail "gradle $task failed.
   Packaging already wrote: $LOVE_FILE
@@ -413,7 +382,7 @@ apply_android_branding
 pack_game_love
 
 if $PACKAGE_ONLY; then
-  say "package-only: skipping gradle (game.love + branding ready under mobile/android/)"
+  say "package-only: skipping gradle (game.love ready under mobile/android/)"
   exit 0
 fi
 
