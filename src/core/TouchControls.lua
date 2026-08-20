@@ -38,6 +38,7 @@
 -- and a player rebind can never detach the overlay.
 
 local Input = require("src.core.Input")
+local PlatformProfile = require("src.core.PlatformProfile")
 local SafeArea = require("src.core.SafeArea")
 
 local TouchControls = {}
@@ -173,6 +174,9 @@ local function wantsOverlay()
   local env = os.getenv("POKEPORT_TOUCH")
   if env == "1" then return true end
   if env == "0" then return false end
+  -- A Quest headset uses tracked controllers and its OpenXR panel.  It is
+  -- Android, but it is not a flat touchscreen target.
+  if PlatformProfile.isQuestStandalone() then return false end
   local osName = love.system and love.system.getOS and love.system.getOS()
   return osName == "Android" or osName == "iOS"
 end

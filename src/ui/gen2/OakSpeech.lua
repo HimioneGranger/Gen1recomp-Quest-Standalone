@@ -43,6 +43,7 @@ local Logger = require("src.core.Logger")
 local Music = require("src.core.Music")
 local Palettes = require("src.world.gen2.Palettes")
 local Runtime = require("src.mods.Runtime")
+local PlatformProfile = require("src.core.PlatformProfile")
 local Screens = require("src.ui.Screens")
 local Sound = require("src.core.Sound")
 local Strings = require("src.core.Strings")
@@ -92,6 +93,7 @@ function OakSpeech.new(game, opts)
   self.onDone = opts.onDone
   local data = opts.data or {}
   self.cfg = data
+  self.questLetterboxWhite = PlatformProfile.isQuestStandalone()
   self.texts = data.text or {}
   self.oakPic = tryImage(data.oakPic or "assets/generated/intro/oak.png")
   -- player.sprite, where Gen 1's Oak speech raises it (src/ui/OakSpeech.lua:121).

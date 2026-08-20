@@ -25,6 +25,7 @@
 -- itself and calls onDone() when finished or skipped.
 
 local Music = require("src.core.Music")
+local PlatformProfile = require("src.core.PlatformProfile")
 
 local YellowIntro = {}
 YellowIntro.__index = YellowIntro
@@ -231,6 +232,11 @@ function YellowIntro.new(game, onDone)
   self.game = game
   self.onDone = onDone
   self.finished = false
+  -- Quest presents the Yellow movie inside the headset panel.  Use the same
+  -- paper surround as its launcher presentation, even when faithful ratio
+  -- would normally reserve black bars for a flat mobile display.
+  self.letterboxWhite = PlatformProfile.isQuestStandalone()
+  self.questLetterboxWhite = self.letterboxWhite
   self.scene = 0
   self.timer = 0
   self.seqIndex = 0

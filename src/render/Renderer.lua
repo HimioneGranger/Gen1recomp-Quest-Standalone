@@ -826,7 +826,7 @@ function Renderer:endFrame(zones, worldZones)
     -- the lock keeps the default black bars.
     if state and state.letterboxWhite
        and not (state.bgMode and state:bgMode() == "black")
-       and not FaithfulRes.scaleCap() then
+       and (state.questLetterboxWhite or not FaithfulRes.scaleCap()) then
       clearR, clearG, clearB = PaletteFX.paperShade(Game and Game.data)
     end
   end

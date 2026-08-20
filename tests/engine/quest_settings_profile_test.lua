@@ -61,6 +61,20 @@ end
 check(inGameColors and inGameColors.value(inGame.game) == "ADVANCED",
   "missing in-game color option reads as Advanced")
 
+local TouchControls = require("src.core.TouchControls")
+TouchControls:init()
+check(not TouchControls.active,
+  "Quest runtime disables the flat Android touch overlay")
+
+local yellowSource
+do
+  local file = assert(io.open("src/ui/YellowIntro.lua", "rb"))
+  yellowSource = assert(file:read("*a"))
+  file:close()
+end
+check(yellowSource:find("self.questLetterboxWhite = self.letterboxWhite", 1, true),
+  "Quest Yellow Intro opts into the paper side fill")
+
 local function read(path)
   local file = assert(io.open(path, "rb"))
   local text = assert(file:read("*a"))
@@ -73,6 +87,19 @@ check(read("src/save_convert/SaveConvert.lua"):find('colors = "redpp"', 1, true)
   "ROM imports default to Advanced colors")
 check(read("src/render/PaletteFX.lua"):find('PaletteFX.mode = "redpp"', 1, true),
   "palette runtime starts at Advanced")
+check(read("src/render/Renderer.lua"):find("state.questLetterboxWhite or not FaithfulRes.scaleCap()", 1, true),
+  "Quest intro paper fill overrides flat-mobile letterbox black")
+for _, path in ipairs({
+  "src/ui/IntroMovie.lua",
+  "src/ui/OakSpeech.lua",
+  "src/ui/gen2/CopyrightSplash.lua",
+  "src/ui/gen2/GameFreakPresents.lua",
+  "src/ui/gen2/GoldSilverIntro.lua",
+  "src/ui/gen2/OakSpeech.lua",
+}) do
+  check(read(path):find("questLetterboxWhite", 1, true),
+    "Quest opening state opts into the paper side fill: " .. path)
+end
 
 love.system.getOS = realGetOS
 _G.QUEST_PANEL_ACTIVE = realQuestPanel
