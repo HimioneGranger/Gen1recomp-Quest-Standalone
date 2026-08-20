@@ -19,6 +19,12 @@ local function labels(model)
 end
 
 local LauncherSettings = require("src.import.LauncherSettings")
+local SaveData = require("src.core.SaveData")
+local PaletteFX = require("src.render.PaletteFX")
+local defaults = SaveData.defaultOptions()
+check(defaults.colors == "redpp", "Quest core default uses Advanced colors")
+check(PaletteFX.modeLabel(defaults.colors) == "ADVANCED",
+  "Advanced default shows its user-facing label")
 local launcher = labels(LauncherSettings.open(nil, "red"))
 check(not launcher["VIDEO MODE"], "Quest launcher hides VIDEO MODE")
 check(not launcher["ORIENTATION"], "Quest launcher hides ORIENTATION")
@@ -37,6 +43,17 @@ check(not rows.touchControls, "Quest in-game menu hides TOUCH PAD")
 check(not rows.haptics, "Quest in-game menu hides VIBRATION")
 check(rows.colors, "Quest in-game menu keeps COLORS")
 check(rows.performance, "Quest in-game menu keeps PERFORMANCE")
+
+local function read(path)
+  local file = assert(io.open(path, "rb"))
+  local text = assert(file:read("*a"))
+  file:close()
+  return text
+end
+check(read("src/core/SaveData.lua"):find('colors = "redpp"', 1, true),
+  "new Quest saves default to Advanced colors")
+check(read("src/save_convert/SaveConvert.lua"):find('colors = "redpp"', 1, true),
+  "ROM imports default to Advanced colors")
 
 love.system.getOS = realGetOS
 T.finish("quest settings profile")

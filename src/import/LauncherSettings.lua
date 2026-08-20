@@ -179,9 +179,9 @@ local function coreRows(opts, hooks)
   local okPal, PaletteFX = pcall(require, "src.render.PaletteFX")
   if okPal then
     add(Strings("COLORS"),
-      function() return PaletteFX.modeLabel(opts.colors or "gbc") end,
+      function() return PaletteFX.modeLabel(opts.colors or "redpp") end,
       function(dir)
-        local cur, idx = opts.colors or "gbc", 1
+        local cur, idx = opts.colors or "redpp", 1
         for i, m in ipairs(PaletteFX.MODES) do
           if m == cur then idx = i break end
         end

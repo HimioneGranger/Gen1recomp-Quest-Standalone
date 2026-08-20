@@ -128,7 +128,7 @@ local function stepVolume(v, dir)
 end
 
 local function colorIndex(opts)
-  local cur = opts.colors or "gbc"
+  local cur = opts.colors or "redpp"
   for i, m in ipairs(PaletteFX.MODES) do
     if m == cur then return i end
   end
@@ -298,7 +298,7 @@ local function buildRows(game)
       end },
     { id = "colors", label = Strings("COLORS"),
       value = function(g)
-        return PaletteFX.modeLabel(g.save.options.colors or "gbc")
+        return PaletteFX.modeLabel(g.save.options.colors or "redpp")
       end,
       step = function(g, dir)
         local o = g.save.options
