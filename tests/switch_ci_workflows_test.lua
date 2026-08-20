@@ -40,7 +40,7 @@ local release = read(".github/workflows/release.yml")
 local comment_wf = read(".github/workflows/switch-artifact-comment.yml")
 local ios_comment_wf = read(".github/workflows/ios-artifact-comment.yml")
 local COMMENT_ACTION =
-  "thollander/actions-comment-pull-request@65f9e5c9a1f2cd378bd74b2e057c9736982a8e74"
+  "thollander/actions-comment-pull-request@e4a76dd2b0a3c2027c3fd84147a67c22ee4c90fa"
 
 mustPinActions(ci, "ci.yml")
 mustPinActions(release, "release.yml")
