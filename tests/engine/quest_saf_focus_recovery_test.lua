@@ -15,6 +15,7 @@ local host = read("mobile/android/love/src/main/java/org/love2d/android/GameActi
 local activity = read("mobile/android/love/src/questVr/java/org/love2d/android/QuestGameActivity.java")
 local bridge = read("mobile/android/love/src/jni/questxr_bridge/questxr_bridge.c")
 local main = read("main.lua")
+local importer = read("src/import/RomImporter.lua")
 
 check(host:find("onHostFilePickerReturned", 1, true), "base host exposes SAF return hook")
 check(activity:find("nativeQuestXrMarkSafReturn", 1, true), "Quest host marks SAF return")
@@ -35,5 +36,9 @@ check(main:find("Importer.safPickerActive", 1, true),
   "quit deferral covers the full native-picker return handoff")
 check(main:find("if Importer.safPickerActive then return true end", 1, true),
   "quit deferral is armed before DocumentsUI can enqueue its shutdown")
+check(importer:find("local modWorker = self.modWorker", 1, true),
+  "completed mod worker is retained locally for its final status check")
+check(importer:find("self.modWorker == modWorker and coroutine.status(modWorker)", 1, true),
+  "completed mod worker never calls coroutine.status on cleared state")
 
 print(("quest_saf_focus_recovery_test: %d checks passed"):format(checks))
