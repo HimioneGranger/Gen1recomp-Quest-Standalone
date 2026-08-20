@@ -944,6 +944,29 @@ local function pacingEnabled()
   return true
 end
 
+-- Horizon OS can send LÖVE a quit event while DocumentsUI is closing its
+-- temporary panel.  The picker result has already been copied into our save
+-- directory at that point, so treating that transient event as an app quit
+-- loses the pending import before RomImporter can consume it.  Defer only
+-- this exact Android/Safe-Access-Framework handoff; ordinary quit events keep
+-- their existing behaviour.
+local function shouldDeferAndroidSafQuit()
+  if not (love.system and love.system.getOS() == "Android") then return false end
+  if not (Importer and love.filesystem) then return false end
+  -- `focus(true)` can run once before GameActivity finishes copying the URI.
+  -- Keep the guard for the whole native-picker handoff, rather than only the
+  -- short interval where the directory poll has its pending bit armed.
+  -- The activity can enqueue its shutdown before pickFile returns to Lua.
+  -- safPickerActive is armed before that call and stays armed until the
+  -- delivered result is processed, so it is the authoritative handoff gate.
+  if Importer.safPickerActive then return true end
+  if not Importer.pickPending then return false end
+  return love.filesystem.getInfo("picked_mod.zip", "file") ~= nil
+    or love.filesystem.getInfo("picked_rom.gb", "file") ~= nil
+    or love.filesystem.getInfo("picked_save.sav", "file") ~= nil
+    or love.filesystem.getInfo("pick_error.flag", "file") ~= nil
+end
+
 function love.run()
   if love.load then love.load(love.arg.parseGameArguments(arg), arg) end
 
@@ -964,7 +987,9 @@ function love.run()
       love.event.pump()
       for name, a, b, c, d, e, f in love.event.poll() do
         if name == "quit" then
-          if not love.quit or not love.quit() then
+          if shouldDeferAndroidSafQuit() then
+            print("POKEPORT_SAF_QUIT_DEFERRED")
+          elseif not love.quit or not love.quit() then
             -- Android keeps the process and its task alive after LOVE's own
             -- teardown, so the relaunched task re-enters an activity whose
             -- native main already returned; end the process outright once the
