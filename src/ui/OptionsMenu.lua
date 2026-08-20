@@ -23,6 +23,7 @@ local Orientation = require("src.core.Orientation")
 local FaithfulRes = require("src.core.FaithfulRes")
 local FrameCap = require("src.core.FrameCap")
 local Performance = require("src.core.Performance")
+local PlatformProfile = require("src.core.PlatformProfile")
 local Logger = require("src.core.Logger")
 local Runtime = require("src.mods.Runtime")
 local OptionRows = require("src.ui.OptionRows")
@@ -563,6 +564,23 @@ local function buildRows(game)
     local filtered = {}
     for _, row in ipairs(rows) do
       if row.id ~= "pikaVol" then filtered[#filtered + 1] = row end
+    end
+    rows = filtered
+  end
+  -- Quest is an immersive Android application. These phone/desktop controls
+  -- do not change its active display or controller path, so do not offer
+  -- settings that cannot take effect. Retain graphics and performance rows:
+  -- they change the renderer and remain useful on Quest.
+  if PlatformProfile.isQuestStandalone() then
+    local hidden = {
+      videoMode = true,
+      orientation = true,
+      touchControls = true,
+      haptics = true,
+    }
+    local filtered = {}
+    for _, row in ipairs(rows) do
+      if not hidden[row.id] then filtered[#filtered + 1] = row end
     end
     rows = filtered
   end
