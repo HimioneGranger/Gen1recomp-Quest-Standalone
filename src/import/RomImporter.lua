@@ -2342,14 +2342,19 @@ function RomImporter:update(dt)
   if self.modWorker then
     local started = love.timer.getTime()
     repeat
-      local ok, workerError = coroutine.resume(self.modWorker)
+      -- A successful mod worker can finish through _finishModWork, which
+      -- clears self.modWorker before control returns here. Keep the running
+      -- coroutine in a local variable so the completion path never calls
+      -- coroutine.status(nil) after an Android picker return.
+      local modWorker = self.modWorker
+      local ok, workerError = coroutine.resume(modWorker)
       if not ok then
-        print(debug.traceback(self.modWorker, tostring(workerError)))
+        print(debug.traceback(modWorker, tostring(workerError)))
         self.modWorker, self.modProgress = nil, nil
         self.modNotice = { ok = false, text = "Mod import failed: " .. tostring(workerError) }
         break
       end
-      if coroutine.status(self.modWorker) == "dead" then
+      if self.modWorker == modWorker and coroutine.status(modWorker) == "dead" then
         self.modWorker = nil
         break
       end
