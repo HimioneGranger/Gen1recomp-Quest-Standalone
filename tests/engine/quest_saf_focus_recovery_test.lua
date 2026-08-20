@@ -14,6 +14,7 @@ end
 local host = read("mobile/android/love/src/main/java/org/love2d/android/GameActivity.java")
 local activity = read("mobile/android/love/src/questVr/java/org/love2d/android/QuestGameActivity.java")
 local bridge = read("mobile/android/love/src/jni/questxr_bridge/questxr_bridge.c")
+local main = read("main.lua")
 
 check(host:find("onHostFilePickerReturned", 1, true), "base host exposes SAF return hook")
 check(activity:find("nativeQuestXrMarkSafReturn", 1, true), "Quest host marks SAF return")
@@ -28,5 +29,9 @@ check(bridge:find('"onQuestXrSessionFocused", "()V"', 1, true),
 check(bridge:find("saf_generation != seen_saf_generation && ray_active", 1, true)
    or bridge:find("saf_pose_pending_generation != 0", 1, true),
   "native bridge requires a returned tracked ray before release")
+check(main:find("shouldDeferAndroidSafQuit", 1, true),
+  "LÖVE loop recognizes the Quest SAF-return quit event")
+check(main:find('love.filesystem.getInfo("picked_mod.zip", "file")', 1, true),
+  "quit deferral is limited to a delivered SAF result")
 
 print(("quest_saf_focus_recovery_test: %d checks passed"):format(checks))
