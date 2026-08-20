@@ -952,7 +952,11 @@ end
 -- their existing behaviour.
 local function shouldDeferAndroidSafQuit()
   if not (love.system and love.system.getOS() == "Android") then return false end
-  if not (Importer and Importer.pickPending and love.filesystem) then return false end
+  if not (Importer and love.filesystem) then return false end
+  -- `focus(true)` can run once before GameActivity finishes copying the URI.
+  -- Keep the guard for the whole native-picker handoff, rather than only the
+  -- short interval where the directory poll has its pending bit armed.
+  if not (Importer.pickPending or Importer.safPickerActive) then return false end
   return love.filesystem.getInfo("picked_mod.zip", "file") ~= nil
     or love.filesystem.getInfo("picked_rom.gb", "file") ~= nil
     or love.filesystem.getInfo("picked_save.sav", "file") ~= nil

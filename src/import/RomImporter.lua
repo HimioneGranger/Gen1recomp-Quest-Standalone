@@ -1690,6 +1690,7 @@ end
 
 function RomImporter:_finishModWork(ok, text, done)
   self.modWorker, self.modProgress = nil, nil
+  self.safPickerActive = nil
   if ok then pcall(self._refreshMods, self) end
   self.modNotice = { ok = ok, text = text }
   if done then done(ok) end
@@ -1866,6 +1867,10 @@ function RomImporter:chooseMod()
         text = "Could not open the file picker. Copy a mod .zip via USB." }
     else
       self.pickPending = true
+      -- Quest can deliver an Android quit event between DocumentsUI returning
+      -- and the first Lua poll that sees the copied ZIP. Keep this marker
+      -- through the resulting install so main.lua can defer only that event.
+      self.safPickerActive = true
       self.pickTimer = 0
     end
     return
