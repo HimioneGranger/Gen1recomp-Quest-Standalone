@@ -4,6 +4,7 @@
 local Font = require("src.render.Font")
 local GameVersion = require("src.core.GameVersion")
 local Music = require("src.core.Music")
+local PlatformProfile = require("src.core.PlatformProfile")
 local Sound = require("src.core.Sound")
 local Strings = require("src.core.Strings")
 
@@ -136,6 +137,8 @@ function IntroMovie.new(game, onDone)
   self.phase = 1
   self.timer = 0
   self.finished = false
+  -- Quest keeps the launcher panel white around every boot movie.
+  self.questLetterboxWhite = PlatformProfile.isQuestStandalone()
 
   local intro = game.data.field and game.data.field.intro or {}
   self.introCfg = intro

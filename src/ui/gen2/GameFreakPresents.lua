@@ -32,6 +32,7 @@ local Chrome = require("src.ui.gen2.Chrome")
 local GbcPalette = require("src.render.GbcPalette")
 local Music = require("src.core.Music")
 local Runtime = require("src.mods.Runtime")
+local PlatformProfile = require("src.core.PlatformProfile")
 local Sound = require("src.core.Sound")
 local SpriteAnims = require("src.ui.gen2.SpriteAnims")
 local TileSheet = require("src.ui.gen2.TileSheet")
@@ -104,6 +105,7 @@ function GameFreakPresents.new(game, opts)
   local splash = (opts.oakSpeech or {}).splash or {}
   self.obColors = splash.obPalette or DEFAULT_OB
   self.bgColors = splash.bgPalette or DEFAULT_BG
+  self.questLetterboxWhite = PlatformProfile.isQuestStandalone()
 
   -- One sheet per INCBIN, each addressed by the VRAM id its tiles were
   -- loaded at, so an OAM entry's tile id picks its own sheet.

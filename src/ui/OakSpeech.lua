@@ -10,6 +10,7 @@
 local Assets = require("src.render.Assets")
 local Sound = require("src.core.Sound")
 local Music = require("src.core.Music")
+local PlatformProfile = require("src.core.PlatformProfile")
 local Logger = require("src.core.Logger")
 local Runtime = require("src.mods.Runtime")
 local TextBox = require("src.render.TextBox")
@@ -234,6 +235,7 @@ end
 
 function OakSpeech.new(game, onDone)
   local self = setmetatable({}, OakSpeech)
+  self.questLetterboxWhite = PlatformProfile.isQuestStandalone()
   self.game = game
   self.onDone = onDone
   self.step = 0

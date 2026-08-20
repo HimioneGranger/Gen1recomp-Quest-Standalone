@@ -11,6 +11,7 @@ local Assets = require("src.render.Assets")
 local Chrome = require("src.ui.gen2.Chrome")
 local Font = require("src.render.Font")
 local Runtime = require("src.mods.Runtime")
+local PlatformProfile = require("src.core.PlatformProfile")
 
 local CopyrightSplash = {}
 CopyrightSplash.__index = CopyrightSplash
@@ -47,6 +48,7 @@ function CopyrightSplash.new(game, opts)
   self.lines = opts.lines
   self.frames = 0
   self.done = false
+  self.questLetterboxWhite = PlatformProfile.isQuestStandalone()
   return self
 end
 

@@ -34,6 +34,7 @@ local Logger = require("src.core.Logger")
 local Music = require("src.core.Music")
 local Palettes = require("src.world.gen2.Palettes")
 local Runtime = require("src.mods.Runtime")
+local PlatformProfile = require("src.core.PlatformProfile")
 local Sound = require("src.core.Sound")
 local SpriteAnims = require("src.ui.gen2.SpriteAnims")
 
@@ -156,6 +157,7 @@ function GoldSilverIntro.new(game, opts)
   self.anims = SpriteAnims.new()
   self.scene = 1
   self.done = false
+  self.questLetterboxWhite = PlatformProfile.isQuestStandalone()
   self.frames = 0
 
   -- Hardware registers and the movie's own WRAM.
