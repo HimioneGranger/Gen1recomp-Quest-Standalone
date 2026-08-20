@@ -35,9 +35,10 @@ local function freshImporter(ready)
     saveNotice = {},
     modNotice = nil,
     androidPendingVersion = nil,
-    _installMod = function(self, source)
+    _installMod = function(self, source, onComplete)
       self._installed = source
       self.modNotice = { ok = true, text = "Installed test" }
+      if onComplete then onComplete(true) end
     end,
     _importSave = function(self, version, source)
       self._imported = { version = version, source = source }
