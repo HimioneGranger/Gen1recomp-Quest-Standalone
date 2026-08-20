@@ -20,6 +20,7 @@
 
 local Strings = require("src.core.Strings")
 local SaveData = require("src.core.SaveData")
+local PlatformProfile = require("src.core.PlatformProfile")
 
 local LauncherSettings = {}
 
@@ -70,6 +71,7 @@ local FILTERS = { "OFF", "1X", "2X", "3X" }
 -- of them, so a phone player could turn the pad and the buzz off in Red and
 -- had no way to reach either in Gold.
 local function addTouchRows(rows, add, opts, hooks)
+  if PlatformProfile.isQuestStandalone() then return end
   -- TOUCH PAD only where the overlay can appear, mirroring OptionsMenu's
   -- gate (mobile, or desktop forced by POKEPORT_TOUCH=1).
   local env = os.getenv("POKEPORT_TOUCH")
@@ -177,9 +179,9 @@ local function coreRows(opts, hooks)
   local okPal, PaletteFX = pcall(require, "src.render.PaletteFX")
   if okPal then
     add(Strings("COLORS"),
-      function() return PaletteFX.modeLabel(opts.colors or "gbc") end,
+      function() return PaletteFX.modeLabel(opts.colors or "redpp") end,
       function(dir)
-        local cur, idx = opts.colors or "gbc", 1
+        local cur, idx = opts.colors or "redpp", 1
         for i, m in ipairs(PaletteFX.MODES) do
           if m == cur then idx = i break end
         end
@@ -225,8 +227,10 @@ local function coreRows(opts, hooks)
       end)
   end
 
+  local questStandalone = PlatformProfile.isQuestStandalone()
+
   local okVm, VideoMode = pcall(require, "src.core.VideoMode")
-  if okVm then
+  if okVm and not questStandalone then
     add(Strings("VIDEO MODE"),
       function() return VideoMode.modeLabel(opts.videoMode) end,
       function(dir)
@@ -243,7 +247,7 @@ local function coreRows(opts, hooks)
   do
     local osName = love.system and love.system.getOS and love.system.getOS()
     local okOr, Orientation = pcall(require, "src.core.Orientation")
-    if okOr and osName == "Android" then
+    if okOr and osName == "Android" and not questStandalone then
       add(Strings("ORIENTATION"),
         function() return Strings(Orientation.modeLabel(opts.orientation)) end,
         function(dir)

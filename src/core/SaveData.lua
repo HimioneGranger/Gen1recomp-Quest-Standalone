@@ -267,8 +267,8 @@ function SaveData.defaultOptions()
     speedOverworld = 1,
     speedBattle = 1,
     speedMenu = 1,
-    -- port display options (OptionsMenu / hotkeys 2/3/4/5)
-    colors = "gbc",
+    -- Quest Unplugged default. redpp is the user-facing ADVANCED palette.
+    colors = "redpp",
     tilt = 0,
     gbcfx = 0,
     -- survey zoom offset from window fit scale (0 = FIT); see Zoom.lua

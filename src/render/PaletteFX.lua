@@ -36,7 +36,7 @@ PaletteFX.MODE_LABELS = {
   ogred = "OG RED", gbc = "SGB", redpp = "ADVANCED", og = "OG",
   og_inv = "OG INV", gbc_inv = "SGB INV", classic = "CLASSIC",
 }
-PaletteFX.mode = "gbc"
+PaletteFX.mode = "redpp"
 
 -- ------- dark-cave state (wMapPalOffset)
 --
@@ -792,7 +792,7 @@ function PaletteFX.cycleMode()
 end
 
 function PaletteFX.applyOptions(opts)
-  PaletteFX.setMode(opts and opts.colors or "gbc")
+  PaletteFX.setMode(opts and opts.colors or "redpp")
 end
 
 function PaletteFX.modeLabel(mode)
