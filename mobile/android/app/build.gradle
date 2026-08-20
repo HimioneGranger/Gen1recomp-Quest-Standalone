@@ -15,6 +15,10 @@ android {
         targetSdk 34
         
         def getAppName = {
+            def override = project.findProperty("app.display_name")
+            if (override != null && !override.toString().trim().isEmpty()) {
+                return override.toString()
+            }
             def nameArray = project.properties["app.name_byte_array"]
             def name = project.properties["app.name"]
             if (name != null && nameArray != null) {
@@ -32,6 +36,12 @@ android {
             }
             return name
         }
+
+        // All locally-built variants use the same launcher source. Only this
+        // explicit diagnostic switch and the visible label may differ.
+        def diagnosticEnabled = project.findProperty("app.diagnostic")
+        buildConfigField "boolean", "DIAGNOSTIC",
+            diagnosticEnabled != null && diagnosticEnabled.toString().toBoolean() ? "true" : "false"
 
         manifestPlaceholders = [
             NAME:getAppName(),
