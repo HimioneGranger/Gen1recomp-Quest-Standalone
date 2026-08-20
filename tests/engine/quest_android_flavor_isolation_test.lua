@@ -139,5 +139,8 @@ check(questDisplay:find("_G.QUEST_PANEL_ACTIVE = true", 1, true),
   "Quest display advertises the panel handoff capability to gameplay mods")
 check(not questManifest:find("QUEST_XR_BOOTSTRAP", 1, true),
   "Quest manifest has no obsolete metadata gate")
+check(questManifest:find('android:launchMode="singleTask"', 1, true) and
+      questManifest:find('tools:replace="android:launchMode"', 1, true),
+  "Quest host reuses the Horizon OS immersive-launch task without changing stock Android")
 
 print("quest_android_flavor_isolation_test: ok")
