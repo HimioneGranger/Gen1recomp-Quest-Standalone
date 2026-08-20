@@ -1,0 +1,2 @@
+# Bash build scripts must retain LF endings in Windows checkouts.
+*.sh text eol=lf

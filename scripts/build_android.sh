@@ -23,7 +23,7 @@ ANDROID_DIR="$ROOT/mobile/android"
 EMBED_ASSETS="$ANDROID_DIR/app/src/embed/assets"
 LOVE_FILE="$EMBED_ASSETS/game.love"
 DIST="$ROOT/dist/android"
-APP_NAME="Gen1Recomp VR Unplugged"
+APP_NAME="Gen 1 Recomp Unplugged"
 APPLICATION_ID="com.theboisclub.pokemonred"
 LOVE_ANDROID_VERSION="11.5a"
 NDK_VERSION="25.2.9519653"
@@ -57,9 +57,13 @@ done
 
 case "$BUILD_VARIANT" in
   normal) ;;
-  test) APP_NAME="Gen 1 Recomp Unplugged Test" ;;
+  test)
+    APP_NAME="Gen 1 Recomp Unplugged Test"
+    APPLICATION_ID+=".test"
+    ;;
   diagnostic)
     APP_NAME="Gen 1 Recomp Unplugged Diagnostic"
+    APPLICATION_ID+=".diagnostic"
     DIAGNOSTIC=true
     ;;
   *) fail "invalid --variant '$BUILD_VARIANT' (normal, test, or diagnostic)" ;;
@@ -349,6 +353,7 @@ run_gradle() {
     cd "$build_dir"
     gradle_args=(--no-daemon "$task" \
       "-Papp.display_name=$APP_NAME" \
+      "-Papp.application_id=$APPLICATION_ID" \
       "-Papp.diagnostic=$DIAGNOSTIC")
     if [ -n "$VERSION" ]; then
       gradle_args+=("-Papp.version_name=$VERSION" \
