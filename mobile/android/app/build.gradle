@@ -84,10 +84,10 @@ android {
 dependencies {
     api 'androidx.multidex:multidex:2.0.1'
     api fileTree(dir: 'libs', include: ['*.jar'])
-    api 'androidx.appcompat:appcompat:1.6.1'
+    api 'androidx.appcompat:appcompat:1.8.0'
     api project(':love')
     // Khronos' official Android OpenXR loader. The flavor-scoped native bridge
     // resolves it at runtime; the AAR also contributes the loader's required
     // global Android manifest declarations.
-    questVrImplementation 'org.khronos.openxr:openxr_loader_for_android:1.1.60'
+    questVrImplementation 'org.khronos.openxr:openxr_loader_for_android:1.1.62'
 }
