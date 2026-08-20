@@ -31,9 +31,9 @@ check(bridge:find("saf_generation != seen_saf_generation && ray_active", 1, true
   "native bridge requires a returned tracked ray before release")
 check(main:find("shouldDeferAndroidSafQuit", 1, true),
   "LÖVE loop recognizes the Quest SAF-return quit event")
-check(main:find('love.filesystem.getInfo("picked_mod.zip", "file")', 1, true),
-  "quit deferral is limited to a delivered SAF result")
 check(main:find("Importer.safPickerActive", 1, true),
   "quit deferral covers the full native-picker return handoff")
+check(main:find("if Importer.safPickerActive then return true end", 1, true),
+  "quit deferral is armed before DocumentsUI can enqueue its shutdown")
 
 print(("quest_saf_focus_recovery_test: %d checks passed"):format(checks))

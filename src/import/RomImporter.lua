@@ -1862,16 +1862,17 @@ function RomImporter:chooseMod()
       end)
       return
     end
+    -- Arm this before opening DocumentsUI. Horizon OS can queue LÖVE's quit
+    -- event synchronously while pickFile is still on the stack; arming after
+    -- it returns leaves no opportunity for main.lua to preserve the app.
+    self.pickPending = true
+    self.safPickerActive = true
+    self.pickTimer = 0
     if not pickFile("mod") then
+      self.pickPending = nil
+      self.safPickerActive = nil
       self.modNotice = { ok = false,
         text = "Could not open the file picker. Copy a mod .zip via USB." }
-    else
-      self.pickPending = true
-      -- Quest can deliver an Android quit event between DocumentsUI returning
-      -- and the first Lua poll that sees the copied ZIP. Keep this marker
-      -- through the resulting install so main.lua can defer only that event.
-      self.safPickerActive = true
-      self.pickTimer = 0
     end
     return
   end
