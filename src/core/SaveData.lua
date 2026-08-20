@@ -267,7 +267,7 @@ function SaveData.defaultOptions()
     speedOverworld = 1,
     speedBattle = 1,
     speedMenu = 1,
-    -- port display options (OptionsMenu / hotkeys 2/3/4/5)
+    -- Quest Unplugged default. redpp is the user-facing ADVANCED palette.
     colors = "redpp",
     tilt = 0,
     gbcfx = 0,

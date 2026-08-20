@@ -9,6 +9,8 @@ love = love or require("tests.love_stub")
 
 local realGetOS = love.system.getOS
 love.system.getOS = function() return "Android" end
+local realQuestPanel = rawget(_G, "QUEST_PANEL_ACTIVE")
+_G.QUEST_PANEL_ACTIVE = true
 
 local function labels(model)
   local out = {}
@@ -33,6 +35,15 @@ check(not launcher["VIBRATION"], "Quest launcher hides VIBRATION")
 check(launcher["COLORS"], "Quest launcher keeps COLORS")
 check(launcher["PERFORMANCE"], "Quest launcher keeps PERFORMANCE")
 
+local launcherColors
+for _, section in ipairs(LauncherSettings.open(nil, "red").sections) do
+  for _, row in ipairs(section.rows) do
+    if row.label == "COLORS" then launcherColors = row end
+  end
+end
+check(launcherColors and launcherColors.value() == "ADVANCED",
+  "missing launcher color option reads as Advanced")
+
 local OptionsMenu = require("src.ui.OptionsMenu")
 local inGame = OptionsMenu.new({ save = { options = {} }, data = { audio = {} } })
 local rows = {}
@@ -43,6 +54,12 @@ check(not rows.touchControls, "Quest in-game menu hides TOUCH PAD")
 check(not rows.haptics, "Quest in-game menu hides VIBRATION")
 check(rows.colors, "Quest in-game menu keeps COLORS")
 check(rows.performance, "Quest in-game menu keeps PERFORMANCE")
+local inGameColors
+for _, row in ipairs(inGame.rows) do
+  if row.id == "colors" then inGameColors = row end
+end
+check(inGameColors and inGameColors.value(inGame.game) == "ADVANCED",
+  "missing in-game color option reads as Advanced")
 
 local function read(path)
   local file = assert(io.open(path, "rb"))
@@ -54,6 +71,9 @@ check(read("src/core/SaveData.lua"):find('colors = "redpp"', 1, true),
   "new Quest saves default to Advanced colors")
 check(read("src/save_convert/SaveConvert.lua"):find('colors = "redpp"', 1, true),
   "ROM imports default to Advanced colors")
+check(read("src/render/PaletteFX.lua"):find('PaletteFX.mode = "redpp"', 1, true),
+  "palette runtime starts at Advanced")
 
 love.system.getOS = realGetOS
+_G.QUEST_PANEL_ACTIVE = realQuestPanel
 T.finish("quest settings profile")
