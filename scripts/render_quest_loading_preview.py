@@ -1,9 +1,8 @@
-"""Render the deterministic Quest loading preview and real-alpha logo.
+"""Render the deterministic V8 Quest loading preview and real-alpha logo.
 
-This script uses the supplied white-background logo master as its only logo
-source. It removes the white matte by color decontamination, then uses the same
-1915x821 geometry, measured text bounds, deterministic seeded Pokeball placement,
-and alternating progress styles as src/ui/kit/QuestLoadingScreen.lua.
+The renderer shares the 36 approved V8 motif anchors, retained color changes,
+14-pixel measured exclusions, destination-seeded fallback placement, and
+alternating progress styles with src/ui/kit/QuestLoadingScreen.lua.
 """
 
 from __future__ import annotations
@@ -20,51 +19,49 @@ BLUE = (30, 120, 210)
 YELLOW = (255, 209, 31)
 WHITE = (255, 255, 255)
 OUTLINE_COLORS = {"red": RED, "blue": BLUE, "yellow": YELLOW}
+PROTECTED_MARGIN = 14
+LOGO_MAX_SIZE = (710, 520)
+LOGO_PATH = Path("assets/logo/gen1recomp_unplugged_tight.png")
+V4_MOTIF_COUNT = 32
+MOTIF_COUNT = 36
 
-STATIC_ZONES = [
-    ("logo", 85, 90, 790, 640),
-    ("progress", 970, 390, 875, 145),
-    ("copy", 1050, 545, 745, 125),
+MOTIF_ANCHORS = [
+    (89, 35, 17, "blue"), (262, 48, 21, "yellow"),
+    (435, 38, 17, "red"), (580, 65, 17, "yellow"),
+    (1069, 76, 27, "blue"), (1192, 76, 13, "yellow"),
+    (1492, 96, 17, "red"),
+    (1705, 92, 17, "red"), (1715, 174, 17, "yellow"),
+    (1069, 193, 17, "red"),
+    (1229, 205, 22, "blue"), (1349, 175, 13, "red"),
+    (71, 372, 22, "red"), (1011, 329, 17, "red"),
+    (1362, 320, 27, "blue"),
+    (1486, 342, 13, "yellow"), (1872, 328, 27, "red"),
+    (889, 446, 22, "yellow"), (911, 619, 22, "red"),
+    (1198, 630, 13, "red"), (1645, 596, 27, "yellow"),
+    (1814, 634, 27, "blue"), (61, 750, 22, "red"),
+    (263, 760, 27, "red"), (405, 758, 17, "yellow"),
+    (579, 750, 27, "blue"), (864, 761, 22, "blue"),
+    (1186, 744, 13, "blue"),
+    (1351, 778, 27, "yellow"), (1530, 723, 27, "red"),
+    (1669, 747, 13, "red"), (1819, 734, 22, "yellow"),
+    (125, 150, 14, "blue"), (330, 150, 20, "red"),
+    (815, 165, 23, "blue"),
+    (75, 575, 18, "yellow"),
 ]
-
-BASE_BALLS = [
-    (105, 58, 31, "red"), (275, 62, 17, "blue"),
-    (470, 62, 24, "yellow"), (700, 48, 17, "red"),
-    (920, 62, 27, "blue"), (1100, 55, 18, "yellow"),
-    (1300, 54, 23, "red"), (1545, 48, 27, "blue"),
-    (1750, 72, 21, "yellow"), (1872, 155, 27, "red"),
-    (54, 268, 25, "blue"), (930, 275, 18, "yellow"),
-    (1880, 350, 26, "red"), (52, 520, 24, "yellow"),
-    (935, 595, 18, "red"), (1878, 535, 25, "blue"),
-    (62, 765, 27, "blue"), (255, 776, 17, "yellow"),
-    (925, 765, 25, "red"), (1100, 752, 18, "blue"),
-    (1320, 765, 24, "yellow"), (1545, 760, 17, "red"),
-    (1765, 760, 27, "blue"), (1890, 700, 24, "yellow"),
-    (955, 360, 15, "blue"),
-    (965, 690, 15, "yellow"), (1830, 690, 16, "red"),
-]
-
-GUIDE_POINTS = [
-    (310, 85), (810, 48), (560, 145), (990, 125),
-    (1200, 90), (1430, 115), (1705, 155), (120, 180),
-    (240, 195), (460, 205), (735, 205), (1090, 185),
-    (1210, 190), (1400, 185), (1580, 190), (1760, 260),
-    (70, 410), (210, 480), (270, 585), (390, 750),
-    (470, 640), (550, 770), (685, 650), (770, 760),
-    (800, 570), (865, 645), (885, 365), (1080, 350),
-    (1180, 330), (1190, 550), (1040, 585), (1150, 665),
-    (1280, 650), (1400, 690), (1500, 660), (1535, 610),
-    (1650, 730), (1700, 600), (1750, 650), (1600, 350),
-    (1420, 350), (1310, 270), (1250, 375), (900, 480),
-]
-BALL_SIZES = (13, 16, 19, 23, 27, 31)
-BALL_COLORS = ("red", "blue", "yellow")
 FALLBACK_OFFSETS = [(0, 0)]
 for distance in (45, 90, 140, 200, 280, 360, 430):
     FALLBACK_OFFSETS.extend((dx * distance, dy * distance) for dx, dy in (
         (-1, 0), (1, 0), (0, -1), (0, 1),
         (-1, -1), (1, -1), (-1, 1), (1, 1),
     ))
+
+
+def protected_zone(name: str, x: float, y: float, width: float,
+                   height: float):
+    return (
+        name, x - PROTECTED_MARGIN, y - PROTECTED_MARGIN,
+        width + PROTECTED_MARGIN * 2, height + PROTECTED_MARGIN * 2,
+    )
 
 
 def intersects(ball: tuple[int, int, int, str],
@@ -189,38 +186,51 @@ def destination_geometry(destination: str, font_path: Path):
     lines = split_name(destination)
     font_size = 48 if len(lines) == 1 else 40
     font = ImageFont.truetype(str(font_path), font_size)
-    boxes = [font.getbbox(line) for line in lines]
-    widths = [box[2] - box[0] for box in boxes]
-    height = max(box[3] - box[1] for box in boxes)
+    widths = [font.getlength(line) for line in lines]
+    height = font_size
     line_height = height + 8
     first_y = 238 - (len(lines) - 1) * line_height / 2
-    padding = 18
     min_x = min(1410 - width / 2 for width in widths)
     max_x = max(1410 + width / 2 for width in widths)
-    zone = ("destination", min_x - padding, first_y - padding,
-            max_x - min_x + padding * 2,
-            height + (len(lines) - 1) * line_height + padding * 2)
+    zone = protected_zone(
+        "destination", min_x, first_y - height / 2, max_x - min_x,
+        height + (len(lines) - 1) * line_height,
+    )
     return lines, font, first_y, line_height, zone
 
 
-def background_layout(destination: str, destination_zone):
-    zones = [*STATIC_ZONES, destination_zone]
+def background_layout(destination: str, zones):
     seed = destination_seed(destination)
     placed = []
-    for index, ball in enumerate(BASE_BALLS, 1):
+    for index, ball in enumerate(MOTIF_ANCHORS, 1):
         resolved = place_ball(ball, zones, placed, seed, index)
         if resolved:
             placed.append(resolved)
-    for index, (x, y) in enumerate(GUIDE_POINTS, 1):
-        ball = (
-            x, y,
-            BALL_SIZES[(seed + index * 37) % len(BALL_SIZES)],
-            BALL_COLORS[(seed + index * 53) % len(BALL_COLORS)],
-        )
-        resolved = place_ball(ball, zones, placed, seed, len(BASE_BALLS) + index)
-        if resolved:
-            placed.append(resolved)
     return placed
+
+
+def layout_zones(logo: Image.Image, destination: str, font_path: Path,
+                 progress: float = .7, total: int = 10):
+    lines, name_font, first_y, line_height, destination_zone = \
+        destination_geometry(destination, font_path)
+    fitted_logo = logo.copy()
+    fitted_logo.thumbnail(LOGO_MAX_SIZE, Image.Resampling.LANCZOS)
+    logo_x = W / 4 - fitted_logo.width / 2
+    logo_y = H / 2 - fitted_logo.height / 2
+    complete = min(total, max(0, int(progress * total + .00001)))
+    copy = f"LOADING MAP DATA - {round(progress * 100)}%  ({complete} / {total})"
+    copy_font = ImageFont.truetype(str(font_path), 25)
+    copy_width = copy_font.getlength(copy)
+    zones = [
+        protected_zone("logo", logo_x, logo_y,
+                       fitted_logo.width, fitted_logo.height),
+        destination_zone,
+        protected_zone("progress", 988, 443, 804, 44),
+        protected_zone("copy", 1422.5 - copy_width / 2,
+                       585 - 25 / 2, copy_width, 25),
+    ]
+    return (lines, name_font, first_y, line_height, copy, copy_font,
+            fitted_logo, zones)
 
 
 def centered_text(draw: ImageDraw.ImageDraw, xy: tuple[int, int], text: str,
@@ -232,13 +242,11 @@ def render(alpha_logo: Image.Image, font_path: Path, destination: str,
            progress: float) -> Image.Image:
     image = Image.new("RGBA", (W, H), (254, 254, 253, 255))
     draw = ImageDraw.Draw(image)
-    name_lines, name_font, first_y, line_height, destination_zone = \
-        destination_geometry(destination, font_path)
-    for ball in background_layout(destination, destination_zone):
+    (name_lines, name_font, first_y, line_height, copy, copy_font, logo,
+     zones) = layout_zones(alpha_logo, destination, font_path, progress)
+    for ball in background_layout(destination, zones):
         draw_outline_ball(draw, ball)
 
-    logo = alpha_logo.copy()
-    logo.thumbnail((710, 520), Image.Resampling.LANCZOS)
     image.alpha_composite(logo, (round(478.75 - logo.width / 2), round(410.5 - logo.height / 2)))
 
     for index, line in enumerate(name_lines):
@@ -250,16 +258,16 @@ def render(alpha_logo: Image.Image, font_path: Path, destination: str,
         x = 1010 + (index - 1) * (760 / 9)
         draw_progress_ball(image, x, 465, 22, index, index <= complete)
 
-    copy_font = ImageFont.truetype(str(font_path), 25)
-    copy = f"LOADING MAP DATA - {round(progress * 100)}%  ({complete} / 10)"
     centered_text(draw, (1422, 585), copy, copy_font, NAVY)
     return image.convert("RGB")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--master", type=Path, required=True)
-    parser.add_argument("--alpha-output", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--logo", type=Path)
+    source.add_argument("--master", type=Path)
+    parser.add_argument("--alpha-output", type=Path)
     parser.add_argument("--jpeg-output", type=Path, required=True)
     parser.add_argument("--asset-output", type=Path)
     parser.add_argument("--font", type=Path, default=Path("assets/fonts/plainpixel/PlainPixel-Regular.ttf"))
@@ -270,9 +278,13 @@ def main() -> None:
     for output in (args.alpha_output, args.jpeg_output, args.asset_output):
         if output and output.exists():
             raise FileExistsError(f"refusing to overwrite {output}")
-    alpha = extract_white_matte(Image.open(args.master))
-    args.alpha_output.parent.mkdir(parents=True, exist_ok=True)
-    alpha.save(args.alpha_output, "PNG", optimize=True)
+    if args.logo:
+        alpha = Image.open(args.logo).convert("RGBA")
+    else:
+        alpha = extract_white_matte(Image.open(args.master))
+    if args.alpha_output:
+        args.alpha_output.parent.mkdir(parents=True, exist_ok=True)
+        alpha.save(args.alpha_output, "PNG", optimize=True)
     if args.asset_output:
         args.asset_output.parent.mkdir(parents=True, exist_ok=True)
         alpha.save(args.asset_output, "PNG", optimize=True)
