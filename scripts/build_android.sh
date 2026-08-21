@@ -219,7 +219,10 @@ pack_game_love() {
   # The launcher UI kit lives at src/ui/kit (inside src/, packed wholesale);
   # the vendored libs/flexlove tree it replaced is gone.
   if command -v zip >/dev/null 2>&1; then
-    (cd "$ROOT" && zip -q -9 -r "$LOVE_FILE" \
+    # Strip host-specific extra fields. In particular, Info-ZIP otherwise
+    # records access times that change while the first archive is being read,
+    # which makes two packages from the same tree byte-different.
+    (cd "$ROOT" && zip -q -X -9 -r "$LOVE_FILE" \
       main.lua conf.lua src data assets tools/save-editor \
       tools/rom_manifest.json tools/rom_manifest_blue.json \
       tools/rom_manifest_yellow.json tools/rom_manifest_gold.json \
@@ -252,8 +255,9 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive
         if path.is_file():
             archive.write(path, path.relative_to(root).as_posix())
         else:
-            for current, _, names in os.walk(path):
-                for name in names:
+            for current, dirs, names in os.walk(path):
+                dirs.sort()
+                for name in sorted(names):
                     candidate = pathlib.Path(current) / name
                     rel = candidate.relative_to(root)
                     if include(rel):
@@ -304,7 +308,7 @@ PY
     sed -E "s/(engine[[:space:]]*=[[:space:]]*\")[^\"]*(\")/\1$VERSION\2/" \
       "$ROOT/src/core/Version.lua" > "$stamp_dir/src/core/Version.lua"
     if command -v zip >/dev/null 2>&1; then
-      (cd "$stamp_dir" && zip -q "$LOVE_FILE" src/core/Version.lua)
+      (cd "$stamp_dir" && zip -q -X "$LOVE_FILE" src/core/Version.lua)
     else
       python3 - "$LOVE_FILE" "$stamp_dir/src/core/Version.lua" <<'PY'
 import sys, zipfile
