@@ -62,6 +62,9 @@ local PROBE = [[
   out.assignGarbage = attempt(function() love.mousemoved = 7 end)
   out.powerInfo = type(love.system.getPowerInfo)
   out.openUrl = love.system.openURL("https://example.com")
+  -- tls* is forwarded from the real love.system when the engine hung it
+  -- (Gen1Tls / Android JNI); without that it's just nil, not an error.
+  out.tlsOpenType = type(love.system.tlsOpen)
   out.eventQuit = love.event.quit()
   out.popen = select(1, io.popen("ls"))
 
@@ -200,6 +203,8 @@ T.check(out.loveAssign ~= false,
   "a mod cannot replace a love module table: " .. tostring(out.loveAssign))
 T.eq(out.powerInfo, "function",
   "love.system reads through to the same information mod.device exposes")
+T.check(out.tlsOpenType == "function" or out.tlsOpenType == "nil",
+  "tls* is readable through the system shim (nil until the engine hangs it)")
 
 -- a wrapped callback has to land on the real table or the wrap never fires
 T.eq(type(installedMouseMoved), "function",

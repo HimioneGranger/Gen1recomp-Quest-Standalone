@@ -662,7 +662,13 @@ end
 
 local function systemShim(ctx)
   local function real() return _G.love and _G.love.system or nil end
-  return {
+  -- tls* comes from the engine (Android JNI, or desktop gen1tls hung on
+  -- love.system at boot).  Forward those; keep clipboard / openURL stubbed.
+  local TLS = {
+    tlsOpen = true, tlsStatus = true, tlsSend = true,
+    tlsReceive = true, tlsError = true, tlsClose = true,
+  }
+  local shim = {
     getOS = function()
       local sys = real()
       return sys and sys.getOS and sys.getOS() or "Unknown"
@@ -697,6 +703,13 @@ local function systemShim(ctx)
       return false
     end,
   }
+  return setmetatable(shim, {
+    __index = function(_, key)
+      if not TLS[key] then return nil end
+      local sys = real()
+      return sys and sys[key]
+    end,
+  })
 end
 
 local function eventShim(ctx)

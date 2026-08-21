@@ -558,6 +558,39 @@ Focused verification:
 - Quest platform lifecycle hooks: 14/14 passed.
 - Staged diff and whitespace checks passed.
 
+### Batch 14: sandbox TLS compatibility bridge
+
+Audit lane: M8 TLS follow-up for LegacyCompat.
+
+Upstream sources, in dependency order:
+
+- `18d61779eb84fe80b167f3ff53dc7263c0af119d`
+- `ef208035ec5a509f7c0f89aff611b85fe2007fcf`
+
+Exact imported path set:
+
+```text
+main.lua
+src/mods/LegacyCompat.lua
+src/net/Gen1Tls.lua
+tests/modkit/cases/sandbox.lua
+```
+
+The second source corrects the first source's UTF-16 file to valid UTF-8. The
+bridge keeps Android/Quest's existing `love.system.tls*` functions when they
+are present and only tries the optional desktop library otherwise. Clipboard,
+URL, process, raw FFI, and other host capabilities remain blocked from mods.
+
+Focused verification:
+
+- Sandbox compatibility: 98/98 passed.
+- Host boundary: 25/25 passed.
+- Android host extension: passed.
+- Quest host adapter: 7/7 passed.
+- Quest platform lifecycle hooks: 14/14 passed.
+- Corrected Gen1Tls module load: passed.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -570,5 +603,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 13 establishes the filtered mod fetch/job core.
-Resume with the TLS compatibility follow-up, then M1 postLog dependents.
+Current recovery point: Batch 14 completes the TLS compatibility follow-up.
+Resume with M1 postLog and its security dependents.

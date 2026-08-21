@@ -281,6 +281,11 @@ function love.load(args)
   -- of each flashing their own cmd.exe window (#606).  No-op elsewhere.
   require("src.core.HostShell").hideHostConsole()
 
+  -- Hang gen1tls on love.system before mods boot.  Android already has tls*
+  -- from JNI; this is the desktop half.  No DLL / no FFI is fine -- ws://
+  -- rooms still work, wss:// just won't.
+  pcall(function() require("src.net.Gen1Tls").install() end)
+
   -- NX fused mounts are unreliable for the blue|yellow cache overlay: wrap
   -- the love loaders once so every generated-asset read falls back to the
   -- versioned save-dir copy.  Never installed on desktop/Android/iOS.
