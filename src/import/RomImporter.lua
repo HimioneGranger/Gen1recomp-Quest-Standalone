@@ -4038,25 +4038,12 @@ function RomImporter:_findRows()
     category = self.findCategory,
   })
   if self.modScope then
+    local ModTargets = require("src.mods.ModTargets")
     local gen = GameVersion.generation(self.modScope)
     local kept = {}
     for _, entry in ipairs(rows) do
-      local has1, has2 = false, false
-      local function note(s)
-        s = tostring(s or ""):lower()
-        if s == "gen1" or s == "gen 1" or s == "red" or s == "blue"
-            or s == "yellow" then
-          has1 = true
-        end
-        if s == "gen2" or s == "gen 2" or s == "gold" then
-          has2 = true
-        end
-      end
-      for _, cat in ipairs(entry.categories or {}) do note(cat) end
-      for _, tag in ipairs(entry.tags or {}) do note(tag) end
-      if (not has1 and not has2)
-          or (gen == 2 and has2)
-          or (gen ~= 2 and has1) then
+      local versions = ModTargets.normalize(entry.games)
+      if #versions == 0 or ModTargets.covers(versions, gen) then
         kept[#kept + 1] = entry
       end
     end

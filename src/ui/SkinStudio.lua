@@ -19,6 +19,17 @@ Studio.CANVASES = {
     lockViewport = { x = 48 / 256, y = 40 / 224, w = 160 / 256, h = 144 / 224 } },
 }
 
+-- Per-page lock, and whether the canvas preset follows it.  Match is on
+-- by default so a portrait/landscape overlay pair does not need two
+-- separate clicks to preview the right way up.  #1503
+Studio.matchOrient = true
+Studio.ORIENT_CYCLE = { "any", "portrait", "landscape" }
+Studio.ORIENT_LABEL = {
+  any = "Lock: Off",
+  portrait = "Lock: Portrait",
+  landscape = "Lock: Landscape",
+}
+
 local HANDLE = 7
 local HANDLES = {
   { "nw", 0, 0 }, { "n", 0.5, 0 }, { "ne", 1, 0 },
@@ -63,9 +74,91 @@ local function syncActive()
   TouchSkin.pageIndex = Studio.pageIndex
 end
 
-function Studio.setCanvas(index)
+local function canvasOrientation(canvas)
+  canvas = canvas or Studio.canvas()
+  if not canvas then return nil end
+  return canvas.w > canvas.h and "landscape" or "portrait"
+end
+
+local function pickCanvasIndex(want)
+  local cur = Studio.canvas()
+  if canvasOrientation(cur) == want then return Studio.canvasIndex end
+  if cur and cur.id then
+    local hint = cur.id:gsub("portrait", want):gsub("landscape", want)
+    for i, c in ipairs(Studio.CANVASES) do
+      if c.id == hint then return i end
+    end
+  end
+  for i, c in ipairs(Studio.CANVASES) do
+    if canvasOrientation(c) == want and not c.lockViewport then return i end
+  end
+  return nil
+end
+
+function Studio.applyImportedOrient()
+  if not Studio.skin then return false end
+  if not TouchSkin.hasOrientPair(Studio.skin) then
+    Studio.syncCanvasToPage()
+    return false
+  end
+  -- A RetroArch overlay that already auto-rotates should do the same in
+  -- the studio: lock is on, canvas follows, and the visible page matches
+  -- the mock device.  #1503
+  Studio.matchOrient = true
+  Studio.syncPageToCanvas()
+  Studio.syncCanvasToPage()
+  return true
+end
+
+function Studio.syncCanvasToPage()
+  if not Studio.matchOrient then return end
+  local want = TouchSkin.pageOrient(Studio.page())
+  if not want then return end
+  local idx = pickCanvasIndex(want)
+  if idx and idx ~= Studio.canvasIndex then Studio.setCanvas(idx, true) end
+end
+
+function Studio.syncPageToCanvas()
+  if not Studio.matchOrient or not Studio.skin then return end
+  local want = canvasOrientation()
+  if TouchSkin.pageOrient(Studio.page()) == want then return end
+  for i, page in ipairs(Studio.skin.pages or {}) do
+    if TouchSkin.pageOrient(page) == want then
+      Studio.pageIndex = i
+      Studio.selected = nil
+      syncActive()
+      return
+    end
+  end
+end
+
+function Studio.cyclePageOrient(dir)
+  local page = Studio.page()
+  if not page then return end
+  local cur = TouchSkin.pageOrient(page) or "any"
+  local idx = 1
+  for i, o in ipairs(Studio.ORIENT_CYCLE) do
+    if o == cur then idx = i break end
+  end
+  local n = #Studio.ORIENT_CYCLE
+  local nxt = Studio.ORIENT_CYCLE[((idx - 1 + (dir or 1)) % n) + 1]
+  page.orient = nxt
+  local name = tostring(page.name or "")
+  if (nxt == "portrait" or nxt == "landscape")
+     and (name == "" or name == "main" or name:match("^page%d+$")) then
+    page.name = nxt
+  end
+  markDirty()
+  Studio.syncCanvasToPage()
+  return nxt
+end
+
+function Studio.setCanvas(index, fromSync)
   local n = #Studio.CANVASES
   Studio.canvasIndex = ((index - 1) % n) + 1
+  -- Pick the matching page before writing canvas-owned fields onto it,
+  -- so a landscape preset does not stamp a portrait page.  #1503
+  if not fromSync then Studio.syncPageToCanvas() end
   local canvas = Studio.canvas()
   local page = Studio.page()
   if page and canvas.lockViewport then
@@ -76,7 +169,11 @@ function Studio.setCanvas(index)
     page.viewportFill = false
     markDirty()
   end
-  if page then page.aspect = canvas.w / canvas.h end
+  -- A cfg-authored aspect_ratio is the overlay's design aspect; keep it so
+  -- the preview letterboxes like RetroArch instead of stretching (#1503).
+  if page and not page.aspectFromCfg then
+    page.aspect = canvas.w / canvas.h
+  end
 end
 
 function Studio.load(opts)
@@ -101,6 +198,10 @@ function Studio.load(opts)
   TouchControls.active = true
   TouchControls.enabled = true
   TouchControls:setPreview(true)
+  -- Play snaps pages from the window aspect.  The studio uses its own
+  -- Match canvas toggle against the mock device instead.  #1503
+  TouchSkin.autoOrient = false
+  Studio.matchOrient = true
 
   local start = opts.skinId
   if not start then
@@ -129,6 +230,7 @@ function Studio.open(id)
   Studio.dirty = false
   Studio.images = TouchSkin.listImages(Studio.skin.root)
   syncActive()
+  Studio.applyImportedOrient()
   return true
 end
 
@@ -136,6 +238,7 @@ function Studio.unload()
   Studio.pendingPlay = false
   TouchSkin.setSurface(nil)
   TouchSkin.setActive(nil)
+  TouchSkin.autoOrient = true
   TouchControls:setPreview(false)
   TouchControls:reset()
   Studio.skin = nil
@@ -302,6 +405,7 @@ function Studio.addPage()
   Studio.pageIndex = #skin.pages
   Studio.selected = nil
   syncActive()
+  Studio.syncCanvasToPage()
   markDirty()
 end
 
@@ -376,7 +480,8 @@ end
 local function viewportRect(page, r)
   local v = page.viewport
   if not v then return nil end
-  return r.x + v.x * r.w, r.y + v.y * r.h, v.w * r.w, v.h * r.h
+  local bx, by, bw, bh = TouchSkin.pageBox(page, r.w, r.h, r.x, r.y)
+  return bx + v.x * bw, by + v.y * bh, v.w * bw, v.h * bh
 end
 
 local function handleRects(bx, by, bw, bh)
@@ -484,17 +589,19 @@ function Studio.updateDrag(mx, my, r)
     end
   end
 
+  local px, py, pw, ph = TouchSkin.pageBox(page, r.w, r.h, r.x, r.y)
+  if pw <= 0 or ph <= 0 then return end
   if d.kind:find("control") then
     local ctl = Studio.selectedControl()
     if not ctl then return end
-    ctl.x = clamp01(((bx + bw * 0.5) - r.x) / r.w)
-    ctl.y = clamp01(((by + bh * 0.5) - r.y) / r.h)
-    ctl.rangeX = math.max(0.002, (bw * 0.5) / r.w)
-    ctl.rangeY = math.max(0.002, (bh * 0.5) / r.h)
+    ctl.x = clamp01(((bx + bw * 0.5) - px) / pw)
+    ctl.y = clamp01(((by + bh * 0.5) - py) / ph)
+    ctl.rangeX = math.max(0.002, (bw * 0.5) / pw)
+    ctl.rangeY = math.max(0.002, (bh * 0.5) / ph)
   else
     page.viewport = {
-      x = clamp01((bx - r.x) / r.w), y = clamp01((by - r.y) / r.h),
-      w = math.max(0.02, bw / r.w), h = math.max(0.02, bh / r.h),
+      x = clamp01((bx - px) / pw), y = clamp01((by - py) / ph),
+      w = math.max(0.02, bw / pw), h = math.max(0.02, bh / ph),
     }
   end
   markDirty()
@@ -609,10 +716,21 @@ local function inspectorBody(x, y, w)
     Studio.pageIndex = (Studio.pageIndex % #Studio.skin.pages) + 1
     Studio.selected = nil
     syncActive()
+    Studio.syncCanvasToPage()
   end
   if Kit.button(x + half + gap, cy, half, rowH, "Add page", { id = "pageadd" }) then
     Studio.addPage()
   end
+  cy = cy + rowH + gap
+  local lock = TouchSkin.pageOrient(page) or "any"
+  if Kit.button(x, cy, half, rowH, Studio.ORIENT_LABEL[lock] or "Lock: Off",
+                { id = "orient" }) then
+    Studio.cyclePageOrient(1)
+  end
+  local matchOn = Studio.matchOrient
+  Studio.matchOrient = Kit.checkbox(x + half + gap, cy, half, rowH,
+                                    Studio.matchOrient, "Match canvas", "matchorient")
+  if Studio.matchOrient and not matchOn then Studio.syncCanvasToPage() end
   cy = cy + rowH + gap
 
   if page then

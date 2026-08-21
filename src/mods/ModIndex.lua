@@ -160,6 +160,7 @@ local function parseEntry(raw)
     summary = str(raw.summary) or "",
     categories = strArray(raw.categories),
     tags = strArray(raw.tags),
+    games = strArray(raw.games),
     license = str(raw.license),
     repo = str(raw.repo),
     github = str(raw.github),

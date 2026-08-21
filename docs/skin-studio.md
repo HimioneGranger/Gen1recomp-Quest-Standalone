@@ -25,7 +25,7 @@ as-is. Supported keys:
 | `overlayN_overlay` | bezel image |
 | `overlayN_full_screen` | stretch the page to the window |
 | `overlayN_rect` | page placement, default `0,0,1,1` |
-| `overlayN_aspect_ratio` | fallback aspect when not full screen |
+| `overlayN_aspect_ratio` | design aspect; the overlay letterboxes to it even when full screen |
 | `overlayN_range_mod`, `overlayN_alpha_mod` | desc defaults |
 | `overlayN_viewport` | `x,y,w,h`, the screen cutout |
 | `overlayN_viewport_fill` | parsed; the engine always fits, see below |
@@ -161,6 +161,15 @@ coordinate its art was drawn at. Bind, hitbox shape, hit reach and idle and
 pressed images are per control; the bezel, the pages and the screen cutout are
 per page. The cutout is itself a draggable element with a 10:9 lock. Drop a PNG
 or JPG on the window to import art into the skin.
+
+Each page can **Lock** to portrait or landscape. With **Match canvas** on
+(the default), Next page picks a matching mock device and the canvas preset
+picks a matching page. Turn Match canvas off to look at a portrait page on a
+landscape device.
+
+A RetroArch overlay whose pages are already named portrait / landscape
+(the auto-rotate convention) locks those pages and turns Match canvas on
+when you open it. You do not have to click Lock first.
 
 **Testing.** **Test** makes the canvas live: clicking presses real Game Boy
 buttons and the footer reports what is held. **Play** saves the skin, selects

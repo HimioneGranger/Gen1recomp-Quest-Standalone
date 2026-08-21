@@ -1286,6 +1286,53 @@ Focused verification:
 - Staged secret, private-path, protected-artifact, authorized-binary,
   whitespace, and diff checks passed.
 
+### Batch 28: Skin Studio orientation and aspect correction
+
+Audit lane: M7, direct Skin Studio follow-up.
+
+Upstream source:
+
+- `675971068e5e129eaf99db74a7ebb71492a3d834`
+
+Audited integrated path set:
+
+```text
+docs/skin-studio.md
+src/core/TouchSkin.lua
+src/import/RomImporter.lua
+src/mods/ModIndex.lua
+src/ui/SkinStudio.lua
+tests/engine/skin_studio_test.lua
+tests/engine/touch_skin_test.lua
+```
+
+`TouchSkin.lua`, `ModIndex.lua`, and both focused test files have exact
+upstream result blobs. The narrow `RomImporter.lua` merge replaces only the
+old category/tag discovery heuristic with the already-integrated `ModTargets`
+contract. `SkinStudio.lua` keeps the current immediate-mode and Quest-safe
+foundation. The documentation keeps the current drag-and-drop art workflow.
+
+The correction preserves explicit RetroArch design aspect ratios, keeps
+controls round when a full-screen overlay is letterboxed, supports matching
+portrait and landscape pages during play, and lets the studio lock a page or
+temporarily disable canvas matching. The Batch 27 Quest gates still prevent a
+saved skin from changing the OpenXR compositor.
+
+Focused verification:
+
+- Touch skin and Skin Studio: 142/142 and 108/108 passed.
+- Launcher skin route and Quest saved-skin isolation: 22/22 and 95/95 passed.
+- Mod target and launcher filtering: 70/70 and 118/118 passed; the feed-index
+  contract driver passed.
+- Renderer/viewport, faithful ratio, safe area, touch orientation, Quest host,
+  compositor, panel, and OpenXR contracts: 190 counted checks plus the render
+  viewport driver passed.
+- LuaJIT source compilation: 373/373 passed.
+- No visual LÖVE driver was launched. The preserved root runtime residues were
+  not changed by this batch.
+- Staged secret, private-path, protected-artifact, binary, whitespace, and
+  diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1298,5 +1345,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 27 completes the base skin and Skin Studio unit
-with Quest compositor isolation. Resume with its audited follow-up fix.
+Current recovery point: Batch 28 completes the audited Skin Studio orientation
+and aspect correction while preserving Quest compositor isolation. Resume with
+the next M7 source, `bd1046f3983552b0594e11131ce1a7f0069a0a55`.
