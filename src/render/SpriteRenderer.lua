@@ -62,6 +62,8 @@ local function getObpImage(path, colors, group)
   return obpCache[key]
 end
 
+SpriteRenderer.obpImage = getObpImage
+
 -- hot reload drops the sheets; live instances hold their own image, so
 -- the world rebuilds them (MapLoader.invalidateAll) rather than this
 function SpriteRenderer.invalidate()
@@ -281,7 +283,7 @@ end
 -- swapped and OAM_XFLIP on each (data/sprites/facings.asm:192-197).  Optional
 -- and trailing, so every existing call site is unchanged.
 function SpriteRenderer:draw(px, py, camX, camY, facing, walkPhase, stepFlip,
-    topHalf, forceFlip)
+    topHalf, forceFlip, frameOverride)
   local x, y = self:getScreenOrigin(px, py, camX, camY)
   local image = self.image
   local redraw = false
@@ -329,6 +331,9 @@ function SpriteRenderer:draw(px, py, camX, camY, facing, walkPhase, stepFlip,
   -- still 3-frame sprites turn to face (the nurse at her machine,
   -- facePlayer on STAY NPCs) but never show walk frames.
   local frame, flip = pose(self, facing, walkPhase, stepFlip)
+  if frameOverride and self.frames[frameOverride] then
+    frame, flip = frameOverride, false
+  end
   if forceFlip then flip = true end
   local quad = self.frames[frame]
   local drawHeight = self.frameHeight

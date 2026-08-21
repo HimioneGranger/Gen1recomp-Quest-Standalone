@@ -203,8 +203,9 @@ function TitleState.new(game, opts)
   self.versionFull = imagePath(title.versionRibbon) ~= nil
   self.version = tryImage(imagePath(title.versionRibbon or title.version)
                           or "assets/generated/title/red_version.png")
-  self.player = tryImage(imagePath(title.player)
-                         or "assets/generated/title/player.png")
+  self.playerPath = imagePath(title.player)
+                    or "assets/generated/title/player.png"
+  self.player = tryImage(self.playerPath)
   -- ..(engine/movie/title2.asm ln 85)
   if self.player then
     local pw, ph = self.player:getDimensions()
@@ -600,6 +601,12 @@ end
 
 -- ..(engine/movie/title.asm ln 28)
 function TitleState:draw()
+  local PaletteFX = require("src.render.PaletteFX")
+  local playerImage = self.player
+  if playerImage and PaletteFX.usesSpriteObp() then
+    playerImage = require("src.render.SpriteRenderer").obpImage(
+      self.playerPath, PaletteFX.ogObj())
+  end
   love.graphics.setColor(1, 1, 1, 1)
   love.graphics.rectangle("fill", 0, 0, 160, 144)
   local scrollY = -(self.scy or 0)
@@ -663,8 +670,8 @@ function TitleState:draw()
       -- layout has no cycling mon and no Red art (title_yellow.asm).
       if spriteTrueColor then
         local cover
-        if self.player then
-          local pw, ph = self.player:getDimensions()
+        if playerImage then
+          local pw, ph = playerImage:getDimensions()
           cover = { 82, 80, pw, ph }
         end
         markVisibleTrueColor(x, y, w, h, cover)
@@ -673,11 +680,11 @@ function TitleState:draw()
     -- Red is OAM in the original: he draws over the mon's box edge
     if self.playerQuads then
       for _, part in ipairs(self.playerQuads) do
-        love.graphics.draw(self.player, part[1], 82 + part[2], 80 + part[3])
+        love.graphics.draw(playerImage, part[1], 82 + part[2], 80 + part[3])
       end
-      love.graphics.draw(self.player, self.ballQuad, 82, self.ballY)
-    elseif self.player then
-      love.graphics.draw(self.player, 82, 80)
+      love.graphics.draw(playerImage, self.ballQuad, 82, self.ballY)
+    elseif playerImage then
+      love.graphics.draw(playerImage, 82, 80)
     end
   end
   self:drawCopyright(136 + (preRibbon and 0 or scrollY))

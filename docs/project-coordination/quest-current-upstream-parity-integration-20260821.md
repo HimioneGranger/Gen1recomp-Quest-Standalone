@@ -396,6 +396,41 @@ Focused verification:
 - Pewter Pikachu translation regression: 9/9 passed.
 - Staged diff and whitespace checks passed.
 
+### Batch 9: Gen 1 title sprite palette behavior
+
+Audit lane: M8, final separated Gen 1 presentation subset of the mixed
+upstream bundle.
+
+Upstream source:
+`37051a26b5b5732cc845441dbd66d1916a6925fb`.
+
+Exact imported path set:
+
+```text
+src/render/SpriteRenderer.lua
+src/ui/TitleState.lua
+```
+
+The filtered source patch is byte-equivalent to upstream, with stable patch
+ID `d089cffa88937efe4cc20f541a977c66cdfd0b98`. The title reuses the Gen 1
+object-palette image path while all Quest compositor, loading-screen, and
+profile behavior remains unchanged.
+
+Focused verification:
+
+- Title fill, cycle, and zone seams: 8/8, 104/104, and 82/82 passed.
+- Advanced palette map: 21/21 passed.
+- Render-compose seam: 5/5 passed.
+- Quest compositor geometry: 14/14 passed.
+- Quest loading screen: 4158/4158 passed.
+- WSL LuaJIT engine after all split subsets: 200/200 suites passed.
+- Staged diff and whitespace checks passed.
+
+The applicable Gen 1 subset of `37051a26` is now complete. The excluded paths
+are exactly `src/core/Game2.lua`, `src/core/gen2/ItemEffects.lua`,
+`src/ui/gen2/EvolutionAnim.lua`, and
+`tests/engine/gen2_sun_stone_bug1219.lua`; they are Gen 2-only.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -408,6 +443,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 8 completes the mixed bundle's item/menu subset.
-Resume with the next separated Gen 1 subsystem inside
-`37051a26b5b5732cc845441dbd66d1916a6925fb`; do not replay its Gen 2 bundle.
+Current recovery point: Batch 9 completes the applicable Gen 1 split of
+`37051a26b5b5732cc845441dbd66d1916a6925fb`. Resume with the next audited
+commit after that bundle; do not import its four Gen 2-only paths.
