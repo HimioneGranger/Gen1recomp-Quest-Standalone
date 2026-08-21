@@ -13,12 +13,14 @@ end
 
 local bridge = read("mobile/android/love/src/jni/questxr_bridge/questxr_bridge.c")
 
-check(bridge:find("launcher_panel_gaze_top_third_offset_m = -0.19375f", 1, true),
-  "panel offset targets the upper third of the 1.1625 m panel")
-check(bridge:find("panel_pose.position.y = launcher_panel_gaze_top_third_offset_m;", 1, true),
-  "view-space startup panel uses the shared downward offset")
-check(bridge:find("panel_pose.position.y +=%s+launcher_panel_gaze_top_third_offset_m"),
-  "anchored room panel keeps the same downward offset")
+check(bridge:find("launcher_panel_height_m = 1.1625f", 1, true) and
+      bridge:find("launcher_panel_previous_offset_m = -0.19375f", 1, true) and
+      bridge:find("launcher_panel_upward_adjustment_ratio = 0.15f", 1, true),
+  "panel candidate moves the accepted shared anchor up by 15 percent of panel height")
+check(bridge:find("panel_pose.position.y = launcher_panel_shared_offset_m;", 1, true),
+  "view-space startup panel uses the adjusted shared offset")
+check(bridge:find("panel_pose.position.y += launcher_panel_shared_offset_m;", 1, true),
+  "anchored room panel keeps the adjusted shared offset")
 check(bridge:find("layer.pose = submitted_panel_pose;", 1, true),
   "all submitted panel content uses one shared pose")
 check(bridge:find("questxr_project_ray", 1, true) and

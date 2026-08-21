@@ -94,9 +94,9 @@ check(questNative:find("XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING", 1, t
   "launcher anchoring follows Quest recenter events")
 check(questNative:find("XR_REFERENCE_SPACE_TYPE_LOCAL", 1, true) and
       questNative:find("XR_REFERENCE_SPACE_TYPE_VIEW", 1, true) and
-      not questNative:find("XR_REFERENCE_SPACE_TYPE_STAGE", 1, true) and
+      not questNative:find("space_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE", 1, true) and
       not questNative:find("xrRequestBoundaryVisibilityMETA", 1, true),
-  "Quest host uses local/view tracking and never requests a Guardian boundary mode")
+  "Quest host creates local/view tracking only and never requests a Guardian boundary mode")
 check(not questNative:find("eglTerminate(display)", 1, true),
   "Quest handoff does not terminate SDL/Love's process-wide EGL display")
 check(questNative:find("uniform vec4 focusRect", 1, true) and
