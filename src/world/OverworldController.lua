@@ -5060,24 +5060,15 @@ function OverworldState:drawWorld()
       if not ((self.flyAnim or self.flyArrive or self.playerHidden)
               and e == self.player) then
         e:draw(cam.x, cam.y)
-        -- tall grass overdraws the sprite's feet (GB sprite priority);
-        -- the overdraw is BG tiles, so it rides the shake offset too
-        love.graphics.setColor(1, 1, 1, 1)
-        if self.map:isGrassCell(e.cellX, e.cellY) then
-          self.map.renderer:drawCellBottom(e.cellX, e.cellY, cam.x, bgY)
-          if grassColors then
-            self.map.renderer:markCellBottomRedraw(e.cellX, e.cellY,
-                                                   cam.x, bgY, grassColors)
-          end
-        end
-        if e.targetX and self.map:isGrassCell(e.targetX, e.targetY) then
-          self.map.renderer:drawCellBottom(e.targetX, e.targetY, cam.x, bgY)
-          if grassColors then
-            self.map.renderer:markCellBottomRedraw(e.targetX, e.targetY,
-                                                   cam.x, bgY, grassColors)
-          end
-        end
       end
+    end
+    -- tall grass overdraws every visible grass cell's feet row after all
+    -- sprites (GB sprite-priority parity).  One pass regardless of how many
+    -- entities are on screen -- see TileRenderer:drawGrassOverdraw.
+    love.graphics.setColor(1, 1, 1, 1)
+    self.map.renderer:drawGrassOverdraw(cam.x, bgY)
+    if grassColors then
+      self.map.renderer:markGrassOverdrawRedraw(cam.x, bgY, grassColors)
     end
     fxHeal()
     fxDust()
@@ -5114,6 +5105,18 @@ function OverworldState:drawWorld()
         items[#items + 1] = { y = e.py + 16, kind = "entity", e = e }
       end
     end
+    -- Inject grass-cell overdraw items into the same depth-sorted queue so
+    -- they occlude entities at lower y correctly (back-to-front by cell foot).
+    -- Each cell's foot y = cy*16 + 16 in world pixels (bottom of its two rows).
+    local grassCells = self.map.renderer.grassCells
+    if grassCells then
+      for _, c in ipairs(grassCells) do
+        local cx, cy = c[1], c[2]
+        -- world-pixel foot of the grass cell's bottom tile row
+        local cellFootY = (cy * 2 + 2) * 8 -- == cy*16+16
+        items[#items + 1] = { y = cellFootY, kind = "grass", cx = cx, cy = cy }
+      end
+    end
     table.sort(items, function(a, b) return a.y < b.y end)
 
     for _, it in ipairs(items) do
@@ -5125,6 +5128,20 @@ function OverworldState:drawWorld()
         local fy = g.npc.py - cam.y + g.oy + 16
         self:billboard(fx, fy, vw, vh, zoneColorsAt(zones, fx, fy), false,
                        function() g.npc:draw(cam.x - g.ox, cam.y - g.oy) end)
+      elseif it.kind == "grass" then
+        -- tall-grass bottom-row overdraw: billboarded at the cell's foot so
+        -- it depth-sorts correctly against any entity in the same y column.
+        -- bgY keeps the elevator-shake offset; drawCellBottomRaw lets the
+        -- billboard own the shader (color-0 keying baked into the keyed image
+        -- on GBC, or applied by drawCellBottom's shader on DMG/SGB).
+        local cx, cy = it.cx, it.cy
+        local fx = cx * 16 - cam.x + 8  -- horizontal centre of the cell
+        local fy = (cy * 2 + 2) * 8 - cam.y  -- foot of the bottom tile row
+        local colors = zoneColorsAt(zones, fx, fy)
+        self:billboard(fx, fy, vw, vh, colors, true, function()
+          love.graphics.setColor(1, 1, 1, 1)
+          self.map.renderer:drawCellBottomRaw(cx, cy, cam.x, bgY)
+        end)
       else
         local e = it.e
         local fx = e.px - cam.x + 8
@@ -5132,22 +5149,6 @@ function OverworldState:drawWorld()
         local colors = zoneColorsAt(zones, fx, fy)
         self:billboard(fx, fy, vw, vh, colors, false,
                        function() e:draw(cam.x, cam.y) end)
-        -- tall-grass feet overdraw glued to the sprite: same anchor + depth
-        -- so it keeps hiding the feet, color-0-keyed palette so its white
-        -- gaps still show the sprite through (drawCellBottomRaw lets the
-        -- billboard own the shader; bgY keeps the elevator-shake offset).
-        if self.map:isGrassCell(e.cellX, e.cellY) then
-          self:billboard(fx, fy, vw, vh, colors, true, function()
-            love.graphics.setColor(1, 1, 1, 1)
-            self.map.renderer:drawCellBottomRaw(e.cellX, e.cellY, cam.x, bgY)
-          end)
-        end
-        if e.targetX and self.map:isGrassCell(e.targetX, e.targetY) then
-          self:billboard(fx, fy, vw, vh, colors, true, function()
-            love.graphics.setColor(1, 1, 1, 1)
-            self.map.renderer:drawCellBottomRaw(e.targetX, e.targetY, cam.x, bgY)
-          end)
-        end
       end
     end
 

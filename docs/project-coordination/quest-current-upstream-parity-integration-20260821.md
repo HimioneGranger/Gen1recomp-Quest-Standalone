@@ -898,6 +898,45 @@ Focused verification:
 - Full Modkit: 21/21 suites passed, including pointer input 68/68.
 - Staged secret, private-path, whitespace, and diff checks passed.
 
+### Batch 21: visible-cell tall-grass overdraw
+
+Audit lane: M5c, after viewport composition and before color-mode filtering.
+
+Upstream source:
+
+- `def967a8f8023eb7896999a066d7ff3a83bfe7bc`
+
+Exact integrated path set:
+
+```text
+src/render/TileRenderer.lua
+src/world/OverworldController.lua
+tests/engine/grass_overdraw_pass.lua
+tests/engine/surfing_m4_contract.lua
+```
+
+`TileRenderer.lua` is byte-identical to the audited upstream commit. It
+records each visible grass cell once, uses one shader-backed SpriteBatch on
+DMG/SGB, uses pre-keyed per-cell draws on GBC, preserves post-zone palette
+replay, and releases both its batch and cell cache.
+
+The flat Gen 1 world now draws that pass once after all sprites. The tilted
+Quest path injects the same visible cells into its depth-sorted billboard
+queue, so grass occludes by world foot position without attaching duplicate
+patches to individual entities. The change preserves the current viewport,
+tilt, shake, neighboring-map ghost, pipeline, and Quest compositor behavior.
+
+Focused verification:
+
+- Runtime grass collection, batch, camera, GBC replay, and release: 12/12
+  passed.
+- Flat and tilted integration source contract: 13/13 passed.
+- LuaJIT source compilation: 369/369 passed.
+- Advanced Gen 1 palette and render-compose seam: 26/26 passed.
+- Quest compositor geometry and panel placement: 21/21 passed.
+- Total focused checks: 441/441 passed.
+- Staged secret, private-path, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -910,5 +949,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 20 completes the Gen 1 viewport split while
-preserving Quest host ownership. Resume with M5c full-screen grass overdraw.
+Current recovery point: Batch 21 completes the full-screen grass overdraw
+while preserving flat and tilted Quest rendering. Resume with M5d Gen 1/shared
+true-color mode filtering.

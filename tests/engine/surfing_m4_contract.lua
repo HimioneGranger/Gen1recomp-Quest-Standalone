@@ -31,15 +31,19 @@ T.check(music:find("function Music.setPitch(pitch)", 1, true),
   "music exposes the minigame pitch control")
 
 local world = read("src/world/OverworldController.lua")
-T.check(world:find("drawCellBottom(e.cellX, e.cellY", 1, true),
-  "flat world overdraws grass only for an entity's current cell")
-T.check(world:find("drawCellBottom(e.targetX, e.targetY", 1, true),
-  "flat world includes an entity's target grass cell")
-T.check(world:find("drawCellBottomRaw(e.cellX, e.cellY", 1, true),
-  "tilted world keeps grass attached to the entity billboard")
+T.check(world:find("drawGrassOverdraw(cam.x, bgY)", 1, true),
+  "flat world overdraws every visible grass cell after sprites")
+T.check(world:find("markGrassOverdrawRedraw(cam.x, bgY, grassColors)", 1, true),
+  "flat GBC overdraw keeps its post-zone palette replay")
+T.check(world:find('kind = "grass"', 1, true),
+  "tilted world depth-sorts grass cells as independent billboards")
+T.check(world:find("drawCellBottomRaw(cx, cy, cam.x, bgY)", 1, true),
+  "tilted grass billboards keep the elevator-shake offset")
 
 local tiles = read("src/render/TileRenderer.lua")
-T.check(not tiles:find("function TileRenderer:drawGrassOverdraw", 1, true),
-  "tile renderer does not overdraw every visible grass cell")
+T.check(tiles:find("function TileRenderer:drawGrassOverdraw", 1, true),
+  "tile renderer exposes the visible-cell grass pass")
+T.check(tiles:find("function TileRenderer:markGrassOverdrawRedraw", 1, true),
+  "tile renderer exposes the GBC redraw pass")
 
 T.finish("surfing M4 contract")
