@@ -73,11 +73,15 @@ local BLOCKED_LOVE = {
     .. "the step bridge", event = true,
 }
 
-local loveProxy
-local function loveFacade()
-  if loveProxy or not _G.love then return loveProxy end
-  loveProxy = setmetatable({}, {
+-- Per-mod, because the compat overrides (src/mods/LegacyCompat.lua) are backed
+-- by that mod's own overlay and must not be shared.
+local function loveFacade(compat)
+  if not _G.love then return nil end
+  local overrides = compat and compat.love
+  return setmetatable({}, {
     __index = function(_, key)
+      local override = overrides and overrides[key]
+      if override ~= nil then return override end
       local hint = BLOCKED_LOVE[key]
       if hint then
         error(("love.%s is not available to mods%s"):format(key,
@@ -85,11 +89,20 @@ local function loveFacade()
       end
       return _G.love[key]
     end,
-    __newindex = function(_, key)
+    -- a callback chain lands on the real table (compat.assign decides which
+    -- names qualify); a module table never does
+    __newindex = function(_, key, value)
+      if compat then
+        local allowed, reason = compat.assign(key, value)
+        if allowed then
+          _G.love[key] = value
+          return
+        end
+        if reason then error(reason, 2) end
+      end
       error(("mods cannot assign love.%s"):format(tostring(key)), 2)
     end,
   })
-  return loveProxy
 end
 
 -- ------- the environment
@@ -177,8 +190,12 @@ end
 -- Runtime.modRequire is how the loader's gate identifies the caller for the
 -- Gen 2 facade once Runtime.currentMod has gone back to nil (a mod requiring
 -- lazily from an event handler).
-local function sandboxedRequire(modId, permissionSet)
+local function sandboxedRequire(modId, permissionSet, compat)
   return function(name, ...)
+    -- the compat stand-in answers first, so a legacy require("io") gets the
+    -- rerouted table instead of the denial below (src/mods/LegacyCompat.lua)
+    local substitute = compat and compat.module(name)
+    if substitute ~= nil then return substitute end
     local denial = Sandbox.moduleDenial(name, permissionSet)
     if denial then error(("[%s] %s"):format(modId or "mod", denial), 2) end
     local previous = Runtime.modRequire
@@ -192,15 +209,23 @@ end
 
 function Sandbox.envFor(opts)
   opts = opts or {}
+  local compat = opts.compat
   local env = baseGlobals()
-  env.love = loveFacade()
-  env.require = sandboxedRequire(opts.modId, opts.permissions)
+  env.love = loveFacade(compat)
+  env.require = sandboxedRequire(opts.modId, opts.permissions, compat)
   local loader = sandboxedLoad(env)
   env.load = loader
   env.loadstring = loader
   -- a mod's globals are its own: two mods no longer share a namespace, and
   -- neither can reach the engine's
   env._G = env
+  if compat then
+    for key, value in pairs(compat.globals) do env[key] = value end
+    for key, value in pairs(compat.os) do env.os[key] = value end
+    compat.bind(env, function(source, chunkname)
+      return Sandbox.compile(source, chunkname, env)
+    end)
+  end
   return env
 end
 

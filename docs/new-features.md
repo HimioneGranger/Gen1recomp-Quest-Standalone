@@ -40,3 +40,4 @@ A fourth game the launcher can import and play, built from pret/pokegold the sam
 * **On-screen touch pad** and controller SELECT for registered items
 
 
+* **Older mods keep loading** after the sandbox change, through per-mod compat stand-ins for the pre-sandbox globals

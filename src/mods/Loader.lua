@@ -19,6 +19,7 @@ local Semver = require("src.mods.Semver")
 local Events = require("src.mods.Events")
 local Gen2Compat = require("src.mods.Gen2Compat")
 local Hooks = require("src.mods.Hooks")
+local LegacyCompat = require("src.mods.LegacyCompat")
 local Runtime = require("src.mods.Runtime")
 local Steps = require("src.mods.Steps")
 
@@ -1253,10 +1254,22 @@ function Loader:_modEnv(mod)
   local id = mod.manifest.id
   local env = self.modEnv[id]
   if not env then
-    env = Sandbox.envFor({ modId = id, permissions = mod.manifest.permissionSet })
+    local loader = self
+    local compat = LegacyCompat.new({
+      modId = id, modPath = mod.path, fs = self.fs,
+      game = function() return loader:_game() end,
+    })
+    env = Sandbox.envFor({ modId = id, permissions = mod.manifest.permissionSet,
+      compat = compat })
     self.modEnv[id] = env
   end
   return env
+end
+
+-- Which pre-sandbox calls each loaded mod actually took, for the manager's
+-- "needs updating" badge; nil id answers for every mod.
+function Loader:legacyReport(modId)
+  return LegacyCompat.report(modId)
 end
 
 function Loader:_loadMod(mod)

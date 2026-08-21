@@ -246,17 +246,37 @@ real Gold boot.
 
 Your code runs in a sandbox (`src/mods/Sandbox.lua`), not against the
 engine's globals. Every chunk you author gets it: `main.lua`, your
-`options_schema`, and anything you `load()` yourself. What is absent:
+`options_schema`, and anything you `load()` yourself.
 
-| Absent | Use instead |
+The globals the sandbox took away are still *reachable*, as compat
+stand-ins (`src/mods/LegacyCompat.lua`) that answer with the new API
+underneath. A mod written before the sandbox keeps working; it logs one
+warning per call it should migrate, and the mod manager lists them. What
+each stand-in actually does:
+
+| Pre-sandbox call | What it does now | Migrate to |
+| --- | --- | --- |
+| `io.open`, `io.lines`, `love.filesystem.read`/`lines`/`newFile` | reads your own shipped files, then your overlay, then `mod.storage` | `mod:read`, `mod.storage` |
+| `love.filesystem.write`/`append`, `io.open(…, "w")`, `os.remove`, `os.rename` | writes to a private per-mod overlay under `mod_compat/<your id>/` | `mod.storage` |
+| `love.filesystem.getDirectoryItems`/`getInfo` | your own directory plus your overlay | `mod:list`, `mod:info` |
+| `love.filesystem.getSaveDirectory` and friends | a virtual root; anything joined to it lands in your overlay | `mod.storage` |
+| `os.getenv` | `nil`, except home-like names, which answer with that same virtual root | nothing |
+| `love.filesystem.load`, `dofile`, `loadfile` | compiles the chunk into your sandbox | `require`, `mod:read` plus `load` |
+| `love.system` | `getOS`/`getPowerInfo`/`getProcessorCount` read through; clipboard and `openURL` do nothing | `mod.device:powerInfo()`, `mod.steps` |
+| `love.event` | passes through, except `quit`, which does nothing | `mod.events`, `mod.hooks` |
+| `love.mousemoved = fn` and the other callbacks | installs on the real `love` table, the way it always did | `mod.hooks`, `mod.events` |
+| `package` | an inert stub, so `package.path = …` does not crash | `require` |
+
+What has no stand-in, because there is nothing honest to reroute it to:
+
+| Still refused | Why |
 | --- | --- |
-| `io`, and `require("io")` | `mod:read` for your own files, `mod.storage` to persist |
-| `os.getenv`, `os.execute`, `os.remove`, `os.rename`, `os.exit` | nothing; `os.time`/`os.date`/`os.clock` still work |
-| `package`, `dofile`, `loadfile`, `debug`, `getfenv`, `setfenv` | `require` for the supported engine modules |
-| `require("ffi")`, `require("love.*")` | the `love` table you are given |
-| `love.filesystem` | `mod.storage` (per-mod, per-playthrough), `mod:read` for a known file, `mod:list` / `mod:info` to iterate your own directory |
-| `love.thread`, `love.event` | `mod.events`, `mod.hooks` |
-| `love.system` | `mod.device:powerInfo()` for battery information; `mod.steps` (with the `steps` permission) for the step bridge |
+| `love.thread` | a LÖVE thread is a fresh Lua state with the full standard library, which no environment-based sandbox in this state can reach |
+| `require("ffi")` | arbitrary C |
+| `debug`, `getfenv`, `setfenv` | each one undoes the sandbox from inside |
+| `io.popen`, `os.execute` | spawning a process |
+| `love.run`, `love.errorhandler` | the engine's own loop and its crash path |
+| replacing a `love` module table (`love.filesystem = {}`) | the engine reads those tables too |
 
 The rest of `love` passes through unchanged, so graphics, audio, timers and
 input work as they always have.
@@ -283,8 +303,12 @@ permission that grants raw filesystem access, because no mod needs one:
 everything a mod legitimately writes is already scoped by
 `mod.storage` or the asset-transform derived root.
 
-If your mod used one of the absent globals, the fix is almost always
-`mod.storage`. Open an issue if you have a case it does not cover.
+If your mod used one of the rerouted globals, the fix is almost always
+`mod.storage`. The overlay is a compatibility floor, not a second storage
+system: it is not scoped per playthrough, it does not migrate, and it is
+the first thing that will be dropped once the mods on the index have
+moved off it. Open an issue if you have a case `mod.storage` does not
+cover.
 
 ### 6. `mod.card`
 

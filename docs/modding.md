@@ -615,3 +615,37 @@ the native side's pending file itself, each permissioned mod receives its
 own copy of a delivery, and steps are anchored natively so the same walk
 is never delivered twice. Without the permission, `sync` and `poll` raise
 an error naming it.
+
+## Pre-sandbox globals (compat)
+
+A mod written before the sandbox landed does not have to be updated to
+load. `io`, `package`, `dofile`, `loadfile`, `os.getenv`, `love.filesystem`,
+`love.system` and `love.event` are all present again as compat stand-ins
+(`src/mods/LegacyCompat.lua`), and assigning a LÖVE callback
+(`love.mousemoved = fn`) installs on the real table the way it always did.
+Every stand-in call logs one warning naming its replacement, and
+`loader:legacyReport(modId)` returns the same list with call counts, which
+is what a "needs updating" badge should read.
+
+The stand-ins are not the old globals. Paths are classified rather than
+passed through:
+
+- A path inside your own mod directory reads the file you shipped.
+- Anything else, including an absolute path, resolves into a private
+  per-mod overlay at `mod_compat/<your id>/` under the save directory.
+  Two mods naming the same path never see each other's bytes, and nothing
+  is written outside the game tree.
+- A read misses through the overlay to your shipped file, then to
+  `mod.storage`, so a half-migrated mod sees both.
+- A write over a path you shipped shadows it; the packaged file is never
+  modified, and `mod:read` still returns the packaged bytes.
+- `love.filesystem.getSaveDirectory()` and `os.getenv("HOME")` answer with
+  a virtual root, so a legacy mod that joins its own paths lands back in
+  the same overlay.
+
+`love.thread` stays refused. A LÖVE thread runs in a separate Lua state
+with the full standard library, which the sandbox in this state cannot
+reach, so a stand-in would be a hole rather than a reroute. The same goes
+for `ffi`, `debug`, `setfenv`, `os.execute`, `io.popen`, `love.run` and
+`love.errorhandler`. A mod that needs real background work needs an
+engine-owned facility, not a compat shim.

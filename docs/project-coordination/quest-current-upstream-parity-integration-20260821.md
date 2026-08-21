@@ -488,6 +488,37 @@ Focused verification:
   this task did not create private data.
 - Staged diff and whitespace checks passed.
 
+### Batch 12: sandboxed legacy-mod compatibility
+
+Audit lane: M8 prerequisite for the network/job compatibility chain.
+
+Upstream source:
+`43cbc554c3badce4bf466a3f922cb9dba92e829b`.
+
+Exact imported path set:
+
+```text
+CONTRIBUTING-mods.md
+docs/modding.md
+docs/new-features.md
+src/mods/LegacyCompat.lua
+src/mods/Loader.lua
+src/mods/Sandbox.lua
+tests/fs_io.lua
+tests/modkit/cases/sandbox.lua
+```
+
+The complete filtered feature patch is byte-equivalent to upstream. Legacy
+APIs now use sandboxed compatibility stand-ins; no host path, process, URL,
+environment, or engine lifecycle capability is exposed.
+
+Focused verification:
+
+- Sandbox compatibility: 97/97 passed.
+- Full Modkit: 18/18 suites passed.
+- Quest platform lifecycle hooks inside Modkit: 14/14 passed.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -500,5 +531,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 11 completes portable escort item C2 after its
-cadence prerequisite. Resume with the remaining audit lanes in source order.
+Current recovery point: Batch 12 establishes LegacyCompat. Resume with the
+filtered network/job core of `5198b359`, excluding launcher-owned paths.
