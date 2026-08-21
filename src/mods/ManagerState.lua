@@ -980,12 +980,15 @@ end
 function ManagerState:buildOptionRows(m, schema)
   local rows = {}
   local modId = m.id
+  local PlatformProfile = require("src.core.PlatformProfile")
   for _, row in ipairs(schema) do
     if type(row) ~= "table" or type(row.key) ~= "string" or row.key == ""
         or not OPTION_TYPES[row.type] then
       -- malformed rows are skipped, reported where the errors screen reads
       Runtime.reportError(modId, "options row skipped: "
         .. tostring(type(row) == "table" and (row.key or row.type) or row))
+    elseif not PlatformProfile.optionRowSupported(row) then
+      -- Hidden only: do not rewrite a saved desktop choice.
     elseif row.type == "toggle" then
       rows[#rows + 1] = { id = row.key, label = row.label or row.key,
         value = function()

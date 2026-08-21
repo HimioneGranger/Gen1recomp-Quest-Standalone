@@ -400,6 +400,8 @@ local function modRows(opts, mod)
         or not OPTION_TYPES[row.type] then
       -- malformed rows are skipped silently here; the in-game manager is
       -- where schema errors are reported to the author
+    elseif not PlatformProfile.optionRowSupported(row) then
+      -- Keep the stored choice intact; this Quest compositor cannot use it.
     elseif row.type == "toggle" then
       rows[#rows + 1] = { label = row.label or row.key,
         value = function() return get(row) and Strings("ON") or Strings("OFF") end,

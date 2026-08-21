@@ -617,6 +617,13 @@ function OptionsMenu.new(game, opts)
     Logger.error("ui.options.rows returned %s; keeping the vanilla rows",
                  type(hooked))
   end
+  if PlatformProfile.isQuestStandalone() then
+    local filtered = {}
+    for _, row in ipairs(rows) do
+      if PlatformProfile.optionRowSupported(row) then filtered[#filtered + 1] = row end
+    end
+    rows = filtered
+  end
   return setmetatable({ game = game, rows = rows, index = 1, scroll = 0,
                         onCancel = opts.onCancel }, OptionsMenu)
 end

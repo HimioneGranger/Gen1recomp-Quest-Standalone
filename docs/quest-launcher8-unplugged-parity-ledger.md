@@ -10,6 +10,12 @@ activation: it depended on the optional OpenXR panel FFI backend succeeding.
 The Quest Android flavor now selects the profile directly through SDL manifest
 environment metadata. Generic Android remains unchanged.
 
+The isolated app-repair candidate at `1c8ba5cd` adds a bounded Quest-only
+launcher handoff with six animated lightning states, makes Gen 1 title states
+use the same Quest paper surround as the opening states, and hides the inactive
+T-shift and V Curved mod rows at all launcher and in-game schema consumers.
+These filters do not change saved values.
+
 The world spawn correction, companion placement, and physical Pokédex are not
 launcher features. They are DRAMALESS Q42 features. They must stay in the mod.
 
@@ -52,6 +58,9 @@ launcher features. They are DRAMALESS Q42 features. They must stay in the mod.
 | Lower shared room panel | Accepted headset panel test | Shared offset `-0.19375 m` | Native source build | New approved |
 | Import and lifecycle recovery | Accepted Unplugged repairs | Present in baseline commits | Built in all variants | Found; device proof pending |
 | Do not stop spawn for a mod-set-only report | Launcher 8 headset flow; 2026-08-20 capture exposed the regression | Quest suppresses only the informational mod-diff page; recovery and quarantine reports remain | Focused policy test | Repaired |
+| Visible animated Quest launch progress | Capture part 1 has no app progress frame between Play and opening | Quest-only 0.75-second launcher-compositor handoff; six bolt states at 12 Hz | Four or more distinct sampled states; packaged source exact | Repaired; headset proof pending |
+| Gen 1 title paper surround | Accepted Quest presentation rule | `TitleState` selects Quest paper letterbox fill | Red, Blue, and Yellow title route static/fixture test | Repaired; headset proof pending |
+| Hide inactive T-shift and V Curved rows | Q42 handoff: these flat-pipeline rows do not affect the Quest compositor | Filtered in launcher, both game option menus, and mod manager | Focused profile and source-consumer tests | Repaired; saved choices preserved |
 
 ### Supported launcher rows retained on Quest
 
@@ -124,9 +133,11 @@ and 2D battle cards on. Its VR compatibility value remains internal.
 
 ## Open acceptance gates
 
-1. Build the three variants with the Quest profile metadata.
-2. Run a fresh ROM opening and confirm a white or palette-paper surround with
-   no phone touch controls.
+1. Run the candidate on a headset and confirm that several lightning states
+   are visible after Play and before the opening route.
+2. Run fresh Red, Blue, Yellow, and Gold openings and titles at wide and narrow
+   aspect ratios. Confirm a white or palette-paper outer surround and no phone
+   touch controls.
 3. Import and activate Q42. Confirm its manifest version in the mod list.
 4. Confirm the 180-degree spawn correction, companion placement, and Pokédex.
 5. If a failure remains, collect the exact Diagnostic log and package/payload

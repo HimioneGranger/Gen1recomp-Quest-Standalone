@@ -2457,6 +2457,9 @@ end
 -- The blocking loader.  imp.workState drives the ROM import (which reports
 -- real progress); imp._busy drives every async network operation.
 local function loaderSpec(imp)
+  if imp._questLaunch then
+    return require("src.import.QuestLaunchProgress").spec(imp._questLaunch)
+  end
   if imp.modProgress then
     local p = imp.modProgress
     return {
@@ -2485,6 +2488,8 @@ local function loaderSpec(imp)
   end
   return nil
 end
+
+LauncherView.loaderSpec = loaderSpec
 
 local function drawPadCursor(imp)
   -- A native host may composite the same virtual pointer after capturing the
