@@ -4136,9 +4136,14 @@ function RomImporter:_findStats(entry)
     end
     self._findStatsCache[entry.id] = nil  -- retry window open, refetch
   end
-  if entry.downloads ~= nil or entry.first_release or entry.last_release then
-    cached = { total = entry.downloads, first = entry.first_release,
-               latest = entry.last_release, done = true }
+  local ModIndex = require("src.mods.ModIndex")
+  local dl = ModIndex.downloadStats(entry)
+  local dates = ModIndex.releaseDates(entry)
+  if dl or dates then
+    cached = { total = dl and dl.total, recent = dl and dl.recent,
+               windowDays = dl and dl.window_days, asOf = dl and dl.as_of,
+               first = dates and dates.first, latest = dates and dates.latest,
+               done = true }
     self._findStatsCache[entry.id] = cached
     return cached
   end

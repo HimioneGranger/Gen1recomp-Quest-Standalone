@@ -1233,16 +1233,20 @@ end
 -- The persisted sort choice both mod panels share.  The chooser itself is a
 -- popup (buildSortModal); panels just read the current key and offer a
 -- "Sort" button, which is what freed the chip row's two lines of space.
-local function sortDefs()
-  return {
+local function sortDefs(scope)
+  local defs = {
     { key = "name", label = Strings("Name") },
-    { key = "popularity", label = Strings("Popularity") },
-    { key = "release", label = Strings("Release date") },
-    { key = "updated", label = Strings("Last updated") },
+    { key = "popularity", label = Strings("Most downloaded") },
   }
+  if scope == "find" then
+    defs[#defs + 1] = { key = "trending", label = Strings("Trending") }
+  end
+  defs[#defs + 1] = { key = "release", label = Strings("Release date") }
+  defs[#defs + 1] = { key = "updated", label = Strings("Last updated") }
+  return defs
 end
 
-local function currentSort(imp)
+local function currentSort(imp, scope)
   local sortKey = imp.modSort
   if sortKey == nil then
     local ok, opts = pcall(require("src.core.SaveData").loadOptions)
@@ -1252,6 +1256,7 @@ local function currentSort(imp)
     sortKey = sortKey or "popularity"
     imp.modSort = sortKey
   end
+  if sortKey == "trending" and scope ~= "find" then return "popularity" end
   return sortKey
 end
 
@@ -1332,7 +1337,7 @@ local function buildModsPanel(imp, x, y, w, availH, m)
         action = function() imp:_syncModUpdateInfo(true) end })
       btn(imp, place(sortW), cy, sortW, bh, "mods-sort", Strings("Sort"), {
         font = "small",
-        action = function() imp._sortPopup = true end })
+        action = function() imp._sortPopup = "mods" end })
     elseif medReq <= w then
       -- Tier 2 (Medium / Compact): Surface Import, Updates, and Sort directly
       btn(imp, place(importW), cy, importW, bh, "mods-import", importLabel, {
@@ -1343,7 +1348,7 @@ local function buildModsPanel(imp, x, y, w, availH, m)
         action = function() imp:_syncModUpdateInfo(true) end })
       btn(imp, place(sortW), cy, sortW, bh, "mods-sort", Strings("Sort"), {
         font = "small",
-        action = function() imp._sortPopup = true end })
+        action = function() imp._sortPopup = "mods" end })
       btn(imp, place(moreW), cy, moreW, bh, "mods-more-actions", Strings("More..."), {
         font = "small",
         action = function() imp._modHeaderActionsPopup = true end })
@@ -1359,7 +1364,7 @@ local function buildModsPanel(imp, x, y, w, availH, m)
         action = function() imp:chooseMod() end })
       btn(imp, place(sortW), cy, sortW, bh, "mods-sort", Strings("Sort"), {
         font = "small",
-        action = function() imp._sortPopup = true end })
+        action = function() imp._sortPopup = "mods" end })
       btn(imp, place(moreW), cy, moreW, bh, "mods-more-actions", Strings("More..."), {
         font = "small",
         action = function() imp._modHeaderActionsPopup = true end })
@@ -1390,7 +1395,7 @@ local function buildModsPanel(imp, x, y, w, availH, m)
     return
   end
 
-  local sortKey = currentSort(imp)
+  local sortKey = currentSort(imp, "mods")
 
   -- Immediate mode paints this panel every frame; re-sorting the whole list
   -- per frame (with lowercased-string allocations in the comparator) fed the
@@ -1725,7 +1730,7 @@ local function buildFindPanel(imp, x, y, w, availH, m)
   local sw = Kit.textWidth("small", Strings("Sort")) + math.floor(20 * m.s)
   btn(imp, place(sw), cy, sw, fieldH, "find-sort", Strings("Sort"), {
     font = "small",
-    action = function() imp._sortPopup = true end })
+    action = function() imp._sortPopup = "find" end })
   -- The Filter button carries its state: blue while a category is active,
   -- so a filtered-down list never reads as "the index shrank".
   local fw = Kit.textWidth("small", Strings("Filter")) + math.floor(20 * m.s)
@@ -1745,7 +1750,7 @@ local function buildFindPanel(imp, x, y, w, availH, m)
     return
   end
 
-  local sortKey = currentSort(imp)
+  local sortKey = currentSort(imp, "find")
 
   -- Same caching rule as the MODS tab: the comparator allocates, so only
   -- re-sort when the inputs actually change.
@@ -1761,6 +1766,7 @@ local function buildFindPanel(imp, x, y, w, availH, m)
         if sortKey == "name" then return (entry.title or entry.id or ""):lower() end
         local stats = imp:_findStats(entry)
         if sortKey == "popularity" then return stats and stats.total or -1 end
+        if sortKey == "trending" then return stats and stats.recent or -1 end
         if sortKey == "release" then return stats and stats.first or "0000-00-00" end
         return stats and stats.latest or "0000-00-00"
       end
@@ -1844,13 +1850,14 @@ local function buildFindPanel(imp, x, y, w, availH, m)
       bx, ly, PAL.heading)
     local by2 = ly + Kit.textHeight("button") + math.floor(4 * m.s)
     -- meta and stats on one line, the download count first (and green)
-    -- because it is what the default Popularity sort is ordering by: a
+    -- because it is what the default Most-downloaded sort is ordering by: a
     -- narrow window ellipsizes the tail, and the count must survive that.
     local stats = imp:_findStats(entry)
     local baseCol = note and PAL.green or PAL.detail
     local lead = "v" .. tostring(ModIndex.displayVersion(entry))
     if note then lead = lead .. "  -  " .. note end
-    local dl = stats and ModUpdate.downloadsLine(stats.total) or nil
+    local dl = stats and ModUpdate.downloadsShort(stats.total) or nil
+    local hasCount = stats ~= nil and stats.total ~= nil
     local dates = stats and ModUpdate.datesLine(stats.first, stats.latest)
       or nil
     local rest = {}
@@ -1860,11 +1867,13 @@ local function buildFindPanel(imp, x, y, w, availH, m)
     end
     if dates then
       rest[#rest + 1] = dates
-    elseif not dl and (entry.summary or "") ~= "" then
+    elseif not hasCount and (entry.summary or "") ~= "" then
       rest[#rest + 1] = entry.summary
     end
     local segs = { { lead, baseCol } }
-    if dl then segs[#segs + 1] = { "  -  " .. dl, PAL.green } end
+    if dl then
+      segs[#segs + 1] = { "  -  " .. dl, hasCount and PAL.green or PAL.faint }
+    end
     if #rest > 0 then
       segs[#segs + 1] = { "  -  " .. table.concat(rest, "  -  "), baseCol }
     end
@@ -2389,7 +2398,7 @@ local function buildModHeaderActionsModal(imp, m)
     { label = Strings("Check for updates"), action = function() imp:_syncModUpdateInfo(true) end },
     { label = Strings("Enable all mods"), kind = "good", action = function() imp:_setAllMods(true) end },
     { label = Strings("Disable all mods"), kind = "warn", action = function() imp:_setAllMods(false) end },
-    { label = Strings("Sort mods..."), action = function() imp._sortPopup = true end },
+    { label = Strings("Sort mods..."), action = function() imp._sortPopup = "mods" end },
   }
   local h = pad + Kit.textHeight("button") + math.floor(12 * m.s)
     + #btns * (m.btnH + gap) + m.btnH + pad
@@ -2417,7 +2426,8 @@ end
 -- Sort chooser, shared by the MODS and FIND MODS tabs (they share the
 -- persisted key, so one popup serves both).
 local function buildSortModal(imp, m)
-  local defs = sortDefs()
+  local scope = imp._sortPopup
+  local defs = sortDefs(scope)
   local pad = math.floor(18 * m.s)
   local w = math.floor(360 * m.s)
   local gap = math.floor(8 * m.s)
@@ -2427,7 +2437,7 @@ local function buildSortModal(imp, m)
   local cy = py + pad
   Kit.text("button", Strings("Sort by"), px + pad, cy, PAL.heading)
   cy = cy + Kit.textHeight("button") + math.floor(12 * m.s)
-  local cur = currentSort(imp)
+  local cur = currentSort(imp, scope)
   for _, s in ipairs(defs) do
     local key = s.key
     btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "sortpop-" .. key, s.label, {
@@ -2662,25 +2672,43 @@ local function buildFindEntryModal(imp, m)
   local gap = math.floor(8 * m.s)
   local nBtns = 3  -- install row, details/source row, close row
   local noteH = note and (Kit.textHeight("small") + math.floor(4 * m.s)) or 0
+  local stats = imp:_findStats(entry)
+  local trend = {}
+  local trendLine = stats and ModUpdate.trendingLine(stats.recent, stats.windowDays)
+  if trendLine then trend[#trend + 1] = trendLine end
+  if stats and stats.asOf then
+    trend[#trend + 1] = Strings("counts approximate, as of %s",
+      tostring(stats.asOf):match("^%d%d%d%d%-%d%d%-%d%d") or stats.asOf)
+  end
+  trend = (#trend > 0) and table.concat(trend, "  -  ") or nil
+  local trendH = trend and (Kit.textHeight("small") + math.floor(2 * m.s)) or 0
   local h = pad + Kit.textHeight("button") + math.floor(4 * m.s)
-    + Kit.textHeight("small") + noteH + math.floor(12 * m.s)
+    + Kit.textHeight("small") + trendH + noteH + math.floor(12 * m.s)
     + nBtns * (m.btnH + gap) - gap + pad
   local px, py, pw = modalPanel(m, w, h)
   local cy = py + pad
   Kit.text("button", Kit.ellipsize("button", entry.title or entry.id,
     pw - 2 * pad), px + pad, cy, PAL.heading)
   cy = cy + Kit.textHeight("button") + math.floor(4 * m.s)
-  local stats = imp:_findStats(entry)
   local lead = "v" .. tostring(ModIndex.displayVersion(entry))
   if entry.author then lead = lead .. "  -  " .. entry.author end
   if entry.categories and entry.categories[1] then
     lead = lead .. "  -  " .. entry.categories[1]
   end
-  local dl = stats and ModUpdate.downloadsLine(stats.total) or nil
+  local dl = stats and ModUpdate.downloadsShort(stats.total) or nil
+  local hasCount = stats ~= nil and stats.total ~= nil
   local segs = { { lead, PAL.detail } }
-  if dl then segs[#segs + 1] = { "  -  " .. dl, PAL.green } end
+  if dl then
+    segs[#segs + 1] = { "  -  " .. dl, hasCount and PAL.green or PAL.faint }
+  end
   segLine("small", segs, px + pad, cy, pw - 2 * pad)
   cy = cy + Kit.textHeight("small")
+  if trend then
+    cy = cy + math.floor(2 * m.s)
+    Kit.text("small", Kit.ellipsize("small", trend, pw - 2 * pad),
+      px + pad, cy, PAL.muted)
+    cy = cy + Kit.textHeight("small")
+  end
   if note then
     cy = cy + math.floor(4 * m.s)
     Kit.text("small", note, px + pad, cy, PAL.green)

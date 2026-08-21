@@ -1333,6 +1333,65 @@ Focused verification:
 - Staged secret, private-path, protected-artifact, binary, whitespace, and
   diff checks passed.
 
+### Batch 29: mod-index download metrics and trending
+
+Audit lane: M7.
+
+Upstream source:
+
+- `bd1046f3983552b0594e11131ce1a7f0069a0a55`
+
+Audited integrated path set:
+
+```text
+docs/new-features.md
+src/import/LauncherView.lua
+src/import/RomImporter.lua
+src/mods/ModIndex.lua
+src/mods/ModUpdate.lua
+tests/drivers/launcher_find_downloads_shot.lua
+tests/drivers/launcher_find_real_index.lua
+tests/engine/launcher_mod_downloads.lua
+tests/engine/mod_index_tests.lua
+tests/engine/mod_update_tests.lua
+```
+
+`ModIndex.lua`, `ModUpdate.lua`, and all five test/driver files have exact
+upstream result blobs. The Q47 launcher merge keeps immediate-mode focus,
+touch, modal, paging, reflow, profile, skin, and cartridge-dropdown behavior.
+The importer merge keeps its asynchronous fetch pump, SAF, and lifecycle
+recovery. The upstream README sentence was excluded: the current README has
+the same trust warning in professional wording and retains the approved Quest
+and package-identity description.
+
+The index cache now accepts backward-compatible scalar counts and structured
+total/recent metrics, records release dates without inventing unknown dates,
+and exposes Most-downloaded and FIND-only Trending sorts. A Trending choice
+degrades to Most-downloaded in the installed-mod panel.
+
+Focused verification:
+
+- Network-stubbed download metrics: 24/24 passed.
+- Mod target, launcher mod, and profile seams: 203/203 passed.
+- Q47 launcher focus, touch, modal, text, reflow, page, and narrow-column
+  regressions: 325 counted checks plus the touch-dispatch driver passed.
+- Quest settings and launch lifecycle: 106/106 passed.
+- LuaJIT source compilation: 373/373 passed.
+- The mod-index and mod-update contract drivers passed. Neither LÖVE driver
+  was launched; the real-index driver remains source-only because it can use
+  the network.
+- Staged secret, private-path, protected-artifact, binary, whitespace, and
+  diff checks passed.
+
+### Audited M7 non-applicable item
+
+Source `58714690027cd3f92ecca8d2a88572bb909818e9` changes only two comments in
+`main.lua` to avoid false positives in `skin_studio_image_import.lua`. That
+triggering test belongs to the omitted `4e1ab187` image-picker batch and is not
+present in this successor. The source has no runtime delta and no applicable
+failing gate here, so it remains deferred rather than creating a comment-only
+parity commit.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1345,6 +1404,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 28 completes the audited Skin Studio orientation
-and aspect correction while preserving Quest compositor isolation. Resume with
-the next M7 source, `bd1046f3983552b0594e11131ce1a7f0069a0a55`.
+Current recovery point: Batch 29 completes the applicable M7 feed metrics and
+trending work while preserving the Q47 launcher and async importer. Resume with
+portable C8 source `90163a3ff28e1ef2def72c0078f02e1f96e658c9`.

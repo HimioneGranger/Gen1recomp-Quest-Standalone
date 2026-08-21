@@ -17,6 +17,7 @@ Features intentionally added beyond the original Pokémon Red, Blue, and Yellow 
 * **Tiled map editing tools** for mod authors
 * **Pokédex diploma and printer image exports**
 * **Community mod browser**
+* **Mod download counts** from the index feed, with Most-downloaded and Trending sorts
 * **Soft reset button combination**
 * **Keyboard and controller rebinding**
 * **Mod profiles** with separate mod settings and save slots
