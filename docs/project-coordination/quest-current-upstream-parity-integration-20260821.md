@@ -1511,6 +1511,50 @@ Focused verification:
   preserved root residues retained identical SHA-256 hashes.
 - Staged scope/provenance, whitespace, and diff checks passed.
 
+### Batch 33: stale palette guard and C9 Diploma reconciliation
+
+Audit lane: portable C9 PaletteFX subset and final C9 equivalence proof.
+
+Upstream source:
+
+- `f5b8b6c85fb20b91de53f5f8ab274a3c799fb287`
+
+Audited integrated path set:
+
+```text
+src/render/PaletteFX.lua
+src/ui/Diploma.lua
+tests/engine/diploma_test.lua
+tests/engine/palette_missing_table.lua
+```
+
+The one-line `PaletteFX.lua` delta is byte-equivalent to upstream, with stable
+patch ID `c243b1d74ca920eced4d1367c549c5ba108e8343`. A stale or partial
+palette pack can no longer index a missing named-palette table. Q47's stronger
+ADVANCED default, mode-aware true-color gates, sprite redraw pass, animated
+HP-bar palette input, and Quest profile remain unchanged.
+
+`Diploma.lua` was already exact at upstream result blob
+`ddcd6c738d83a3d9434feca01128c7347e775bb6`. Its current ROM-free test is
+stronger than the upstream test: it checks the ornate frame, circle asset,
+player art and coordinates, all nine frame quads, palette, opacity, and
+dismissal. It remains unchanged. The mixed `version_blink_test.lua` driver is
+excluded because it switches to Gold and needs a live ROM/app session. With
+the TownMap and TradeAnim batches, every applicable Gen 1 path in C9 is now
+reconciled.
+
+Focused verification:
+
+- Missing/complete palette-table behavior: 3/3 passed.
+- Advanced palette map and title palette seams: 109/109 passed.
+- Full mod graphics, including Q47 true-color behavior: 191/191 passed.
+- Diploma layout, art, palette, and dismissal: 12/12 passed.
+- Direct PaletteFX LuaJIT compilation passed.
+- Quest settings profile: 95/95 passed.
+- No app or visual driver was launched and no network was used. The four
+  preserved root residues retained identical SHA-256 hashes.
+- Staged scope/provenance, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1523,7 +1567,7 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 32 completes the isolated C9 TradeAnim subset
-after the committed C9 TownMap subset. Resume with the PaletteFX portion of
-`f5b8b6c85fb20b91de53f5f8ab274a3c799fb287`; keep the C8 SAVE-panel field
-deferred until its audited M8 menu foundation lands.
+Current recovery point: Batch 33 completes all applicable C9 paths after the
+isolated TownMap and TradeAnim commits. Resume with the remaining audited M8
+items in dependency order. Apply the deferred C8 SAVE-panel field only after
+the `0f8f6d0e` and `dbecc345` menu foundation is integrated and tested.
