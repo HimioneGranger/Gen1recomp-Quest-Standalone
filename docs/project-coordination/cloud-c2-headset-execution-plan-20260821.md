@@ -61,6 +61,8 @@ organic silhouette, scale layering, and slow deterministic drift. Prove C2,
 C1, and C0 with exact cloud fetch counts `4`, `1`, and `0`. Prove real Water
 reflection and wave distortion from the same cloud field.
 
+Capture a lower/under-cloud view that looks up at the same cloud and makes its underside and darker lower mass unambiguous.
+
 ## Exact 4x3 performance matrix
 
 Run all 12 resolution-by-Water cells at the configured target refresh. For

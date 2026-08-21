@@ -171,6 +171,7 @@ def main() -> None:
         "configured target refresh",
         "12 resolution-by-Water cells",
         "separate 60-second C2 visual sequence",
+        "Capture a lower/under-cloud view that looks up at the same cloud and makes its underside and darker lower mass unambiguous.",
         "PAIRED_HEADSET_GATE_PLAN.md",
         "superseded for physical execution",
     ), "authoritative headset procedure")
