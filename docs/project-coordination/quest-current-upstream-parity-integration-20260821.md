@@ -634,6 +634,58 @@ Focused verification:
 - Quest platform lifecycle hooks: 14/14 passed.
 - Staged diff and whitespace checks passed.
 
+### Batch 16: Gen 1 save recovery and editor lifecycle
+
+Audit lane: M2, in upstream dependency order.
+
+Upstream sources:
+
+- `df0be1cba67441a19f7b5dd937058043794efd1c`
+- `8dfbd1daae8f4628e2025e28e3e9eede6ffd37fa`
+- `3a997e8a62cc4f20f7a3978841f0dcd409edd683`
+- `f06c4d45845382a9c2573f2a88b67e10decebc5f`
+- `b29b6fd7bd3fbfab1083aaee4ab6dea1af7f7652`
+- `393a1013e4b3af0a85705f191200552a37377fe7`
+
+Exact integrated path set:
+
+```text
+main.lua
+src/core/Data.lua
+src/core/SaveData.lua
+tests/engine/save_editor_lifecycle.lua
+tests/engine/save_slots.lua
+tests/save_editor_mod_tests.lua
+tools/save-editor/App.lua
+tools/save-editor/Catalog.lua
+tools/save-editor/Ops.lua
+```
+
+The first source is a mixed Gold-editor, launcher, updater, and save-editor
+commit. Only its shared nil-safe event-directory handling and safe test
+teardown apply here. Gold editor support, all Gen 2 source and tests, launcher
+and updater changes, packaging additions, and removal of the split app's
+explicit Gold-editor refusal remain excluded. From `8dfbd1da`, only the Gen 1
+slot-registry recovery applies. `androidcrash.log` was not imported, changed,
+or deleted; the Gen 2 PartyMenu and test hunks remain excluded.
+
+The later M2 fixes clear generated data and flat editor modules after close,
+reload data when the selected Gen 1 version changes, tolerate mobile hosts
+without `io.popen`, and skip undefined move catalog entries. Recovery scans
+existing slot files and rebuilds only `options.lua` metadata. It does not
+rewrite a save. The implementation uses the audited upstream behavior with a
+ROM-free Gen 1 regression companion.
+
+Focused verification:
+
+- In-memory Gen 1 slot migration, recovery, selection, and deletion: 90/90
+  passed; no save file was created on disk.
+- ROM-free editor unload, mobile event scrape, cross-version reload contract,
+  and undefined move handling: 14/14 passed.
+- The generated-data save-editor tier remains at its existing private ROM-data
+  boundary and was not enabled.
+- Staged secret, private-path, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -646,5 +698,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 15 completes the audited M1 sandbox/API chain.
-Resume with the next independent audited subsystem lane.
+Current recovery point: Batch 16 completes the audited Gen 1-applicable M2
+save/editor chain. Resume with the ordered M3 audio foundation.

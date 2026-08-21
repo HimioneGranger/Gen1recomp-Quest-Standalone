@@ -181,6 +181,18 @@ function closeEditor()
     require("src.import.CacheFs").unmountVersion(version)
     require("src.core.Data"):unloadGenerated()
   end
+  -- The editor uses flat module names. Remove them after an embedded session
+  -- so the next slot gets a clean editor and does not reuse stale state.
+  local editorModules = {
+    App = true, Kit = true, State = true, Catalog = true, SaveIO = true,
+    Ops = true, MonOps = true, ItemOps = true, PadInput = true, Theme = true,
+  }
+  for name in pairs(package.loaded) do
+    if type(name) == "string"
+        and (name:find("save%-editor") or editorModules[name]) then
+      package.loaded[name] = nil
+    end
+  end
   editorVersion = nil
   restoreWindow()
   Importer = editorHost

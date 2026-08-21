@@ -779,9 +779,40 @@ local function tryMigrateLegacy(version, fs)
   return id
 end
 
+-- Scan saves/<version>/ for slot files when options.lua lost its registry.
+-- This recovery only rebuilds metadata. It does not rewrite a save file.
+local function scanDiskSlots(version, fs)
+  if not fs then return nil end
+  local dir = "saves/" .. version
+  local slots = {}
+  if fs.getDirectoryItems and fs.getInfo and fs.getInfo(dir) then
+    local ok, items = pcall(fs.getDirectoryItems, dir)
+    items = ok and items or {}
+    local numbers = {}
+    for _, item in ipairs(items) do
+      local slotId = item:match("^(slot%d+)%.lua$")
+      if slotId then
+        local n = tonumber(slotId:match("%d+"))
+        numbers[#numbers + 1] = { id = slotId, num = n or 0 }
+      end
+    end
+    table.sort(numbers, function(a, b) return a.num < b.num end)
+    for _, item in ipairs(numbers) do slots[#slots + 1] = item.id end
+  else
+    -- Minimal injected filesystems cannot list directories. Probe the slot
+    -- range that the launcher supports so the same recovery stays testable.
+    for i = 1, 30 do
+      local slotId = "slot" .. i
+      local path = dir .. "/" .. slotId .. ".lua"
+      if fs.getInfo and fs.getInfo(path) then slots[#slots + 1] = slotId end
+    end
+  end
+  return #slots > 0 and slots or nil
+end
+
 -- Resolve (once per version per process) which slot in-game saves use: an
 -- existing registry wins; otherwise a lazy legacy migration may create
--- slot1; otherwise false, meaning the flat legacy path.
+-- slot1; otherwise recover orphaned disk slots; otherwise use the flat path.
 local function ensureVersionSlots(version, fs)
   if slotsChecked[version] then return end
   slotsChecked[version] = true
@@ -795,7 +826,22 @@ local function ensureVersionSlots(version, fs)
     activeSlotCache[version] = reg.active or reg.list[1]
     return
   end
-  activeSlotCache[version] = tryMigrateLegacy(version, fs) or false
+  local migrated = tryMigrateLegacy(version, fs)
+  if migrated then
+    activeSlotCache[version] = migrated
+    return
+  end
+  local recovered = scanDiskSlots(version, fs)
+  if recovered then
+    opts.saveSlots = opts.saveSlots or {}
+    opts.saveSlots[version] = { list = recovered, active = recovered[1] }
+    SaveData.saveOptions(opts, fs)
+    activeSlotCache[version] = recovered[1]
+    Logger.info("auto-recovered %d save slot(s) for %s from disk",
+                #recovered, version)
+    return
+  end
+  activeSlotCache[version] = false
 end
 
 -- (body for the forward-declared saveNames.)  Resolves the ACTIVE slot for

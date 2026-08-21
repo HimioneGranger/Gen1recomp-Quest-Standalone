@@ -356,7 +356,7 @@ function Ops.setDv(S, mon, key, value)
 end
 
 function Ops.cycleMove(S, mon, slot)
-  if not mon then return false end
+  if not mon or not (S.cat and S.cat.moves and #S.cat.moves > 0) then return false end
   local moves = S.cat.moves
   local current = mon.moves and mon.moves[slot] and mon.moves[slot].id
   local idx = 0
@@ -365,9 +365,14 @@ function Ops.cycleMove(S, mon, slot)
       if id == current then idx = i break end
     end
   end
-  local nextId = moves[(idx % #moves) + 1]
-  MonOps.setMove(S.data, mon, slot, nextId)
-  return Ops.mark(S, ("Move %d set to %s"):format(slot, nextId))
+  for step = 1, #moves do
+    local nextId = moves[((idx + step - 1) % #moves) + 1]
+    if S.data and S.data.moves and S.data.moves[nextId] then
+      MonOps.setMove(S.data, mon, slot, nextId)
+      return Ops.mark(S, ("Move %d set to %s"):format(slot, nextId))
+    end
+  end
+  return false
 end
 
 function Ops.clearMove(S, mon, slot)
