@@ -13,8 +13,8 @@
 #   - JDK 17
 #
 # Output (after gradle):
-#   dist/android/debug/*.apk (convenience copy)
-#   mobile/android/app/build/outputs/apk/embedNoRecord/debug/*.apk
+#   dist/android/debug/<variant>/gen1recomp-unplugged-<variant>-*.apk
+#   mobile/android/app/build/outputs/apk/questVrNoRecord/debug/*.apk
 
 set -euo pipefail
 
@@ -426,10 +426,17 @@ run_gradle() {
     say "APK output:"
     find "$out_dir" -name '*.apk' -exec ls -lh {} \;
 
-    local dist_dir="$DIST/debug"
+    # Keep every app identity. Normal, Test, and Diagnostic are built one at
+    # a time from the same Gradle output path, so copying all three into one
+    # directory used to delete the previous variant on every run.
+    local dist_dir="$DIST/debug/$BUILD_VARIANT"
     rm -rf "$dist_dir"
     mkdir -p "$dist_dir"
-    find "$out_dir" -name '*.apk' -exec cp {} "$dist_dir/" \;
+    while IFS= read -r -d '' apk; do
+      local apk_name
+      apk_name="$(basename "$apk")"
+      cp "$apk" "$dist_dir/gen1recomp-unplugged-$BUILD_VARIANT-$apk_name"
+    done < <(find "$out_dir" -name '*.apk' -print0)
     say "copied to $dist_dir/"
   else
     warn "gradle finished but no APK dir at $out_dir,  check gradle logs above"
