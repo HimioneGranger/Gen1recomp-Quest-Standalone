@@ -1091,6 +1091,7 @@ function OverworldState:update(dt)
   -- the player lands on desk Oak.
   local scripted = self.runner:isRunning() or #self.scriptMoves > 0
                    or self.engaging or self.emote or self.teleportOut
+                   or self.flyAnim or self.flyArrive
   if not scripted and not self.transitioning then
     self:checkTrainerSight()
     -- CheckFightingMapTrainers (home/trainers.asm) zeroes hJoyHeld and
@@ -1099,6 +1100,7 @@ function OverworldState:update(dt)
     -- the player can never start another step after being spotted.
     scripted = self.runner:isRunning() or #self.scriptMoves > 0
                or self.engaging or self.emote or self.teleportOut
+               or self.flyAnim or self.flyArrive
   end
   if not scripted and not self.transitioning then
     self:handleInput()
@@ -1668,6 +1670,10 @@ end
 -- Goldeen/Poliwag L10; Super Rod uses the map's extracted fishing group
 -- (no group means "Not even a nibble!").
 function OverworldState:goFishing(rod)
+  if GameVersion.isYellow() then
+    Game.save.pikachuEmotionModifier = 2
+    Game.save.pikachuMood = 0x81
+  end
   local pool, always = fishingPool(Game.data, rod, self.map.id)
   local enc
   if Runtime.wantsHook("encounter.fishing") then
@@ -2912,6 +2918,11 @@ end
 -- POKéMON" and "fighting fit".
 function OverworldState:nurseHeal(onDone, npc)
   local t = Game.data.text
+  if self.map.id == "PEWTER_POKECENTER" and self.pikachuPewterSleepScene then
+    Game.stack:push(TextBox.new(Game,
+      t._LooksContentText or Strings("PIKACHU looks\ncontent."), onDone))
+    return
+  end
   local bye = t._PokemonCenterFarewellText or romText(Game.data, "_PokemonCenterFarewellText", "We hope to see\nyou again!")
   local hello = t._PokemonCenterWelcomeText
                 or Strings("Welcome to our\nPOKéMON CENTER!")
@@ -2985,9 +2996,13 @@ function OverworldState:finishNurseHeal(bye, onDone, npc)
       end))
     end
     if not npc then farewell() return end
-    npc.facing = "up"
+    npc.frameOverride = 3
     -- bubble = false is the silent world hold, this port's DelayFrames
-    self.emote = { npc = npc, frames = 20, bubble = false, onDone = farewell }
+    self.emote = { npc = npc, frames = 20, bubble = false, onDone = function()
+      npc.frameOverride = nil
+      npc:facePlayer(self.player)
+      farewell()
+    end }
   end))
 end
 
@@ -2999,6 +3014,11 @@ end
 -- for the original serial handshake; declining prints "Please come again!"
 function OverworldState:cableClubReceptionist(onDone)
   local t = Game.data.text
+  if self.map.id == "PEWTER_POKECENTER" and self.pikachuPewterSleepScene then
+    Game.stack:push(TextBox.new(Game,
+      t._LooksContentText or Strings("PIKACHU looks\ncontent."), onDone))
+    return
+  end
   local welcome = t._CableClubNPCWelcomeText or romText(Game.data, "_CableClubNPCWelcomeText", "Welcome to the\nCable Club!")
   if not Game.save.flags.EVENT_GOT_POKEDEX then
     -- CableClubNPC .didNotConnect path before the pokedex

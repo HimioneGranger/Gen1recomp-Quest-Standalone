@@ -102,7 +102,7 @@ Upstream sources, in dependency order:
 - `9fab992d425305f3d1dc41eb0eb48162c1fcb541`
 - `fb738fa1cee883ad15b0333235b5e4c6d1b9a1d9`
 
-Exact imported path set:
+Exact inspected path set:
 
 ```text
 CONTRIBUTING-mods.md
@@ -169,9 +169,10 @@ tests/run_tests.lua
 ```
 
 The Gen 2 source and all Gen 2 tests in the mixed upstream commit were not
-imported. The Gen 1 unit adds nil-safe Oak intro sprite lookup and prevents a
-script-driven step from rolling a wild encounter. Shared fixtures now use the
-current link-session and sandbox-export contracts.
+imported. The listed Gen 1 source and shared fixture behavior was already in
+the Q47 successor or Batch 1. Applying the filtered upstream patch produced no
+new source or test delta. Commit `347a7dce` is the durable equivalence and test
+record only.
 
 Focused verification:
 
@@ -181,6 +182,49 @@ Focused verification:
 - Title fill, cycle, and zone seams: 8/8, 104/104, and 82/82 passed.
 - ROM-backed link and Yellow Pallet aggregate cases remain unavailable because
   this worktree has no generated private ROM data.
+- Staged diff and whitespace checks passed.
+
+### Batch 3: Gen 1 story, world, and Yellow companion repairs
+
+Audit lanes: M8 and portable C7.
+
+Upstream sources, in dependency order:
+
+- `37051a26b5b5732cc845441dbd66d1916a6925fb` world/story subset
+- `f6a035947f7593baad6a9afca3b1157bfc76004a`
+
+Exact imported path set:
+
+```text
+data/scripts/oaks_lab.lua
+data/scripts/oaks_lab_yellow.lua
+data/scripts/story.lua
+data/scripts/story2.lua
+data/scripts/story4.lua
+data/scripts/story5.lua
+src/world/NPC.lua
+src/world/OverworldController.lua
+src/world/PikachuFollower.lua
+tests/engine/nurse_bow_bug995.lua
+tests/engine/pewter_pikachu_content_translation_test.lua
+tests/parity_B.lua
+tests/parity_yellow_disabled_pikachu.lua
+```
+
+Battle, save, renderer, unrelated UI, Gen 2 source, and Gen 2 test paths from
+the upstream bundle remain outside this batch. The C7 fallback is applied only
+after its Pewter rest-scene source context exists. The added ROM-free
+translation regression proves both affected interaction entry points.
+
+Focused verification:
+
+- WSL LuaJIT engine: 196/196 suites passed.
+- C7 Pewter translation: 9/9 passed inside the engine tier.
+- Updated Nurse Joy behavior: 25/25 passed.
+- All Quest host, compositor, OpenXR, loading-screen, panel, SAF, settings,
+  flavor, and lifecycle suites inside the engine tier passed.
+- ROM-backed aggregate parity files remain unavailable because no generated
+  private ROM data exists.
 - Staged diff and whitespace checks passed.
 
 ## Final acceptance
@@ -195,6 +239,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 2 follows committed Batch 1 `2711f45a`. Resume
-with the Gen 1 source/test units inside upstream row
+Current recovery point: Batch 3 follows equivalence record `347a7dce`. Resume
+with the next separated Gen 1 subsystem inside
 `37051a26b5b5732cc845441dbd66d1916a6925fb`; do not replay its Gen 2 bundle.

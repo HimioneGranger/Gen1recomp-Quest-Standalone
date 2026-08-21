@@ -226,9 +226,15 @@ return {
   },
 
   onEnter = function(game, ow)
-    if not (game.save.flags and game.save.flags.EVENT_GOT_POKEDEX) then
-      return
+    local flags = game.save.flags or {}
+    if flags.EVENT_GOT_STARTER and not flags.EVENT_BATTLED_RIVAL_IN_OAKS_LAB then
+      local rival = ow:npcByIndex(RIVAL)
+      if rival then
+        rival.cellX, rival.cellY = 7, 4
+        rival.px, rival.py = 7 * 16, 4 * 16
+      end
     end
+    if not flags.EVENT_GOT_POKEDEX then return end
     local Commands = require("src.script.Commands")
     local ctx = { save = game.save, game = game, overworld = ow }
     Commands.hide_object(ctx, "OAKS_LAB", "OAKSLAB_POKEDEX1")
@@ -296,13 +302,14 @@ return {
       table.insert(rows, { "wait", 20 })
       table.insert(rows, { "show_text", "_OaksLabRivalSmellYouLaterText" })
       table.insert(rows, { "stop_music" })
-      table.insert(rows, { "play_music", "Music_MeetRival" })
+      table.insert(rows, { "play_music", "Music_MeetRival", { start = "rival" } })
       table.insert(rows, { "move_npc_to", RIVAL, 4, 11 })
       table.insert(rows, { "hide_object", "OAKS_LAB", "OAKSLAB_RIVAL" })
       table.insert(rows, { "play_music", "Music_OaksLab" })
       -- OaksLabPikachuEscapesPokeballScript: the follower reaches the map (#1009)
       table.insert(rows, { "face_player_dir", "up" })
       table.insert(rows, { "set_field", "pikachuInBall", false })
+      table.insert(rows, { "spawn_pikachu_follower" })
       table.insert(rows, { "play_cry", "PIKACHU" })
       table.insert(rows, { "show_text", "_OaksLabPikachuDislikesPokeballsText1" })
       table.insert(rows, { "show_text", "_OaksLabPikachuDislikesPokeballsText2" })

@@ -508,12 +508,12 @@ M.PEWTER_CITY = {
 -- Rival ambush: show the hidden rival, walk him up to the player, run
 -- the battle rows, march him back and hide him.  On a loss the walk is
 -- skipped (the blackout rebuilds the map mid-script).
-local function runAmbush(game, ow, rows, playerFacing)
+local function runAmbush(game, ow, rows, playerFacing, musicOpts)
   if ow.runner:isRunning() then return false end
   ow.player.facing = playerFacing
   -- the rival encounter sting (MUSIC_MEET_RIVAL); the battle music
   -- takes over and the map theme returns after the victory jingle
-  require("src.core.Music").play(game.data, "Music_MeetRival")
+  require("src.core.Music").play(game.data, "Music_MeetRival", nil, musicOpts)
   ow.runner:run(rows)
   return true
 end
@@ -567,10 +567,12 @@ local function route22Scene(n, objIndex, objName, oppClass, baseParty, beatFlag,
     { "face_object", objIndex, rivalFacing },                  -- 3
     { "show_text", "_Route22RivalBeforeBattleText" .. n },     -- 4
     { "rival_battle", oppClass, baseParty },                   -- 5
-    { "jump_if_false", 11 },                                   -- 6
+    { "jump_if_false", 12 },                                   -- 6
     { "set_flag", beatFlag },                                  -- 7
     { "show_text", "_Route22Rival" .. n .. "DefeatedText" },   -- 8
     { "show_text", "_Route22RivalAfterBattleText" .. n },      -- 9
+    { "play_music", "Music_MeetRival", { start = "rival",
+      tempo = n == 2 and 100 or nil } },
     { "walk_npc", objIndex, route22ExitDirs(n, py) },          -- 10
     { "hide_object", "ROUTE_22", objName },                    -- 11
   }
@@ -594,7 +596,8 @@ M.ROUTE_22 = {
     if f.EVENT_BEAT_GIOVANNI and not f.EVENT_BEAT_ROUTE22_RIVAL_2ND_BATTLE then
       return runAmbush(game, ow,
         route22Scene(2, 2, "ROUTE22_RIVAL2", "OPP_RIVAL2", 10,
-                     "EVENT_BEAT_ROUTE22_RIVAL_2ND_BATTLE", y), playerFacing)
+                     "EVENT_BEAT_ROUTE22_RIVAL_2ND_BATTLE", y), playerFacing,
+        { tempo = 100 })
     end
     return false
   end,
@@ -618,10 +621,11 @@ local function ceruleanRivalScene(px, py)
     { "face_object", 1, "down" },                              -- 3
     { "show_text", "_CeruleanCityRivalPreBattleText" },        -- 4
     { "rival_battle", "OPP_RIVAL1", 7 },                       -- 5
-    { "jump_if_false", 11 },                                   -- 6
+    { "jump_if_false", 12 },                                   -- 6
     { "set_flag", "EVENT_BEAT_CERULEAN_RIVAL" },               -- 7
     { "show_text", "_CeruleanCityRivalDefeatedText" },         -- 8
     { "show_text", "_CeruleanCityRivalIWentToBillsText" },     -- 9
+    { "play_music", "Music_MeetRival", { start = "rival" } },
     { "walk_npc", 1, ceruleanRivalExitDirs(px) },              -- 10
     { "hide_object", "CERULEAN_CITY", "CERULEANCITY_RIVAL" },  -- 11
   }
@@ -730,7 +734,7 @@ local JIGGLYPUFF_SILENCE, JIGGLYPUFF_STEP, JIGGLYPUFF_TAIL = 32, 24, 48
 -- Built as a TextBox `auto` table: auto.sound fires the frame the last
 -- page has typed out (PrintText returning), and auto.tick then runs once
 -- per frame while the gate it returns still reads as playing.
-local function jigglypuffDance(game, npc)
+local function jigglypuffDance(game, npc, ow)
   local Music = require("src.core.Music")
   -- .findMatchingFacingDirectionLoop: the rotation picks up at the entry
   -- matching the sprite's current facing (showMapText has just turned it
@@ -776,7 +780,13 @@ local function jigglypuffDance(game, npc)
         if npc then npc.facing = JIGGLYPUFF_SPIN[step] end
         return
       end
-      if frames >= JIGGLYPUFF_TAIL then phase = "done" end
+      if frames >= JIGGLYPUFF_TAIL then
+        phase = "done"
+        if require("src.core.GameVersion").isYellow()
+            and require("src.world.PikachuFollower").starterInParty(game.save) then
+          ow.pikachuPewterSleepScene = true
+        end
+      end
     end,
   }
 end
@@ -789,7 +799,7 @@ M.PEWTER_POKECENTER = {
       local TextBox = require("src.render.TextBox")
       game.stack:push(TextBox.new(game,
         text(game)._PewterPokecenterJigglypuffText or "JIGGLYPUFF: Puu\npupuu!",
-        done, { auto = jigglypuffDance(game, npc) }))
+        done, { auto = jigglypuffDance(game, npc, ow) }))
     end,
   },
 }
@@ -864,10 +874,11 @@ M.SILPH_CO_7F = {
       { "face_object", 9, "up" },                              -- 4
       { "show_text", "_SilphCo7FRivalWaitedHereText" },        -- 5
       { "rival_battle", "OPP_RIVAL2", 7 },                     -- 6
-      { "jump_if_false", 12 },                                 -- 7
+      { "jump_if_false", 13 },                                 -- 7
       { "set_flag", "EVENT_BEAT_SILPH_CO_RIVAL" },             -- 8
       { "show_text", "_SilphCo7FRivalDefeatedText" },          -- 9
       { "show_text", "_SilphCo7FRivalGoodLuckToYouText" },     -- 10
+      { "play_music", "Music_MeetRival", { start = "rival" } },
       { "move_npc_to", 9, 5, y + 1 },                          -- 11
       { "hide_object", "SILPH_CO_7F", "SILPHCO7F_RIVAL" },     -- 12
     }, "down")
@@ -899,10 +910,11 @@ M.SS_ANNE_2F = {
       { "face_object", 2, onLeft and "down" or "right" },      -- 3
       { "show_text", "_SSAnne2FRivalText" },                   -- 4
       { "rival_battle", "OPP_RIVAL2", 1 },                     -- 5
-      { "jump_if_false", 11 },                                 -- 6
+      { "jump_if_false", 12 },                                 -- 6
       { "set_flag", "EVENT_BEAT_SS_ANNE_RIVAL" },              -- 7
       { "show_text", "_SSAnne2FRivalDefeatedText" },           -- 8
       { "show_text", "_SSAnne2FRivalCutMasterText" },          -- 9
+      { "play_music", "Music_MeetRival", { start = "rival" } },
       { "walk_npc", 2, ssAnne2FRivalExitDirs(onLeft) },        -- 10
       { "hide_object", "SS_ANNE_2F", "SSANNE2F_RIVAL" },       -- 11
     }, onLeft and "up" or "left")

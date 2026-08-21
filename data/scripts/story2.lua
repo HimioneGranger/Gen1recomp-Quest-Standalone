@@ -413,6 +413,9 @@ M.ROUTE_8_GATE = saffronGate("TEXT_ROUTE8GATE_GUARD", { { 2, 3 }, { 2, 4 } }, tr
 -- -------------------------------------------------------------------
 
 M.POKEMON_FAN_CLUB = {
+  onEnter = function(game, ow)
+    require("src.world.PikachuFollower").onFanClubEntered(game, ow)
+  end,
   talk = {
     TEXT_POKEMONFANCLUB_CHAIRMAN = {
       { "face_player" },                                          -- 1

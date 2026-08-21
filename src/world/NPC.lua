@@ -128,7 +128,8 @@ end
 
 function NPC:draw(camX, camY)
   local sprite, px, py, facing, phase, flip = self:pose()
-  sprite:draw(px, py, camX, camY, facing, phase, flip)
+  sprite:draw(px, py, camX, camY, facing, phase, flip, nil, nil,
+              self.frameOverride)
 end
 
 return NPC
