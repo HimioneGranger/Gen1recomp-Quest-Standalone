@@ -167,6 +167,17 @@ public class GameActivity extends SDLActivity {
         return new String[0];
     }
 
+    /** Neutral Lua adapter module supplied by an optional host flavor. */
+    protected String getHostModule() {
+        return "";
+    }
+
+    @Keep
+    public static String getHostModuleName() {
+        GameActivity self = (GameActivity) mSingleton;
+        return self == null ? "" : self.getHostModule();
+    }
+
     @Override
     protected String[] getLibraries() {
         String[] hostLibraries = getHostLibraries();

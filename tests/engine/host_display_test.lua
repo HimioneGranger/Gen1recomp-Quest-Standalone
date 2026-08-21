@@ -8,6 +8,8 @@ local T = require("tests.harness")
 local check, eq = T.check, T.eq
 local HostDisplay = require("src.core.HostDisplay")
 
+eq(HostDisplay.API_VERSION, 1, "host display API is versioned")
+
 -- Vanilla: no backend, no state requirement, and no invented return value.
 HostDisplay.setBackend(nil)
 eq(HostDisplay.update(1 / 60), nil, "default update is a no-op")
@@ -20,10 +22,14 @@ local ok, err = pcall(HostDisplay.setBackend, function() end)
 check(not ok, "non-table backend is rejected")
 check(tostring(err):find("table or nil", 1, true) ~= nil,
   "backend type error explains the accepted shape")
+check(not pcall(HostDisplay.setBackend, {}),
+  "backend without an API version is rejected")
+check(not pcall(HostDisplay.setBackend, { apiVersion = 2 }),
+  "unknown backend API version is rejected")
 
 local calls = {}
 local subject = { tag = "launcher-instance" }
-local fake = {}
+local fake = { apiVersion = 1 }
 function fake:update(dt)
   calls[#calls + 1] = { "update", self, dt }
   return "updated"
@@ -54,10 +60,37 @@ eq(calls[3][1], "end", "endFrame is last")
 eq(calls[3][3], "launcher", "endFrame receives the frame kind")
 eq(calls[3][4], subject, "endFrame receives the drawn subject")
 
+local rendered = HostDisplay.render("launcher", subject, function()
+  calls[#calls + 1] = { "draw" }
+  return "drawn"
+end)
+eq(rendered, "drawn", "render forwards the draw result")
+eq(calls[#calls - 2][1], "begin", "render begins before draw")
+eq(calls[#calls - 1][1], "draw", "render calls draw")
+eq(calls[#calls][1], "end", "render ends after draw")
+
+local cancelled
+HostDisplay.setBackend({
+  apiVersion = 1,
+  beginFrame = function() end,
+  cancelFrame = function(_, kind, gotSubject, reason)
+    cancelled = { kind, gotSubject, reason }
+  end,
+})
+local drawOk = pcall(HostDisplay.render, "game", subject, function()
+  error("draw failed")
+end)
+check(not drawOk, "render rethrows draw failures")
+eq(cancelled[1], "game", "failed render is cancelled")
+eq(cancelled[2], subject, "cancel receives the subject")
+check(cancelled[3]:find("draw failed", 1, true) ~= nil,
+  "cancel receives the failure")
+
 -- Every callback is optional. Replacing and clearing a backend must not retain
 -- callbacks from the old host across a restart or test process.
 local partialCalls = 0
 HostDisplay.setBackend({
+  apiVersion = 1,
   endFrame = function() partialCalls = partialCalls + 1 end,
 })
 eq(HostDisplay.update(1), nil, "missing optional update remains a no-op")

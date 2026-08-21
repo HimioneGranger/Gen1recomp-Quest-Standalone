@@ -5,27 +5,26 @@ local Strings = require("src.core.Strings")
 local HostShell = require("src.core.HostShell")
 local Platform = require("src.core.Platform")
 local SafeArea = require("src.core.SafeArea")
+local ImportHost = require("src.core.ImportHost")
 
 local RomImporter = {}
 RomImporter.__index = RomImporter
 
--- love.system.pickFile is a NATIVE BRIDGE, not part of LÖVE: it exists only on
+-- The native picker is not part of LÖVE: it exists only on
 -- builds that compiled one (Android, and iOS builds patched by
 -- mobile/ios/patch_love_src.py). A build without it must fall back to the
 -- copy-it-into-the-save-folder flow that every caller below already has --
 -- calling the nil field instead took the whole app down the moment the player
 -- pressed Import ROM:
 --
---   src/import/RomImporter.lua: attempt to call field 'pickFile' (a nil value)
+--   src/import/RomImporter.lua: attempted to call a missing picker
 --
--- love.system.createFile was already guarded this way at its one call site;
+-- The native save picker was already guarded this way at its one call site;
 -- these three were not. Every caller here treats `false` as "no picker
 -- available" and shows its own notice, so a missing bridge now degrades to
 -- exactly the path a picker-less Android device has always taken.
-local function pickFile(...)
-  local fn = love.system.pickFile
-  if not fn then return false end
-  return fn(...) and true or false
+local function pickFile(kind)
+  return ImportHost.requestOpen(kind)
 end
 
 -- Cache generation tag; bump to force every imported version to re-extract.
@@ -1036,7 +1035,7 @@ local function chooseRom(promptName)
 end
 
 -- Open a native picker for a mod .zip (mirrors chooseRom's per-OS dialogs).
--- Returns the chosen absolute path or nil.  Android uses love.system.pickFile
+-- Returns the chosen absolute path or nil. Android uses the native picker
 -- ("mod") instead -- see RomImporter:chooseMod.
 local function chooseZip()
   local prompt = shellSafe(Strings("Choose a mod .zip"))
@@ -1077,7 +1076,7 @@ end
 
 -- Open a native picker for a raw .sav battery save (mirrors chooseZip's per-OS
 -- dialogs).  Returns the chosen absolute path or nil.  Android uses
--- love.system.pickFile("sav") instead -- see RomImporter:chooseSaveImport.
+-- the native picker instead -- see RomImporter:chooseSaveImport.
 local function chooseSav()
   local prompt = shellSafe(Strings("Choose a .sav save file"))
   local platform = love.system.getOS()
@@ -1160,7 +1159,7 @@ end
 function RomImporter.new(onComplete, opts)
   opts = opts or {}
   -- iOS rides the same mobile import flows as Android: the save-dir
-  -- pending-file scan plus love.system.pickFile / createFile, provided
+  -- pending-file scan plus the native open/save bridge, provided
   -- natively by the Swift GRPickerBridge (mobile/ios/native/).  The flag
   -- keeps its historical name so every Android call site stays untouched.
   -- NX uses a separate save-directory inbox (isNX / romImportMode) and must
@@ -1836,7 +1835,7 @@ end
 
 -- "Import mod .zip" button: open a native picker and install the pick.
 -- Android mirrors ROM import: scan for a pending .zip in the save dir (USB
--- or a fresh SAF drop), else love.system.pickFile("mod") -> picked_mod.zip
+-- or a fresh SAF drop), else the native picker stages picked_mod.zip
 -- which focus/Choose consumes on return.
 -- NX: no HostShell/desktop picker — rescan imports/mods/ inbox instead.
 function RomImporter:chooseMod()
@@ -1846,7 +1845,7 @@ function RomImporter:chooseMod()
     self:rescanModsAction()
     return
   end
-  if self.nativePicker and love.system.getPickedFile then
+  if self.nativePicker and ImportHost.capabilities().result then
     self.pickerPendingKind = "mod"
     if not pickFile("mod") then
       self.pickerPendingKind = nil
@@ -1937,7 +1936,7 @@ function RomImporter:_importSave(version, source, force)
 end
 
 -- "Import save" button: open a native .sav picker and import the pick.
--- Android mirrors ROM / mod import via love.system.pickFile("sav").
+-- Android mirrors ROM / mod import through the neutral native picker.
 -- NX: no HostShell/desktop picker — rescan imports/saves/ inbox instead.
 function RomImporter:chooseSaveImport(version)
   if self.workState == "working" then return end
@@ -1947,7 +1946,7 @@ function RomImporter:chooseSaveImport(version)
     self:rescanSavesAction(version)
     return
   end
-  if self.nativePicker and love.system.getPickedFile then
+  if self.nativePicker and ImportHost.capabilities().result then
     self.pickerPendingKind = "sav"
     self.pickerPendingVersion = version
     if not pickFile("sav") then
@@ -1984,7 +1983,7 @@ end
 -- "Export save" button: write the active slot back out to a raw .sav in the save
 -- directory's exports/ folder.  On desktop, show the path with an open-folder
 -- affordance.  On Android, stage pending_export.sav and open the system
--- create-document picker (love.system.createFile) so the player can save to
+-- create-document picker so the player can save to
 -- Downloads / Drive / etc. -- the app-private exports/ path is not useful there.
 -- NX: surface exports path + MTP hint; do not rely on openURL / open-folder.
 function RomImporter:exportSave(version)
@@ -2023,7 +2022,7 @@ function RomImporter:exportSave(version)
       return
     end
     self.androidPendingExportVersion = version
-    if love.system.createFile and love.system.createFile(suggested, love.filesystem.getSaveDirectory()) then
+    if ImportHost.requestSave(suggested, love.filesystem.getSaveDirectory()) then
       self.pickPending = true
       self.pickTimer = 0
       self.saveNotice[version] = { ok = true,
@@ -2080,7 +2079,7 @@ function RomImporter:choose(version)
     self:startData(data, baseRom.name)
     return
   end
-  if self.nativePicker and love.system.getPickedFile then
+  if self.nativePicker and ImportHost.capabilities().result then
     self.pickerPendingKind = "rom"
     if not pickFile("rom") then
       self.pickerPendingKind = nil
@@ -2311,8 +2310,8 @@ function RomImporter:update(dt)
       end)
     end
   end
-  if self.nativePicker and love.system.getPickedFile and self.workState ~= "working" then
-    local path = love.system.getPickedFile()
+  if self.nativePicker and ImportHost.capabilities().result and self.workState ~= "working" then
+    local path = ImportHost.takeOpenResult()
     if path then
       local kind = self.pickerPendingKind or "rom"
       local version = self.pickerPendingVersion
@@ -2332,8 +2331,8 @@ function RomImporter:update(dt)
         self:startPath(path)
         if Platform.isUWP() then os.remove(path) end
       end
-    elseif love.system.getPickError then
-      local errorText = love.system.getPickError()
+    else
+      local errorText = ImportHost.takeOpenError()
       if errorText then
         local kind = self.pickerPendingKind or "rom"
         local version = self.pickerPendingVersion or self:_savedropTarget()

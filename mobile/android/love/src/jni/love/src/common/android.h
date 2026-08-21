@@ -60,6 +60,9 @@ bool openURL(const std::string &url);
 
 void vibrate(double seconds);
 
+/** Returns the optional neutral Lua host adapter module name. */
+std::string getHostModule();
+
 /**
  * Shows the system's "pick a document" UI (Storage Access Framework).
  * Returns true if the picker was launched; the picked file (if any) is

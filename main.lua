@@ -15,6 +15,7 @@ local LaunchOptions = require("src.core.LaunchOptions")
 local NxDisplay = require("src.core.NxDisplay")
 local PlatformHooks = require("src.core.PlatformHooks")
 local HostDisplay = require("src.core.HostDisplay")
+local HostLifecycle = require("src.core.HostLifecycle")
 
 -- Lua errors: persist a redacted trace in the save dir and surface a hint.
 do
@@ -272,7 +273,9 @@ local function bootGame(version)
 end
 
 function love.load(args)
-  HostDisplay.installPackagedBackend()
+  if not require("src.core.HostBootstrap").install() then
+    HostDisplay.installPackagedBackend()
+  end
   -- Before anything can shell out (update check, mod index, ROM picker),
   -- claim one hidden console on Windows so those children inherit it instead
   -- of each flashing their own cmd.exe window (#606).  No-op elsewhere.
@@ -481,45 +484,45 @@ end
 
 function love.draw()
   if editorMode then
-    HostDisplay.beginFrame("editor", EditorApp)
-    local result = EditorApp.draw()
-    PlatformHooks.frameDrawn("editor", EditorApp)
-    HostDisplay.endFrame("editor", EditorApp)
-    return result
+    return HostDisplay.render("editor", EditorApp, function()
+      local result = EditorApp.draw()
+      PlatformHooks.frameDrawn("editor", EditorApp)
+      return result
+    end)
   end
   if TouchEditor then
-    HostDisplay.beginFrame("touch_editor", TouchEditor)
-    local result = TouchEditor.draw()
-    PlatformHooks.frameDrawn("touch_editor", TouchEditor)
-    HostDisplay.endFrame("touch_editor", TouchEditor)
-    return result
+    return HostDisplay.render("touch_editor", TouchEditor, function()
+      local result = TouchEditor.draw()
+      PlatformHooks.frameDrawn("touch_editor", TouchEditor)
+      return result
+    end)
   end
   if Importer then
-    HostDisplay.beginFrame("launcher", Importer)
-    local result = Importer:draw()
-    PlatformHooks.frameDrawn("launcher", Importer)
-    HostDisplay.endFrame("launcher", Importer)
-    return result
+    return HostDisplay.render("launcher", Importer, function()
+      local result = Importer:draw()
+      PlatformHooks.frameDrawn("launcher", Importer)
+      return result
+    end)
   end
   if not Game then return end
 
-  HostDisplay.beginFrame("game", Game)
-  Game:draw()
-  PlatformHooks.frameDrawn("game", Game)
-  -- frame capture requested by a driver
-  if Game.capturePath then
-    local path = Game.capturePath
-    Game.capturePath = nil
-    love.graphics.captureScreenshot(function(imagedata)
-      local fd = imagedata:encode("png")
-      local f = io.open(path, "wb")
-      if f then
-        f:write(fd:getString())
-        f:close()
-      end
-    end)
-  end
-  HostDisplay.endFrame("game", Game)
+  return HostDisplay.render("game", Game, function()
+    Game:draw()
+    PlatformHooks.frameDrawn("game", Game)
+    -- frame capture requested by a driver
+    if Game.capturePath then
+      local path = Game.capturePath
+      Game.capturePath = nil
+      love.graphics.captureScreenshot(function(imagedata)
+        local fd = imagedata:encode("png")
+        local f = io.open(path, "wb")
+        if f then
+          f:write(fd:getString())
+          f:close()
+        end
+      end)
+    end
+  end)
 end
 
 function love.keypressed(key, scancode, isrepeat)
@@ -679,6 +682,7 @@ end
 -- direction's key-up can be delivered to the OS instead of the game while
 -- unfocused, so reset input on either transition rather than trust it.
 function love.focus(f)
+  HostLifecycle.focus(f)
   if editorMode or TouchEditor then return end
   if Importer then
     require("src.core.Input"):reset()
@@ -690,6 +694,7 @@ end
 
 -- v is true when the window becomes visible again, false on minimize.
 function love.visible(v)
+  HostLifecycle.visible(v)
   if editorMode or TouchEditor then return end
   if Importer then
     require("src.core.Input"):reset()
@@ -896,11 +901,14 @@ function love.quit()
   -- docs/modding.md's core.quit_to_launcher entry) may veto returning to
   -- this Lua launcher via that hook. Vanilla behavior (used when no mod
   -- claims the hook) is exactly the condition below.
+  local terminalHostExit = HostLifecycle.mustExit()
   local wouldReturnToLauncher = PlatformHooks.quitToLauncher(function()
-    return Game and not Importer and not quitToLauncher and not scripted
+    return not terminalHostExit and Game and not Importer
+      and not quitToLauncher and not scripted
       and not launchedIntoGame
   end)
   if wouldReturnToLauncher then
+    HostLifecycle.handoff("launcher")
     quitToLauncher = true
     -- Tell the fresh boot to ignore any boot-straight-into-a-game option this
     -- once, so the restart really does land in the launcher (#887).  A failed
@@ -909,6 +917,7 @@ function love.quit()
     require("src.core.HostShell").restart()
     return true -- abort this quit; the restart lands back in the launcher
   end
+  HostLifecycle.shutdown()
   pcall(function()
     require("src.core.DiscordPresence").shutdown()
   end)
