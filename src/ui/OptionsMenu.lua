@@ -181,6 +181,11 @@ local function buildRows(game)
       step = function(g)
         local o = g.save.options
         o.battleLayout = o.battleLayout == "wide" and "og" or "wide"
+        if o.battleLayout ~= "wide" then
+          o.battleHud = "standard"
+        elseif o.battleFit == "fill" and o.battleHud == "extended" then
+          o.battleBg = "white"
+        end
         return true
       end },
     -- FIXED keeps the classic integer-scaled letterbox -- a GB pixel is a
@@ -196,6 +201,31 @@ local function buildRows(game)
       step = function(g)
         local o = g.save.options
         o.battleFit = o.battleFit == "fill" and "fixed" or "fill"
+        if o.battleFit == "fill" and o.battleLayout == "wide"
+           and o.battleHud == "extended" then
+          o.battleBg = "white"
+        end
+        return true
+      end },
+    { id = "battleHud", label = Strings("BATTLE HUD"),
+      value = function(g)
+        local o = g.save.options
+        return o.battleLayout == "wide" and o.battleHud == "extended"
+               and Strings("EXTENDED")
+               or Strings("STANDARD")
+      end,
+      step = function(g)
+        local o = g.save.options
+        -- The extended HUD is a widescreen-only composition. Keep OG locked
+        -- to the author's standard HUD even if an older save says otherwise.
+        if o.battleLayout ~= "wide" then
+          o.battleHud = "standard"
+          return false
+        end
+        o.battleHud = o.battleHud == "extended" and "standard" or "extended"
+        if o.battleHud == "extended" and o.battleFit == "fill" then
+          o.battleBg = "white"
+        end
         return true
       end },
     -- What sits behind and around the battle.  WHITE is the classic paper
@@ -204,13 +234,24 @@ local function buildRows(game)
     -- shows through everywhere the battle does not paint).
     { id = "battleBg", label = Strings("BATTLE BG"),
       value = function(g)
-        local m = g.save.options.battleBg
+        local o = g.save.options
+        if o.battleLayout == "wide" and o.battleFit == "fill"
+           and o.battleHud == "extended" then
+          o.battleBg = "white"
+          return Strings("AUTO")
+        end
+        local m = o.battleBg
         if m == "black" then return Strings("BLACK") end
         if m == "world" then return Strings("WORLD") end
         return Strings("WHITE")
       end,
       step = function(g, dir)
         local o = g.save.options
+        if o.battleLayout == "wide" and o.battleFit == "fill"
+           and o.battleHud == "extended" then
+          o.battleBg = "white"
+          return false
+        end
         local order = { "white", "black", "world" }
         local cur = 1
         for i, m in ipairs(order) do if o.battleBg == m then cur = i break end end

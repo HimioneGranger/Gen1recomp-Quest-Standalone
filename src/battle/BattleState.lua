@@ -87,6 +87,33 @@ function BattleState:wantsFillScale()
   return options and options.battleFit == "fill" or false
 end
 
+-- EXTENDED HUD configurations are admitted one at a time after their own
+-- placement and screenshot review.  FIXED supports the three authored battle
+-- backgrounds; FILL uses one adaptive presentation stored as WHITE: stock
+-- battles retain the paper field required by Gen 1 back sprites, while arena
+-- providers may replace it with their own scene.  Only the HUD moves to window
+-- space.
+function BattleState:extendedHUD()
+  local options = self.game and self.game.save and self.game.save.options
+  local bg = options and options.battleBg
+  return self:wideLayout()
+     and options and options.battleHud == "extended"
+     and ((options.battleFit == "fixed"
+           and (bg == "world" or bg == "white" or bg == "black"))
+       or (options.battleFit == "fill" and bg == "white"))
+end
+
+function BattleState:extendedWorldHUD()
+  local options = self.game and self.game.save and self.game.save.options
+  return self:extendedHUD() and options
+     and options.battleFit == "fixed" and options.battleBg == "world"
+end
+
+function BattleState:extendedBlackHUD()
+  local options = self.game and self.game.save and self.game.save.options
+  return self:extendedHUD() and options and options.battleBg == "black"
+end
+
 -- BATTLE BG: what fills the screen AROUND the battle -- the letterbox voids
 -- that grow as the window gets bigger or the view is zoomed out.  The battle
 -- screen itself is untouched: it keeps its white paper field in every mode.

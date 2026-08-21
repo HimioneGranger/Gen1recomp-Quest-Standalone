@@ -77,6 +77,7 @@ local function battleWith(fx, sprites)
     statusHUDVisible = function() return true end,
     bottomUIVisible = function() return true end,
     caughtMarkerVisible = function() return false end,
+    extendedHUD = function() return false end,
   }
 end
 

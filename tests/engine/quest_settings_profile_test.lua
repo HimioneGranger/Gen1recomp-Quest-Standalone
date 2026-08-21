@@ -106,7 +106,7 @@ check(launcher["COLORS"], "Quest launcher keeps COLORS")
 check(launcher["PERFORMANCE"], "Quest launcher keeps PERFORMANCE")
 for _, label in ipairs({
   "TEXT SPEED", "BATTLE ANIMATION", "BATTLE STYLE", "BATTLE LAYOUT",
-  "BATTLE SIZE", "BATTLE BG", "UI LAYOUT", "MUSIC VOL", "SFX VOL",
+  "BATTLE SIZE", "BATTLE HUD", "BATTLE BG", "UI LAYOUT", "MUSIC VOL", "SFX VOL",
   "MUSIC FILTER", "TILT", "VOID FILL", "FAITHFUL RATIO", "MAX FPS",
   "OVERWORLD SPEED", "BATTLE SPEED", "MENU SPEED", "RESET REBINDS",
 }) do
@@ -134,7 +134,7 @@ check(rows.colors, "Quest in-game menu keeps COLORS")
 check(rows.performance, "Quest in-game menu keeps PERFORMANCE")
 for _, id in ipairs({
   "textSpeed", "animations", "battleStyle", "battleLayout", "battleFit",
-  "battleBg", "uiLayout", "ruleset", "musicVol", "sfxVol", "musicFilter",
+  "battleHud", "battleBg", "uiLayout", "ruleset", "musicVol", "sfxVol", "musicFilter",
   "tilt", "zoom", "voidFill", "faithfulRes", "fpsCap", "speedOverworld",
   "speedBattle", "speedMenu", "mods", "controls", "dateFormat", "timeFormat",
 }) do

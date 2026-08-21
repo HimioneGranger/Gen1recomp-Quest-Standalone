@@ -784,6 +784,64 @@ Focused verification:
   created or staged.
 - Staged secret, private-path, whitespace, and diff checks passed.
 
+### Batch 19: extended WIDE battle HUD and menu composition
+
+Audit lane: M5a, before viewport and world-renderer changes.
+
+Upstream sources, in dependency order:
+
+- `530f2bdd1562b5280880694d2d2c4eb680d10d68`
+- `90eb53b00c46b9b08aba4c991188297af67b08cf`
+- `524138ff271cff89873ab4dec499f6dea5f15351`
+
+Exact integrated path set:
+
+```text
+src/battle/BattleState.lua
+src/battle/WideBattle.lua
+src/core/Game.lua
+src/core/SaveData.lua
+src/import/LauncherSettings.lua
+src/render/Renderer.lua
+src/ui/OptionsMenu.lua
+tests/drivers/fixed_extended_world_bag_overlay_test.lua
+tests/engine/battle_fixed_menu_scale.lua
+tests/engine/extended_battle_hud_contract.lua
+tests/engine/quest_settings_profile_test.lua
+tests/engine/wide_battle_shake_bug562.lua
+tests/mod_ui_tests.lua
+```
+
+The optional EXTENDED HUD keeps the battle scene on its native WIDE canvas
+and moves only approved status and text regions to physical-window anchors.
+The standard HUD remains the default. Unsupported combinations fall back to
+STANDARD, and WIDE + FILL + EXTENDED keeps the authored WHITE background.
+Opaque classic menus now retain the WIDE battle presentation below them.
+
+The upstream visual driver is byte-identical to `90eb53b0`, but it was not
+launched. The shake fixture hunk is exact. Renderer integration is semantic
+because Q47 has later Quest compositor behavior: its `questLetterboxWhite`
+exception and mobile faithful-ratio lock remain intact. The Quest settings
+profile now proves that BATTLE HUD remains reachable in both launcher and
+in-game settings. No OpenXR, Android host, package, launcher profile, panel,
+or compatibility-adapter behavior was removed or reduced.
+
+Focused verification:
+
+- Extended battle scaling, menu ownership, WIDE layout, and shake: 108/108
+  passed.
+- ROM-free extended-HUD activation, option normalization, stack, and anchor
+  contracts: 30/30 passed.
+- Quest compositor geometry and panel placement: 21/21 passed.
+- Quest settings profile and faithful-ratio mobile behavior: 122/122 passed.
+- Save-option write/read recovery: 26/26 passed.
+- Total focused checks: 307/307 passed.
+- The changed option-row section of the monolithic mod UI test passed; its
+  later private generated-data tier stopped at the existing missing
+  `data/generated/field.lua` boundary. No generated data was created.
+- The visual driver was preserved as evidence and was not launched.
+- Staged secret, private-path, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -796,5 +854,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 18 completes the audited Gen 1-applicable M4
-extractor/minigame batch. Resume with the ordered M5 renderer stack.
+Current recovery point: Batch 19 completes the extended WIDE battle HUD and
+menu-composition checkpoint. Resume with M5b viewport composition.

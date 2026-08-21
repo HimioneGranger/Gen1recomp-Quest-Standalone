@@ -282,7 +282,7 @@ local function optGame()
 end
 local om = OptionsMenu.new(optGame())
 local WANT_IDS = { "textSpeed", "animations", "battleStyle", "battleLayout",
-                   "battleFit", "battleBg", "uiLayout",
+                   "battleFit", "battleHud", "battleBg", "uiLayout",
                    "ruleset", "musicVol", "sfxVol", "musicFilter",
                    "performance", "colors",
                    "tilt", "gbcfx", "zoom", "voidFill", "videoMode",
@@ -296,11 +296,11 @@ end
 
 -- ruleset row cycles the sorted non-hidden registry ids showing name
 om.game.save.options.ruleset = "gen1_faithful"
-check(om.rows[8].value(om.game) == "GEN 1", "ruleset row shows record.name")
-om.rows[8].step(om.game, 1)
+check(om.rows[9].value(om.game) == "GEN 1", "ruleset row shows record.name")
+om.rows[9].step(om.game, 1)
 check(om.game.save.options.ruleset == "modern_clean",
   "ruleset row cycles sorted registry ids")
-om.rows[8].step(om.game, 1)
+om.rows[9].step(om.game, 1)
 check(om.game.save.options.ruleset == "gen1_faithful",
   "hidden rulesets are excluded from the cycle")
 
@@ -319,9 +319,9 @@ check(om.game.save.options.battleLayout == "wide", "battle layout flips to WIDE"
 check(om.rows[4].value(om.game) == "WIDE", "the WIDE layout renders its label")
 om.rows[4].step(om.game, 1)
 check(om.game.save.options.battleLayout == "og", "battle layout flips back")
-om.rows[9].step(om.game, -1)
+om.rows[10].step(om.game, -1)
 check(om.game.save.options.musicVol == 6, "music volume steps down")
-for _ = 1, 10 do om.rows[9].step(om.game, -1) end
+for _ = 1, 10 do om.rows[10].step(om.game, -1) end
 check(om.game.save.options.musicVol == 0, "music volume clamps at 0")
 
 -- ZOOM / VOID FILL rows (indices track WANT_IDS above; the battle
@@ -331,30 +331,30 @@ local Zoom = require("src.render.Zoom")
 local TileRenderer = require("src.render.TileRenderer")
 om.game.save.options.zoom = 0
 Zoom.offset = 0
-check(om.rows[16].value(om.game) == "FIT", "ZOOM row shows FIT at offset 0")
-om.rows[16].step(om.game, 1)
+check(om.rows[17].value(om.game) == "FIT", "ZOOM row shows FIT at offset 0")
+om.rows[17].step(om.game, 1)
 check(om.game.save.options.zoom == 1 and Zoom.offset == 1,
   "ZOOM row steps to IN1")
-om.rows[17].step(om.game, 1)
+om.rows[18].step(om.game, 1)
 check(om.game.save.options.voidFill == "water"
       and TileRenderer.voidFill == "water",
   "VOID FILL row cycles TREES → WATER")
-om.rows[17].step(om.game, 1)
+om.rows[18].step(om.game, 1)
 check(om.game.save.options.voidFill == "black", "VOID FILL steps to BLACK")
-om.rows[17].step(om.game, 1)
+om.rows[18].step(om.game, 1)
 check(om.game.save.options.voidFill == "trees", "VOID FILL wraps to TREES")
 
 -- the MAX FPS row cycles the render-cap steps and shows the value plain
 om.game.save.options.fpsCap = nil
-check(om.rows[20].value(om.game) == "60",
+check(om.rows[21].value(om.game) == "60",
   "MAX FPS row defaults to 60 with no saved cap")
-om.rows[20].step(om.game, 1)
+om.rows[21].step(om.game, 1)
 check(om.game.save.options.fpsCap == 75, "MAX FPS steps up from 60 to 75")
-check(om.rows[20].value(om.game) == "75", "the MAX FPS row renders the cap")
+check(om.rows[21].value(om.game) == "75", "the MAX FPS row renders the cap")
 om.game.save.options.fpsCap = 160
-om.rows[20].step(om.game, 1)
+om.rows[21].step(om.game, 1)
 check(om.game.save.options.fpsCap == 30, "MAX FPS wraps past the ceiling to 30")
-om.rows[20].step(om.game, -1)
+om.rows[21].step(om.game, -1)
 check(om.game.save.options.fpsCap == 160, "MAX FPS wraps back down to the ceiling")
 
 -- ------- FrameCap normalize / cycle (issue #88)
@@ -384,7 +384,7 @@ check(FrameCap.current == 60, "FrameCap.applyOptions defaults a missing key to 6
 -- the MODS row is the manager's discoverable home
 local mgGame = optGame()
 om = OptionsMenu.new(mgGame)
-om.rows[24].activate(mgGame)
+om.rows[25].activate(mgGame)
 check(getmetatable(mgGame.stack:top()) == ManagerState,
   "the MODS row opens the manager")
 check(mgGame.stack:top().screenId == "ManagerState",
@@ -394,7 +394,7 @@ check(mgGame.stack:top().screenId == "ManagerState",
 local BindingsMenu = require("src.ui.BindingsMenu")
 local cbGame = optGame()
 om = OptionsMenu.new(cbGame)
-om.rows[25].activate(cbGame)
+om.rows[26].activate(cbGame)
 local bm = cbGame.stack:top()
 check(getmetatable(bm) == BindingsMenu,
   "the CONTROLS row opens the rebind list")
@@ -413,17 +413,17 @@ check(cbGame.save.options.bindings == nil,
 -- engine UI and mods without becoming checkpoint progress
 om.game.save.options.dateFormat = "device"
 om.game.save.options.timeFormat = "device"
-check(om.rows[26].value(om.game) == "DEVICE",
-  "DATE FORMAT defaults to device locale")
-om.rows[26].step(om.game, 1)
-check(om.game.save.options.dateFormat == "dmy"
-      and om.rows[26].value(om.game) == "DD-MM-YYYY",
-  "DATE FORMAT exposes deterministic DMY override")
 check(om.rows[27].value(om.game) == "DEVICE",
-  "TIME FORMAT defaults to device locale")
+  "DATE FORMAT defaults to device locale")
 om.rows[27].step(om.game, 1)
+check(om.game.save.options.dateFormat == "dmy"
+      and om.rows[27].value(om.game) == "DD-MM-YYYY",
+  "DATE FORMAT exposes deterministic DMY override")
+check(om.rows[28].value(om.game) == "DEVICE",
+  "TIME FORMAT defaults to device locale")
+om.rows[28].step(om.game, 1)
 check(om.game.save.options.timeFormat == "24h"
-      and om.rows[27].value(om.game) == "24 HOUR",
+      and om.rows[28].value(om.game) == "24 HOUR",
   "TIME FORMAT exposes deterministic 24-hour override")
 check(bm.onKeyPressed == nil and bm.onGamepadPressed == nil,
   "no raw-input claim until a capture is armed")

@@ -239,6 +239,11 @@ function SaveData.defaultOptions()
     -- scale the battle surface to the window so it fills vertically.  See
     -- BattleState:wantsFillScale.
     battleFit = "fixed",
+    -- BATTLE HUD: STANDARD keeps every wide-battle element inside the native
+    -- 304x144 surface. EXTENDED is opt-in window-space placement for selected
+    -- wide layouts; unsupported combinations deliberately fall back to the
+    -- standard composition.
+    battleHud = "standard",
     -- BATTLE BG: what fills the screen behind and around the battle.
     -- "white" = the display mode's paper shade (the classic look),
     -- "black" = plain black bars, "world" = the frozen overworld showing
