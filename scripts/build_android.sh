@@ -23,7 +23,7 @@ ANDROID_DIR="$ROOT/mobile/android"
 EMBED_ASSETS="$ANDROID_DIR/app/src/embed/assets"
 LOVE_FILE="$EMBED_ASSETS/game.love"
 DIST="$ROOT/dist/android"
-APP_NAME="Gen 1 Recomp Unplugged"
+DISPLAY_NAME_OVERRIDE=""
 APPLICATION_ID="com.theboisclub.pokemonred"
 LOVE_ANDROID_VERSION="11.5a"
 NDK_VERSION="25.2.9519653"
@@ -58,11 +58,11 @@ done
 case "$BUILD_VARIANT" in
   normal) ;;
   test)
-    APP_NAME="Gen 1 Recomp Unplugged Test"
+    DISPLAY_NAME_OVERRIDE="Gen1Recomp Test"
     APPLICATION_ID+=".test"
     ;;
   diagnostic)
-    APP_NAME="Gen 1 Recomp Unplugged Diagnostic"
+    DISPLAY_NAME_OVERRIDE="Gen1Recomp Diagnostic"
     APPLICATION_ID+=".diagnostic"
     DIAGNOSTIC=true
     ;;
@@ -196,11 +196,16 @@ ensure_gold_manifest() {
 }
 
 # --------------------------------------------------------------- branding
-# Build variants pass their label and diagnostic setting directly to Gradle.
-# The script must not rewrite tracked launcher configuration, because that
-# made a local test build look like a source change and let variants drift.
+# Test and Diagnostic pass only their label override and diagnostic setting
+# directly to Gradle. Normal keeps the tracked gradle.properties label. The
+# script must not rewrite tracked launcher configuration, because that made a
+# local test build look like a source change and let variants drift.
 apply_android_branding() {
-  say "using build-time Android label: $APP_NAME"
+  if [ -n "$DISPLAY_NAME_OVERRIDE" ]; then
+    say "using build-time Android label: $DISPLAY_NAME_OVERRIDE"
+  else
+    say "using tracked Android label from gradle.properties"
+  fi
 }
 
 # --------------------------------------------------------------- game.love
@@ -408,9 +413,11 @@ run_gradle() {
   if ! (
     cd "$build_dir"
     gradle_args=(--no-daemon "$task" \
-      "-Papp.display_name=$APP_NAME" \
       "-Papp.application_id=$APPLICATION_ID" \
       "-Papp.diagnostic=$DIAGNOSTIC")
+    if [ -n "$DISPLAY_NAME_OVERRIDE" ]; then
+      gradle_args+=("-Papp.display_name=$DISPLAY_NAME_OVERRIDE")
+    fi
     if [ -n "$VERSION" ]; then
       gradle_args+=("-Papp.version_name=$VERSION" \
         "-Papp.version_code=$VERSION_CODE")
