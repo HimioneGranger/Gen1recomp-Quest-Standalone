@@ -1023,8 +1023,7 @@ function BattleState:stepHPDrain()
         -- between steps: leave the field at 0 and BattleSafety.inspect
         -- reads it as still mid-animation for the rest of the battle,
         -- since drainHold ~= nil is its settled-presentation gate.
-        if b.drainHold <= 0 and b.shownPx == targetPx and b.shownHP == goal
-            and not b.draining then
+        if b.drainHold <= 0 and b.shownHP == goal and not b.draining then
           b.drainHold = nil
         end
         busy = true
