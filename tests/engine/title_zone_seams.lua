@@ -21,6 +21,7 @@ local function loadScissor(loveMajor)
   check(f ~= nil, "Renderer source is readable")
   local src = f and f:read("*a") or ""
   if f then f:close() end
+  src = src:gsub("\r\n", "\n"):gsub("\r", "\n")
   local bias = src:match("\nlocal SCISSOR_PIXEL_BIAS = 0%.5.-\nend\n")
   check(bias ~= nil, "scissor bias is still version-gated")
   local body = src:match("\nlocal function scissorClamped.-\nend\n")
