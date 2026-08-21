@@ -410,11 +410,14 @@ the wrapper is visible during that same fixed step. The callback receives
 
 `input.pointer` delivers uncaptured gameplay pointer events -- touches and
 real mouse input alike. The callback receives `(next, game, ev)` where `ev`
-is `{ phase, source, id, x, y, dx, dy, pressure, button }`: `phase` is
+is `{ phase, source, id, x, y, gameX, gameY, insideGame, dx, dy, pressure,
+button }`: `phase` is
 `"pressed"`, `"moved"`, `"released"` or `"cancelled"`; `source` is `"touch"`
 or `"mouse"`; `id` is the LÖVE touch id or `"mouse"`; and the coordinates
-are LOVE window units, the same space `render.hud`'s viewport and the touch
-overlay lay out in. The on-screen touch controls keep first refusal: a
+`x` / `y` are LOVE window units, while `gameX` / `gameY` are local to the
+active game viewport and `insideGame` says whether the pointer is inside it.
+Without a custom viewport both coordinate pairs are identical. The on-screen
+touch controls keep first refusal: a
 pointer that begins on a virtual control belongs to the pad for its whole
 lifecycle and never reaches the hook, while one that begins outside stays
 visible even if it later crosses a control. A real mouse reaches the hook
@@ -446,6 +449,22 @@ composited and before touch controls draw. The window-space viewport contains
 `width`, `height`, `gameX`, `gameY`, `gameWidth`, `gameHeight`, `scale`, `dpiX`,
 and `dpiY`, so a tool can use the letterbox margins without drawing over the
 playfield or pushing an updating game state.
+
+`render.viewport` lets a layout mod reserve the window-space rectangle in which
+the game renders. It receives `(next, ctx)` with the full window's `width`,
+`height`, `pixelWidth`, `pixelHeight`, `dpiX`, `dpiY`, and `generation`, and
+returns `{ x, y, width, height }`. The engine clamps that rectangle to the
+window and makes game layout, safe-area calculations, and rendering use it as
+their display. Set `capture = true` to request a composition canvas even when
+the rectangle fills the window. With no subscriber, no canvas is allocated and
+the normal presentation path is unchanged.
+
+When a viewport is active, `render.window` receives `(next, game, ctx)` after
+the game frame has been captured. `ctx` contains its `canvas`, `x`, `y`,
+`width`, `height`, the full `windowWidth` / `windowHeight`, `dpiX`, `dpiY`, and
+`generation`. Calling `next(game, ctx)` draws the game at the requested origin;
+a wrapper may instead compose that canvas with its own UI. Touch controls remain
+full-size OS-window chrome and draw after this hook.
 
 `render.compose` wraps the whole-window composite in `Renderer:endFrame`. It
 receives `(next, renderer, ctx)`; returning `true` without calling `next` hands

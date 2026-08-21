@@ -15,6 +15,7 @@ local LaunchOptions = require("src.core.LaunchOptions")
 local NxDisplay = require("src.core.NxDisplay")
 local PlatformHooks = require("src.core.PlatformHooks")
 local HostDisplay = require("src.core.HostDisplay")
+local GameViewport = require("src.render.GameViewport")
 local HostLifecycle = require("src.core.HostLifecycle")
 
 -- Lua errors: persist a redacted trace in the save dir and surface a hint.
@@ -501,6 +502,7 @@ end
 
 function love.draw()
   if editorMode then
+    GameViewport.reset()
     return HostDisplay.render("editor", EditorApp, function()
       local result = EditorApp.draw()
       PlatformHooks.frameDrawn("editor", EditorApp)
@@ -508,6 +510,7 @@ function love.draw()
     end)
   end
   if TouchEditor then
+    GameViewport.reset()
     return HostDisplay.render("touch_editor", TouchEditor, function()
       local result = TouchEditor.draw()
       PlatformHooks.frameDrawn("touch_editor", TouchEditor)
@@ -515,13 +518,17 @@ function love.draw()
     end)
   end
   if Importer then
+    GameViewport.reset()
     return HostDisplay.render("launcher", Importer, function()
       local result = Importer:draw()
       PlatformHooks.frameDrawn("launcher", Importer)
       return result
     end)
   end
-  if not Game then return end
+  if not Game then
+    GameViewport.reset()
+    return
+  end
 
   return HostDisplay.render("game", Game, function()
     Game:draw()

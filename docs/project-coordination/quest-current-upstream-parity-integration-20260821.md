@@ -842,6 +842,62 @@ Focused verification:
 - The visual driver was preserved as evidence and was not launched.
 - Staged secret, private-path, whitespace, and diff checks passed.
 
+### Batch 20: Gen 1 OS-independent game viewport
+
+Audit lane: M5b, after the extended WIDE HUD and before world overdraw.
+
+Upstream sources, in dependency order:
+
+- `1f3d13adaf048626527fcec90d2c909d5c12c3f1`
+- `a542ed90bae3f6ab4f7592bb381173b838433c3d` (source-limit gate only)
+
+Exact integrated path set:
+
+```text
+docs/modding.md
+main.lua
+src/core/Game.lua
+src/core/SafeArea.lua
+src/core/TouchControls.lua
+src/render/GameViewport.lua
+src/render/Renderer.lua
+src/ui/kit/Layout.lua
+src/world/OverworldController.lua
+tests/engine/luajit_source_limits_test.lua
+tests/engine/render_viewport.lua
+```
+
+`GameViewport.lua` is byte-identical to `1f3d13ad`, and the LuaJIT
+source-limit gate is byte-identical to `a542ed90`. The viewport is inactive
+and allocation-free without a mod subscriber. When requested, it maps Gen 1
+rendering, safe-area geometry, world pipelines, UI layout, and pointer-local
+coordinates into the reserved rectangle, then restores full-window Quest
+chrome and touch-control space.
+
+This is the audited mixed split: the shared and Gen 1 parts apply, while
+`Game2.lua`, Gen 2 BattleTransition, Gen 2 World, and the Gen 2 compatibility
+document remain excluded. The upstream viewport test is unchanged except that
+its source-order assertion names only `Game.lua`. The unrelated launcher,
+updater, and Gen 2 World rewrites in `a542ed90` also remain excluded.
+
+Q47's newer `HostDisplay.render` ownership is preserved. Viewport reset was
+added before each editor, touch-editor, and Quest launcher host render without
+restoring upstream's older begin/end wrapper. No Quest compositor, panel,
+OpenXR, Android host, package, launcher profile, or compatibility-adapter path
+was removed or reduced.
+
+Focused verification:
+
+- Reserved, full-window capture, pointer-local, safe-area, target, reset, and
+  Gen 1 render-order viewport contract: passed.
+- LuaJIT source compilation and strict local-limit meta-gate: 369/369 passed.
+- Safe-area and touch orientation/pad/second-screen contracts: 48/48 passed.
+- Host display: 34/34 passed.
+- Quest compositor geometry and panel placement: 21/21 passed.
+- UI layout and Quest launcher panel reflow: 198/198 passed.
+- Full Modkit: 21/21 suites passed, including pointer input 68/68.
+- Staged secret, private-path, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -854,5 +910,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 19 completes the extended WIDE battle HUD and
-menu-composition checkpoint. Resume with M5b viewport composition.
+Current recovery point: Batch 20 completes the Gen 1 viewport split while
+preserving Quest host ownership. Resume with M5c full-screen grass overdraw.

@@ -6,6 +6,7 @@ local FixedStep = require("src.core.FixedStep")
 local Input = require("src.core.Input")
 local Logger = require("src.core.Logger")
 local Renderer = require("src.render.Renderer")
+local GameViewport = require("src.render.GameViewport")
 local SaveData = require("src.core.SaveData")
 local StateStack = require("src.core.StateStack")
 local TouchControls = require("src.core.TouchControls")
@@ -497,6 +498,7 @@ local function centerClassicZones(zones, offset)
 end
 
 function Game:draw()
+  GameViewport.begin(1)
   -- the UI canvas clears transparent when the overworld's world pass
   -- shows through beneath it; opaque full-screen states get the classic
   -- white clear
@@ -610,7 +612,9 @@ function Game:draw()
   if ModRuntime.wantsHook("render.hud") then
     ModRuntime.call("render.hud", function() end, self, viewport)
   end
-  -- on-screen mobile controls: pure screen-space, over the finished frame
+  GameViewport.finish(self)
+  -- OS-window chrome: keep the pad full-size and above any composed companion
+  -- view instead of capturing and shrinking it with the game viewport.
   TouchControls:draw()
 end
 
@@ -986,8 +990,10 @@ local function pointerUnclaimed() return false end
 -- coordinates are LOVE window units, the same space render.hud's viewport
 -- and the touch overlay lay out in
 function Game:pointerEvent(phase, source, id, x, y, dx, dy, pressure, button)
+  local gameX, gameY, insideGame = GameViewport.toLocal(x, y)
   return ModRuntime.call("input.pointer", pointerUnclaimed, self, {
     phase = phase, source = source, id = id, x = x, y = y,
+    gameX = gameX, gameY = gameY, insideGame = insideGame,
     dx = dx or 0, dy = dy or 0, pressure = pressure, button = button,
   })
 end

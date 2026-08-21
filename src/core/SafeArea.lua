@@ -7,12 +7,14 @@
 -- (touch overlay, launcher) should prefer this over getDimensions; the game
 -- canvas may still letterbox into the full framebuffer for immersion.
 
+local GameViewport = require("src.render.GameViewport")
+
 local SafeArea = {}
 
-function SafeArea.rect()
+function SafeArea.windowRect()
   local ww, wh = 0, 0
   if love and love.graphics and love.graphics.getDimensions then
-    ww, wh = love.graphics.getDimensions()
+    ww, wh = GameViewport.fullDimensions()
   end
   if ww <= 0 then ww = 1 end
   if wh <= 0 then wh = 1 end
@@ -53,6 +55,10 @@ function SafeArea.rect()
   w = math.max(1, math.min(w, ww - x))
   h = math.max(1, math.min(h, wh - y))
   return x, y, w, h
+end
+
+function SafeArea.rect()
+  return GameViewport.localSafeRect(SafeArea.windowRect())
 end
 
 return SafeArea
