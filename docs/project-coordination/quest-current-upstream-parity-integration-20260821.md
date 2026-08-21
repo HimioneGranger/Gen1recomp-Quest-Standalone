@@ -1095,6 +1095,64 @@ Focused verification:
 - Staged secret, private-path, protected-artifact, binary, whitespace, and
   diff checks passed.
 
+### Batch 25: launcher profiles and dependency resolution
+
+Audit lane: M7, dependent on Batch 24.
+
+Upstream source:
+
+- `500d8c2c078e8512c94148a89627dfb52a8d1a1a`
+
+Audited integrated path set:
+
+```text
+src/import/LauncherView.lua
+src/import/RomImporter.lua
+src/mods/LauncherMods.lua
+src/mods/Manifest.lua
+src/mods/ModIndex.lua
+tests/mod_manifest_tests.lua
+tests/mod_ui_tests.lua
+```
+
+Quest adaptation test:
+
+```text
+tests/engine/launcher_profile_dependency_test.lua
+```
+
+The Manifest, ModIndex, and two upstream test patches have the exact source
+stable patch ids. LauncherView has the same 716 ordered changed lines as the
+audited patch; three-way hunk grouping differs only because the successor
+already has the Q47 launcher architecture. LauncherMods preserves the current
+bounded install-progress callback while also returning the validated manifest.
+RomImporter keeps Q47's coroutine-based picker and SAF path and performs the
+new dependency check on both its synchronous inbox path and its task-owned
+asynchronous direct-package path.
+
+Profiles can now be applied, captured, duplicated, renamed, deleted, and kept
+in sync with per-game choices. Dependency specifications accept validated
+repository hints. The launcher reports missing, incompatible, direct-conflict,
+and reverse-conflict conditions and can resolve an authorized dependency
+through the existing asynchronous mod update path. No dependency, URL, socket,
+or network action was started during integration or testing.
+
+Focused verification:
+
+- Launcher list and target contracts: 118/118 and 70/70 passed.
+- Manifest and dependency resolver: 107/107 passed.
+- Profile mutation and Q47 asynchronous dependency check: 15/15 passed.
+- LuaJIT source compilation: 370/370 passed.
+- Quest launcher focus, touch, modal, text, row, reflow, scroll, profile, SAF,
+  launch-progress, and lifecycle checks: 536 checks plus 3 contract drivers
+  passed.
+- Full Modkit: 21/21 suites passed.
+- The direct `tests/mod_ui_tests.lua` run remains behind the missing private
+  `data/generated/field.lua` boundary. Its new profile assertions are repeated
+  in the ROM-free focused test without creating generated data.
+- Staged secret, private-path, protected-artifact, binary, whitespace, and
+  diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1107,5 +1165,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 24 starts the ordered M7 launcher lane with the
-per-game enablement foundation. Resume with its dependent profile controls.
+Current recovery point: Batch 25 completes the M7 profile and dependency
+foundation while preserving the Q47 async/SAF importer. Resume with versioned
+conflict resolution.

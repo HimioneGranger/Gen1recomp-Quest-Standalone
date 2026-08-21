@@ -41,6 +41,8 @@ local CacheFs = require("src.import.CacheFs")
 
 local LauncherMods = {}
 
+local discover  -- forward declaration for helper functions above line 343
+
 -- ------- pure status derivation
 
 -- A hard-dependency / conflict / version verdict for one manifest.  mods is
@@ -105,6 +107,166 @@ local function statusFor(mods, id, enabledSet, enabled, version, forcedFor)
   return "ok", "Ready"
 end
 
+-- Resolves the best-known GitHub owner/repo string for a dependency spec, if any.
+function LauncherMods.resolveDependencyRepo(depId, parentManifest, installedDep)
+  if not depId or depId == "" then return nil end
+  -- 1. Check spec hint if parentManifest dependencySpecs carries it
+  if parentManifest and parentManifest.dependencySpecs then
+    for _, spec in ipairs(parentManifest.dependencySpecs) do
+      if spec.id == depId and spec.github then
+        return spec.github
+      end
+    end
+  end
+  -- 2. Check parentManifest raw dependency_sources
+  if parentManifest and parentManifest.raw and type(parentManifest.raw.dependency_sources) == "table" then
+    local src = parentManifest.raw.dependency_sources[depId]
+    if src then
+      local ok, clean = pcall(Manifest.parseGithub, src)
+      if ok and clean then return clean end
+    end
+  end
+  -- 3. Check installed dependency manifest
+  if installedDep and installedDep.github then
+    return installedDep.github
+  end
+  -- 4. Check ModIndex entries if available
+  local okModIndex, ModIndex = pcall(require, "src.mods.ModIndex")
+  if okModIndex and ModIndex and type(ModIndex.sources) == "function" then
+    for _, src in ipairs(ModIndex.sources() or {}) do
+      local cached = ModIndex.readCache and ModIndex.readCache(src.feed)
+      if cached and type(cached.index) == "table" then
+        for _, entry in ipairs(cached.index) do
+          if type(entry) == "table" and entry.id == depId and entry.github then
+            local ok, clean = pcall(Manifest.parseGithub, entry.github)
+            if ok and clean then return clean end
+          end
+        end
+      end
+    end
+  end
+  return nil
+end
+
+-- Inspect manifest dependencies and conflicts against installed mods.
+-- Returns: { hasIssues = bool, targetMod = {...}, deps = [ { id, name, range, status, kind, installedVersion, github, safeUrl }, ... ] }
+function LauncherMods.checkDependencies(manifest, options, version, installedManifests)
+  if not manifest then
+    return { hasIssues = false, targetMod = { name = "Unknown" }, deps = {} }
+  end
+
+  local SaveData = require("src.core.SaveData")
+  local manifests = installedManifests or discover()
+  local installedMap = {}
+  for _, m in ipairs(manifests) do
+    installedMap[m.id] = m
+  end
+
+  local depsResult = {}
+  local hasIssues = false
+
+  -- 1. Hard Dependencies (dependencySpecs)
+  if type(manifest.dependencySpecs) == "table" then
+    for _, spec in ipairs(manifest.dependencySpecs) do
+      local depId = spec.id
+      local range = spec.range
+      local installedDep = installedMap[depId]
+      local status = "satisfied"
+      local installedVersion = installedDep and installedDep.version or nil
+
+      if not installedDep then
+        status = "missing"
+        hasIssues = true
+      elseif range and not Semver.satisfies(installedDep.version, range) then
+        status = "incompatible"
+        hasIssues = true
+      end
+
+      local ghRepo = LauncherMods.resolveDependencyRepo(depId, manifest, installedDep)
+      local safeUrl = ghRepo and ("https://github.com/" .. ghRepo) or nil
+
+      depsResult[#depsResult + 1] = {
+        id = depId,
+        name = (installedDep and installedDep.name) or depId,
+        range = range,
+        status = status,
+        kind = "dependency",
+        installedVersion = installedVersion,
+        github = ghRepo,
+        safeUrl = safeUrl,
+      }
+    end
+  end
+
+  -- 2. Conflicts / Incompatible Mods (conflictSpecs)
+  local conflictIdsSeen = {}
+  local scope = SaveData.modScope and SaveData.modScope(version) or version
+
+  local isEnabled = function(modId)
+    if not options then return true end
+    local dec = SaveData.modEnabled(options, modId, scope)
+    if dec ~= nil then return dec == true end
+    local m = installedMap[modId]
+    return m and not m.experimental
+  end
+
+  -- (a) Conflicts declared by target manifest
+  if type(manifest.conflictSpecs) == "table" then
+    for _, spec in ipairs(manifest.conflictSpecs) do
+      local conflictId = spec.id
+      local installedOther = installedMap[conflictId]
+      if installedOther and isEnabled(conflictId) and not conflictIdsSeen[conflictId] then
+        conflictIdsSeen[conflictId] = true
+        hasIssues = true
+        depsResult[#depsResult + 1] = {
+          id = conflictId,
+          name = installedOther.name or conflictId,
+          status = "conflict",
+          kind = "conflict",
+          installedVersion = installedOther.version or "?",
+          github = nil,
+          safeUrl = nil,
+        }
+      end
+    end
+  end
+
+  -- (b) Reverse conflicts declared by installed mods against target manifest
+  if manifest.id then
+    for _, other in ipairs(manifests) do
+      if other.id ~= manifest.id and isEnabled(other.id) and not conflictIdsSeen[other.id] then
+        local conflicts = other.conflictSpecs or {}
+        for _, spec in ipairs(conflicts) do
+          if spec.id == manifest.id then
+            conflictIdsSeen[other.id] = true
+            hasIssues = true
+            depsResult[#depsResult + 1] = {
+              id = other.id,
+              name = other.name or other.id,
+              status = "conflict",
+              kind = "conflict",
+              installedVersion = other.version or "?",
+              github = nil,
+              safeUrl = nil,
+            }
+            break
+          end
+        end
+      end
+    end
+  end
+
+  return {
+    hasIssues = hasIssues,
+    targetMod = {
+      id = manifest.id,
+      name = manifest.name or manifest.id,
+      version = manifest.version or "?",
+    },
+    deps = depsResult,
+  }
+end
+
 -- deriveList(manifests, options [, version]) -> the panel row list, pure.
 -- manifests is an array of validated manifests (Manifest.validate output);
 -- options is the options table (options.mods, options.modsByVersion and
@@ -165,6 +327,8 @@ function LauncherMods.deriveList(manifests, options, version)
       statusDetail = detail,
       github = m.github,
       experimental = m.experimental == true,
+      dependencySpecs = m.dependencySpecs,
+      manifest = m,
       -- what game this mod is for, and whether it will run on the one the
       -- panel is showing (src/mods/ModTargets.lua)
       targets = ModTargets.chip(m),
@@ -252,7 +416,7 @@ end
 -- Scan "mods/" one level deep for valid manifests (mirrors Loader:_discover,
 -- but validates only -- no entry chunk is ever loaded).  First id wins on a
 -- duplicate.  Returns an array of validated manifests.
-local function discover()
+discover = function()
   local fs = love and love.filesystem
   local out = {}
   if not (fs and fs.getInfo and fs.getDirectoryItems) then return out end
@@ -386,6 +550,7 @@ function LauncherMods.setEnabled(id, enabled, version)
   local options = SaveData.loadOptions()
   SaveData.setModEnabled(options, id, enabled, SaveData.modScope(version))
   SaveData.saveOptions(options)
+  LauncherMods.syncActiveProfile(options)
   return true
 end
 
@@ -409,6 +574,7 @@ function LauncherMods.setAllEnabled(ids, enabled, version)
     end
   end
   SaveData.saveOptions(options)
+  LauncherMods.syncActiveProfile(options)
   return true
 end
 
@@ -1228,9 +1394,9 @@ function LauncherMods.adoptStrays() return scanStrays(true) end
 -- opts.replace = true uninstalls an existing same-id mod first (updates /
 -- rollbacks).  opts.expectId, when set, refuses a zip whose manifest id differs.
 function LauncherMods.installZip(source, opts)
-  local ok, result, err = pcall(LauncherMods._installZipInner, source, opts)
+  local ok, result, res2, res3 = pcall(LauncherMods._installZipInner, source, opts)
   if not ok then return nil, "import failed: " .. tostring(result) end
-  return result, err
+  return result, res2, res3
 end
 
 function LauncherMods._installZipInner(source, opts)
@@ -1348,7 +1514,7 @@ function LauncherMods._installZipInner(source, opts)
   end
   cleanup()
   if progress then progress("complete", 1, 1, manifest.id) end
-  return true, manifest.id
+  return true, manifest.id, manifest
 end
 
 -- Install (or replace) a mod from a GitHub release zip URL.
@@ -1469,6 +1635,151 @@ function LauncherMods.uninstall(id)
     end
   end
   if changed then
+    SaveData.saveOptions(options)
+  end
+  return true
+end
+
+-- ----------------------------------------------------------- Mod Profiles (#593)
+local ModProfile = require("src.mods.ModProfile")
+
+function LauncherMods.getProfiles(options)
+  options = options or SaveData.loadOptions()
+  local manifests = discover()
+  ModProfile.ensureFirst(options, manifests, options.modOptions)
+  return options.modProfiles or {}, options.activeProfile or "PROFILE 1"
+end
+
+function LauncherMods.applyProfile(profileName, options)
+  options = options or SaveData.loadOptions()
+  local profiles = options.modProfiles or {}
+  local targetProfile
+  for _, p in ipairs(profiles) do
+    if p.name == profileName then targetProfile = p; break end
+  end
+  if not targetProfile then return false end
+  ModProfile.restoreVersions(targetProfile, options)
+  options.activeProfile = profileName
+  SaveData.saveOptions(options)
+  return true
+end
+
+function LauncherMods.saveProfile(profileName, options)
+  options = options or SaveData.loadOptions()
+  local manifests = discover()
+  options.modProfiles = options.modProfiles or {}
+  local snap = ModProfile.capture(manifests, options.modOptions, options.modsByVersion)
+  snap.name = profileName
+  local existingIdx
+  for i, p in ipairs(options.modProfiles) do
+    if p.name == profileName then existingIdx = i; break end
+  end
+  if existingIdx then
+    options.modProfiles[existingIdx] = snap
+  else
+    options.modProfiles[#options.modProfiles + 1] = snap
+  end
+  options.activeProfile = profileName
+  SaveData.saveOptions(options)
+  return snap
+end
+
+local function copyTable(tbl)
+  if type(tbl) ~= "table" then return tbl end
+  local copy = {}
+  for k, v in pairs(tbl) do
+    copy[k] = type(v) == "table" and copyTable(v) or v
+  end
+  return copy
+end
+
+function LauncherMods.syncActiveProfile(options)
+  options = options or SaveData.loadOptions()
+  local activeName = options.activeProfile or "PROFILE 1"
+  local profiles = options.modProfiles or {}
+  local manifests = discover()
+  local snap = ModProfile.capture(manifests, options.modOptions, options.modsByVersion)
+  snap.name = activeName
+
+  local found = false
+  for i, p in ipairs(profiles) do
+    if p.name == activeName then
+      profiles[i] = snap
+      found = true
+      break
+    end
+  end
+  if not found then
+    profiles[#profiles + 1] = snap
+  end
+  options.modProfiles = profiles
+  options.activeProfile = activeName
+  SaveData.saveOptions(options)
+  return snap
+end
+
+function LauncherMods.duplicateProfile(sourceName, options)
+  options = options or SaveData.loadOptions()
+  local profiles = options.modProfiles or {}
+  local sourceProfile
+  for _, p in ipairs(profiles) do
+    if p.name == sourceName then sourceProfile = p; break end
+  end
+  if not sourceProfile then return nil end
+
+  local baseName = sourceName .. " (Copy)"
+  local newName = baseName
+  local n = 1
+  local taken = {}
+  for _, p in ipairs(profiles) do taken[p.name] = true end
+  while taken[newName] do
+    n = n + 1
+    newName = sourceName .. " (" .. n .. ")"
+  end
+
+  local snap = {
+    name = newName,
+    enabled = copyTable(sourceProfile.enabled),
+    options = copyTable(sourceProfile.options),
+    slots = copyTable(sourceProfile.slots),
+    enabledByVersion = copyTable(sourceProfile.enabledByVersion),
+  }
+  profiles[#profiles + 1] = snap
+  options.modProfiles = profiles
+  options.activeProfile = newName
+  SaveData.saveOptions(options)
+  return snap
+end
+
+function LauncherMods.renameProfile(oldName, newName, options)
+  options = options or SaveData.loadOptions()
+  if not newName or newName == "" then return false end
+  local profiles = options.modProfiles or {}
+  for i, p in ipairs(profiles) do
+    if p.name == oldName then
+      p.name = newName
+      if options.activeProfile == oldName then
+        options.activeProfile = newName
+      end
+      SaveData.saveOptions(options)
+      return true
+    end
+  end
+  return false
+end
+
+function LauncherMods.deleteProfile(profileName, options)
+  options = options or SaveData.loadOptions()
+  options.modProfiles = options.modProfiles or {}
+  local newProfiles = {}
+  for _, p in ipairs(options.modProfiles) do
+    if p.name ~= profileName then newProfiles[#newProfiles + 1] = p end
+  end
+  options.modProfiles = newProfiles
+  if options.activeProfile == profileName then
+    local fallback = newProfiles[1] and newProfiles[1].name or "PROFILE 1"
+    LauncherMods.applyProfile(fallback, options)
+  else
     SaveData.saveOptions(options)
   end
   return true

@@ -1698,7 +1698,7 @@ end
 function RomImporter:_installModNow(source)
   if self.workState == "working" then return end
   self.tab = "mods"
-  local ok, installed, res = pcall(function()
+  local ok, installed, res, manifest = pcall(function()
     local LauncherMods = require("src.mods.LauncherMods")
     return LauncherMods.installZip(source)
   end)
@@ -1710,6 +1710,17 @@ function RomImporter:_installModNow(source)
   if installed then
     pcall(self._refreshMods, self)
     self.modNotice = { ok = true, text = "Installed " .. tostring(res) }
+    local LauncherMods = require("src.mods.LauncherMods")
+    local checkTarget = manifest
+    if not checkTarget and type(res) == "string" then
+      checkTarget = { id = res }
+    end
+    if checkTarget then
+      local depCheck = LauncherMods.checkDependencies(checkTarget)
+      if depCheck and depCheck.hasIssues then
+        self._modDepResolver = depCheck
+      end
+    end
   else
     -- A direct package keeps its existing install path.  Only an archive with
     -- no package manifest can become a bundle; prepareBundle performs every
@@ -1784,8 +1795,15 @@ function RomImporter:_installMod(source, done)
       self:_finishModWork(false, tostring(bundleErr), done)
       return
     end
-    local installed, res = LauncherMods._installZipInner(source, { progress = progress })
+    local installed, res, manifest = LauncherMods._installZipInner(source, { progress = progress })
     if installed then
+      local checkTarget = manifest or (type(res) == "string" and { id = res })
+      if checkTarget then
+        local depCheck = LauncherMods.checkDependencies(checkTarget)
+        if depCheck and depCheck.hasIssues then
+          self._modDepResolver = depCheck
+        end
+      end
       self:_finishModWork(true, "Installed " .. tostring(res), done)
     else
       self:_finishModWork(false, tostring(res), done)
@@ -2898,6 +2916,43 @@ function RomImporter:fileUrl(path)
 end
 
 function RomImporter:keypressed(key)
+  if self._profileSavePrompt then
+    if key == "backspace" then
+      self._profileSavePrompt.text = utf8Back(self._profileSavePrompt.text or "")
+    elseif key == "return" or key == "kpenter" then
+      local txt = self._profileSavePrompt and self._profileSavePrompt.text
+      if txt and txt ~= "" then
+        local LauncherMods = require("src.mods.LauncherMods")
+        LauncherMods.saveProfile(txt)
+        self._profileSavePrompt = nil
+        self:_disarmTextInput()
+        if self._refreshMods then self:_refreshMods() end
+      end
+    elseif key == "escape" then
+      self._profileSavePrompt = nil
+      self:_disarmTextInput()
+    end
+    return
+  end
+  if self._profileRenamePrompt then
+    if key == "backspace" then
+      self._profileRenamePrompt.text = utf8Back(self._profileRenamePrompt.text or "")
+    elseif key == "return" or key == "kpenter" then
+      local txt = self._profileRenamePrompt and self._profileRenamePrompt.text
+      local old = self._profileRenamePrompt and self._profileRenamePrompt.oldName
+      if txt and txt ~= "" and old then
+        local LauncherMods = require("src.mods.LauncherMods")
+        LauncherMods.renameProfile(old, txt)
+        self._profileRenamePrompt = nil
+        self:_disarmTextInput()
+        if self._refreshMods then self:_refreshMods() end
+      end
+    elseif key == "escape" then
+      self._profileRenamePrompt = nil
+      self:_disarmTextInput()
+    end
+    return
+  end
   if self._settingsText then
     if key == "backspace" then
       self._settingsText.text = utf8Back(self._settingsText.text)
@@ -3067,6 +3122,14 @@ function RomImporter:_commitRename()
 end
 
 function RomImporter:textinput(text)
+  if self._profileSavePrompt then
+    self._profileSavePrompt.text = utf8Cap((self._profileSavePrompt.text or "") .. text, MAX_SLOT_LABEL)
+    return
+  end
+  if self._profileRenamePrompt then
+    self._profileRenamePrompt.text = utf8Cap((self._profileRenamePrompt.text or "") .. text, MAX_SLOT_LABEL)
+    return
+  end
   if self._settingsText then
     local st = self._settingsText
     st.text = utf8Cap(st.text .. text, st.maxLen or MAX_SLOT_LABEL)
@@ -3552,6 +3615,76 @@ function RomImporter:_pumpModInstall()
     self.findNotice = { ok = true, text = text }
   else
     self.modNotice = { ok = true, text = text }
+  end
+  local LauncherMods = require("src.mods.LauncherMods")
+  local depCheck = LauncherMods.checkDependencies({ id = spec.modId })
+  if depCheck and depCheck.hasIssues then
+    self._modDepResolver = depCheck
+  end
+end
+
+-- Start an async pull for a single dependency
+function RomImporter:_startDepPull(dep)
+  if not dep or not dep.github then return end
+  self._depPullState = self._depPullState or {}
+  local hFetch = require("src.mods.ModUpdate").beginFetchReleases(dep.github, dep.id, { force = true })
+  self._depPullState[dep.id] = {
+    dep = dep,
+    stage = "fetching",
+    fetchHandle = hFetch,
+  }
+end
+
+-- Pump all in-flight dependency pulls
+function RomImporter:_pumpDepPulls()
+  if not self._depPullState then return end
+  local ModUpdate = require("src.mods.ModUpdate")
+  local LauncherMods = require("src.mods.LauncherMods")
+
+  for depId, state in pairs(self._depPullState) do
+    if state.stage == "fetching" then
+      local done, releases, err = ModUpdate.pumpFetchReleases(state.fetchHandle)
+      if done then
+        if err or not releases or #releases == 0 then
+          state.stage = "error"
+          state.err = err or "No downloadable releases found on GitHub"
+        else
+          local rel = releases[1]
+          if not rel or not rel.zip or not rel.zip.url then
+            state.stage = "error"
+            state.err = "Latest release has no downloadable .zip asset"
+          else
+            local tmpName = ("dep_%s_%s.zip"):format(depId, tostring(rel.version or os.time()))
+            state.dlHandle = ModUpdate.beginDownloadZip(rel.zip.url, tmpName, rel.zip.size)
+            state.stage = "downloading"
+            state.targetVersion = rel.version
+          end
+        end
+      end
+    elseif state.stage == "downloading" then
+      local done, localPath, err, progress = ModUpdate.pumpDownloadZip(state.dlHandle)
+      state.progress = progress
+      if done then
+        if err or not localPath then
+          state.stage = "error"
+          state.err = err or "Download failed"
+        else
+          state.stage = "installing"
+          local okInst, versionRes = LauncherMods.installDownloadedZip(depId, localPath, state.targetVersion)
+          if okInst then
+            state.stage = "done"
+            pcall(self._refreshMods, self)
+            if self._modDepResolver and self._modDepResolver.targetMod then
+              local updated = LauncherMods.checkDependencies(self._modDepResolver.targetMod)
+              self._modDepResolver = updated
+            end
+          else
+            state.stage = "error"
+            state.err = tostring(versionRes or "Installation failed")
+          end
+        end
+      end
+    end
   end
 end
 

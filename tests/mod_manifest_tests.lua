@@ -138,7 +138,25 @@ check(not pcall(Manifest.parseGithub, "not a repo"),
 check(not pcall(Manifest.validate, {
   id = "badgh", name = "Bad", version = "1.0.0", entry = "main.lua",
   github = "ftp://example.com/x",
-}), "a bad github field fails manifest validation")
+}), "an unsupported github URL fails validation")
+
+-- ------- dependency github repo spec hints & dependency resolver
+local depGh = Manifest.validate({
+  id = "depgh", name = "DepGH", version = "1.0.0", entry = "main.lua",
+  dependencies = { "colorlib@^1.2.0#Acme/ColorLib", "soundpack#Acme/SoundPack" },
+  dependency_sources = { helper = "Acme/Helper" },
+})
+check(depGh.dependencySpecs[1].id == "colorlib" and depGh.dependencySpecs[1].github == "Acme/ColorLib",
+  "dependency spec hash hint parses github owner/repo")
+check(depGh.dependencySpecs[2].id == "soundpack" and depGh.dependencySpecs[2].github == "Acme/SoundPack",
+  "dependency spec hash hint without range parses github owner/repo")
+
+local LauncherMods = require("src.mods.LauncherMods")
+local depCheck = LauncherMods.checkDependencies(depGh)
+check(depCheck.hasIssues == true, "missing dependencies trigger issues verdict")
+check(#depCheck.deps == 2, "dependency check lists all specs")
+check(depCheck.deps[1].status == "missing", "absent dependency reports missing")
+check(depCheck.deps[1].safeUrl == "https://github.com/Acme/ColorLib", "safeUrl built from validated github repo")
 
 local v1 = Manifest.validate({
   id = "v1", name = "V1", version = "1.0.0", entry = "main.lua",
@@ -517,8 +535,26 @@ local emptyLoader = Loader.new({ fs = memfs({}) })
 check(emptyLoader:load(pristine) == true, "an empty mods dir still loads clean")
 check(#emptyLoader:status().errors == 0, "no mods means no diagnostics")
 check(#emptyLoader.order == 0, "no mods means an empty load order")
-check(pristine.pokemon.A.hp == 1 and next(pristine.items) == nil,
-  "no-mod load leaves data untouched")
+-- ------- dependency resolver conflict detection test
+local LauncherMods = require("src.mods.LauncherMods")
+local testTargetManifest = Manifest.validate({
+  id = "new_mod",
+  name = "New Mod",
+  version = "1.0.0",
+  entry = "main.lua",
+  incompatible = { "colorlib" },
+}, "mods/new_mod")
+local installedColorlib = Manifest.validate({
+  id = "colorlib",
+  name = "Color Lib",
+  version = "1.0.0",
+  entry = "main.lua",
+}, "mods/colorlib")
+local depConflictCheck = LauncherMods.checkDependencies(testTargetManifest, nil, nil, { installedColorlib })
+check(depConflictCheck.hasIssues == true, "conflict with colorlib triggers hasIssues")
+check(#depConflictCheck.deps == 1 and depConflictCheck.deps[1].status == "conflict",
+  "incompatible mod is flagged as status conflict")
+check(depConflictCheck.deps[1].kind == "conflict", "conflict item carries kind conflict")
 
 Runtime.install(savedEvents, savedHooks)
 

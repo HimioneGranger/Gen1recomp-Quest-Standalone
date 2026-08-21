@@ -321,10 +321,10 @@ local function modStatusColor(status)
   return Strings("Incompatible"), PAL.yellow
 end
 
--- MODS panel scope row: which game the list is answering for.  Drawn from
--- GameVersion.ORDER so a new game needs nothing here.
+-- MODS panel scope row: which game the list is answering for, plus dedicated Profile control (cycle + gear).
 local function buildModScopeRow(imp, x, y, w, m)
   local GameVersion = require("src.core.GameVersion")
+  local LauncherMods = require("src.mods.LauncherMods")
   local h = math.max(Kit.tapMin(), math.floor(26 * m.s))
   local gap = math.floor(6 * m.s)
   local label = Strings("Show for:")
@@ -337,16 +337,63 @@ local function buildModScopeRow(imp, x, y, w, m)
         { id = version, label = GameVersion.info(version).label }
     end
   end
-  if #options < 2 then return 0 end
-  for _, opt in ipairs(options) do
-    local cw = Kit.textWidth("micro", opt.label) + math.floor(18 * m.s)
-    if Kit.chip(cx, y, cw, h, opt.label, imp.modScope == opt.id, PAL.lineStrong,
-                "mod-scope-" .. tostring(opt.id or "all")) then
-      local want = opt.id
-      queueAction(imp, "mod-scope-" .. tostring(want or "all"),
-        function() imp:_setModScope(want) end)
+
+  -- Dedicated Profile control section (cycle button + gear icon button) on right side of Scope Bar
+  local profiles, activeProf = LauncherMods.getProfiles()
+  local isCompact = (w < math.floor(500 * m.s))
+  local nameText = tostring(activeProf or "Default")
+  local profLabel = isCompact and nameText or Strings("Profile: %s", nameText)
+  local profW = Kit.textWidth("micro", profLabel) + math.floor(20 * m.s)
+  local gearW = h
+  local gearX = x + w - gearW
+  local profX = gearX - profW - math.floor(4 * m.s)
+
+  -- Tapping main profile button cycles to the next profile (styles match iconButton)
+  Kit._audit("control", profX, y, profW, h, "mod-scope-profile")
+  local focused = Kit.focusable("mod-scope-profile", profX, y, profW, h)
+  local hot = focused or Kit.hover(profX, y, profW, h)
+  Theme.fillRounded(profX, y, profW, h, hot and PAL.ink or PAL.surface, 1)
+  Theme.strokeRounded(profX, y, profW, h, PAL.line,
+    hot and Theme.A.focus or Theme.A.hairline, 1)
+  Kit.textCenterBold("micro", profLabel, profX,
+    y + (h - Kit.textHeight("micro")) / 2, profW,
+    hot and PAL.inverse or PAL.heading)
+  if Kit.press(profX, y, profW, h) or Kit._activateId == "mod-scope-profile" then
+    local nextIdx = 1
+    for i, p in ipairs(profiles) do
+      if p.name == activeProf then
+        nextIdx = (i % #profiles) + 1
+        break
+      end
     end
-    cx = cx + cw + gap
+    local nextProf = profiles[nextIdx] and profiles[nextIdx].name
+    if nextProf then
+      queueAction(imp, "mod-scope-profile", function()
+        LauncherMods.applyProfile(nextProf)
+        if imp._refreshMods then imp:_refreshMods() end
+      end)
+    end
+  end
+
+  -- Tapping gear button opens the Profile Manager modal
+  imp._gearIcon = imp._gearIcon or (love and love.graphics and love.graphics.newImage and love.graphics.newImage("assets/launcher/gear.png"))
+  iconButton(imp, "mod-profile-gear", gearX, y, gearW, imp._gearIcon, function()
+    imp._profilesPopup = true
+  end)
+
+  if #options >= 2 then
+    for _, opt in ipairs(options) do
+      local cw = Kit.textWidth("micro", opt.label) + math.floor(18 * m.s)
+      if cx + cw <= profX - gap then
+        if Kit.chip(cx, y, cw, h, opt.label, imp.modScope == opt.id, PAL.lineStrong,
+                    "mod-scope-" .. tostring(opt.id or "all")) then
+          local want = opt.id
+          queueAction(imp, "mod-scope-" .. tostring(want or "all"),
+            function() imp:_setModScope(want) end)
+        end
+        cx = cx + cw + gap
+      end
+    end
   end
   return h + math.floor(8 * m.s)
 end
@@ -1130,33 +1177,31 @@ end
 local function drawCheck(x, y, size, color)
   love.graphics.push("all")
   love.graphics.setColor(color)
-  love.graphics.setLineWidth(math.max(2, size * 0.16))
+  love.graphics.setLineWidth(math.max(2.2, size * 0.17))
   love.graphics.setLineJoin("bevel")
   love.graphics.line(
-    x, y + size * 0.55,
-    x + size * 0.35, y + size * 0.85,
-    x + size * 0.95, y + size * 0.15)
+    x + size * 0.02, y + size * 0.52,
+    x + size * 0.38, y + size * 0.80,
+    x + size * 1.015, y + size * 0.18)
   love.graphics.pop()
 end
 
 -- One compact coloured checkbox for each game.  The cartridge colour carries
--- the game identity even when the row is narrow; the letter keeps an unchecked
--- box legible without relying on colour alone.
+-- the game identity even when the row is narrow.
 local function modGameCheckbox(x, y, size, checked, game, id)
   local color = cartColor(game)
   local focused = Kit.focusable(id, x, y, size, size)
   local hot = focused or Kit.hover(x, y, size, size)
   if love.graphics then
+    Theme.fillRounded(x, y, size, size, PAL.bg, 1)
     if checked then
-      Theme.fillRounded(x, y, size, size, color, 1)
-      drawCheck(x, y, size, PAL.inverse)
+      Theme.strokeRounded(x, y, size, size, color,
+        hot and Theme.A.focus or 0.9, 1.5)
+      drawCheck(x, y, size, color)
     else
-      Theme.fillRounded(x, y, size, size, PAL.bg, 1)
-      Kit.textCenterBold("micro", game:sub(1, 1):upper(), x,
-        y + (size - Kit.textHeight("micro")) / 2, size, color)
+      Theme.strokeRounded(x, y, size, size, color,
+        hot and Theme.A.focus or Theme.A.hairline, 1)
     end
-    Theme.strokeRounded(x, y, size, size, color,
-      hot and Theme.A.focus or Theme.A.hover, 1)
   end
   return Kit.press(x, y, size, size) or Kit._activateId == id
 end
@@ -1168,28 +1213,79 @@ local function buildModsPanel(imp, x, y, w, availH, m)
   local gap = m.gap
   local cy = y
 
-  -- header: just the action cluster, right-aligned.  No "Mods" headline (the
-  -- active tab already says it) and no enabled count (the toggles show it).
-  local place = Layout.rightCluster(x, w, math.floor(6 * m.s))
+  -- header: progressive action cluster. Surfaces primary/frequent actions
+  -- (Import, Updates, Sort) directly on the bar across screen sizes, placing
+  -- bulk actions (Enable all / Disable all) into More... on compact viewports.
   local bh = m.btnH
   local importLabel = imp:_modsImportButtonLabel()
-  local iw2 = Kit.textWidth("small", importLabel) + math.floor(24 * m.s)
-  btn(imp, place(iw2), cy, iw2, bh, "mods-import", importLabel, {
-    kind = "accent", font = "small",
-    action = function() imp:chooseMod() end })
+  local importW = Kit.textWidth("small", importLabel) + math.floor(24 * m.s)
+
   if #mods > 0 then
-    local dw = Kit.textWidth("small", Strings("Disable all")) + math.floor(20 * m.s)
-    btn(imp, place(dw), cy, dw, bh, "mods-disable-all", Strings("Disable all"), {
-      kind = "warn", font = "small",
-      action = function() imp:_setAllMods(false) end })
-    local ew = Kit.textWidth("small", Strings("Enable all")) + math.floor(20 * m.s)
-    btn(imp, place(ew), cy, ew, bh, "mods-enable-all", Strings("Enable all"), {
-      kind = "good", font = "small",
-      action = function() imp:_setAllMods(true) end })
-    local sw = Kit.textWidth("small", Strings("Sort")) + math.floor(24 * m.s)
-    btn(imp, place(sw), cy, sw, bh, "mods-sort", Strings("Sort"), {
-      font = "small",
-      action = function() imp._sortPopup = true end })
+    local disableW = Kit.textWidth("small", Strings("Disable all")) + math.floor(20 * m.s)
+    local enableW = Kit.textWidth("small", Strings("Enable all")) + math.floor(20 * m.s)
+    local checkFullW = Kit.textWidth("small", Strings("Check for updates")) + math.floor(20 * m.s)
+    local checkShortW = Kit.textWidth("small", Strings("Updates")) + math.floor(20 * m.s)
+    local sortW = Kit.textWidth("small", Strings("Sort")) + math.floor(24 * m.s)
+    local moreW = Kit.textWidth("small", Strings("More...")) + math.floor(20 * m.s)
+
+    local fullReq = importW + disableW + enableW + checkFullW + sortW + math.floor(30 * m.s)
+    local medReq = importW + checkShortW + sortW + moreW + math.floor(24 * m.s)
+
+    local place = Layout.rightCluster(x, w, math.floor(6 * m.s))
+
+    if fullReq <= w then
+      -- Tier 1 (Desktop / Wide): Show all 5 full-text buttons
+      btn(imp, place(importW), cy, importW, bh, "mods-import", importLabel, {
+        kind = "accent", font = "small",
+        action = function() imp:chooseMod() end })
+      btn(imp, place(disableW), cy, disableW, bh, "mods-disable-all", Strings("Disable all"), {
+        kind = "warn", font = "small",
+        action = function() imp:_setAllMods(false) end })
+      btn(imp, place(enableW), cy, enableW, bh, "mods-enable-all", Strings("Enable all"), {
+        kind = "good", font = "small",
+        action = function() imp:_setAllMods(true) end })
+      btn(imp, place(checkFullW), cy, checkFullW, bh, "mods-check-updates", Strings("Check for updates"), {
+        font = "small",
+        action = function() imp:_syncModUpdateInfo(true) end })
+      btn(imp, place(sortW), cy, sortW, bh, "mods-sort", Strings("Sort"), {
+        font = "small",
+        action = function() imp._sortPopup = true end })
+    elseif medReq <= w then
+      -- Tier 2 (Medium / Compact): Surface Import, Updates, and Sort directly
+      btn(imp, place(importW), cy, importW, bh, "mods-import", importLabel, {
+        kind = "accent", font = "small",
+        action = function() imp:chooseMod() end })
+      btn(imp, place(checkShortW), cy, checkShortW, bh, "mods-check-updates", Strings("Updates"), {
+        font = "small",
+        action = function() imp:_syncModUpdateInfo(true) end })
+      btn(imp, place(sortW), cy, sortW, bh, "mods-sort", Strings("Sort"), {
+        font = "small",
+        action = function() imp._sortPopup = true end })
+      btn(imp, place(moreW), cy, moreW, bh, "mods-more-actions", Strings("More..."), {
+        font = "small",
+        action = function() imp._modHeaderActionsPopup = true end })
+    else
+      -- Tier 3 (Ultra-Compact Mobile): Surface Import, Sort + More...
+      local importShortLabel = Strings("Import")
+      local importShortW = Kit.textWidth("small", importShortLabel) + math.floor(20 * m.s)
+      local miniReq = importShortW + sortW + moreW + math.floor(18 * m.s)
+      local useImportW = (miniReq <= w) and importShortW or importW
+
+      btn(imp, place(useImportW), cy, useImportW, bh, "mods-import", (miniReq <= w) and importShortLabel or importLabel, {
+        kind = "accent", font = "small",
+        action = function() imp:chooseMod() end })
+      btn(imp, place(sortW), cy, sortW, bh, "mods-sort", Strings("Sort"), {
+        font = "small",
+        action = function() imp._sortPopup = true end })
+      btn(imp, place(moreW), cy, moreW, bh, "mods-more-actions", Strings("More..."), {
+        font = "small",
+        action = function() imp._modHeaderActionsPopup = true end })
+    end
+  else
+    local place = Layout.rightCluster(x, w, math.floor(6 * m.s))
+    btn(imp, place(importW), cy, importW, bh, "mods-import", importLabel, {
+      kind = "accent", font = "small",
+      action = function() imp:chooseMod() end })
   end
   cy = cy + bh + math.floor(8 * m.s)
 
@@ -1269,17 +1365,28 @@ local function buildModsPanel(imp, x, y, w, availH, m)
     local mod = mods[i]
     local ry = listTop + (i - first) * (rowH + gap)
     local rowKey = "mod-row-" .. mod.id
-    -- The whole row is the control: it opens the per-mod actions popup
-    -- (update / versions / delete moved there).  Only the enable toggle
-    -- stays inline, because flipping a mod on and off is the everyday act.
+    local isFullyDisabled = true
+    if mod.enabledByVersion then
+      for _, on in pairs(mod.enabledByVersion) do
+        if on then isFullyDisabled = false; break end
+      end
+    else
+      isFullyDisabled = not mod.enabled
+    end
+
     local focused = Kit.focusable(rowKey, x, ry, w, rowH)
     local hot = focused or Kit.hover(x, ry, w, rowH)
-    Kit.card(x, ry, w, rowH, hot)
+    if isFullyDisabled then
+      Theme.fillRounded(x, ry, w, rowH, PAL.bg, 0.8, Theme.cardRadius())
+      Theme.strokeRounded(x, ry, w, rowH, PAL.muted, hot and Theme.A.hover or 0.25, 1, Theme.cardRadius())
+    else
+      Kit.card(x, ry, w, rowH, hot)
+    end
     local pad = math.floor(12 * m.s)
     local px, inner = x + pad, w - 2 * pad
     local ly = ry + math.floor(10 * m.s)
 
-    local togGap = math.floor(4 * m.s)
+    local togGap = math.floor(5 * m.s) + 1
     local info = mod.github and mod.github ~= "" and imp:_modUpdateInfo(mod.id)
 
     -- These answer separate games, not a single shared install flag.  The
@@ -1317,7 +1424,8 @@ local function buildModsPanel(imp, x, y, w, availH, m)
       and Kit.textWidth("micro", mod.targets) + math.floor(12 * m.s) or 0
     local nameShown = Kit.ellipsize("button", mod.name,
       textW - badgeW - gamesW - math.floor(12 * m.s))
-    Kit.text("button", nameShown, px, ly, PAL.heading)
+    local headingCol = isFullyDisabled and PAL.muted or PAL.heading
+    Kit.text("button", nameShown, px, ly, headingCol)
     local tagX = px + Kit.textWidth("button", nameShown) + math.floor(8 * m.s)
     Kit.tag(tagX, ly, badgeW, Kit.textHeight("button"), mod.badge,
       mod.experimental and PAL.yellow or PAL.muted)
@@ -1899,6 +2007,219 @@ local function buildVersionsModal(imp, m)
       action = function() imp._modVersions = nil end })
 end
 
+-- Modal for per-profile actions (Duplicate, Rename, Delete) for compact / mobile / RG device compatibility
+local function buildSingleProfileActionsModal(imp, m)
+  local pName = imp._singleProfileActions and imp._singleProfileActions.name
+  if not pName then imp._singleProfileActions = nil return end
+
+  local LauncherMods = require("src.mods.LauncherMods")
+  local SaveData = require("src.core.SaveData")
+  local options = SaveData.loadOptions()
+  local profiles, active = LauncherMods.getProfiles(options)
+
+  local pad = math.floor(18 * m.s)
+  local w = math.min(math.floor(380 * m.s), m.w - 2 * m.pad)
+  local gap = math.floor(8 * m.s)
+  local canDelete = (#profiles > 1)
+  local armed = deleteArmed(imp, "profile", pName, nil)
+
+  local btns = {
+    {
+      label = Strings("Duplicate profile"),
+      kind = "accent",
+      action = function()
+        LauncherMods.duplicateProfile(pName, options)
+        imp._singleProfileActions = nil
+      end
+    },
+    {
+      label = Strings("Rename profile"),
+      font = "small",
+      action = function()
+        imp._singleProfileActions = nil
+        imp._profileRenamePrompt = { oldName = pName, text = pName }
+        imp:_armTextInput(pName)
+      end
+    },
+  }
+  if canDelete then
+    btns[#btns + 1] = {
+      label = DELETE_LABEL(armed),
+      kind = armed and "warn" or "danger",
+      keepArm = true,
+      action = function()
+        imp:pressDelete("profile", pName, nil, function()
+          LauncherMods.deleteProfile(pName, options)
+          imp._singleProfileActions = nil
+        end)
+      end
+    }
+  end
+
+  local h = pad + Kit.textHeight("button") + math.floor(12 * m.s)
+    + #btns * (m.btnH + gap) + m.btnH + pad
+  local px, py, pw = modalPanel(m, w, h)
+  local cy = py + pad
+
+  Kit.text("button", Kit.ellipsize("button", pName, pw - 2 * pad), px + pad, cy, PAL.heading)
+  cy = cy + Kit.textHeight("button") + math.floor(12 * m.s)
+
+  for i, b in ipairs(btns) do
+    btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "profact-" .. i, b.label, {
+      kind = b.kind,
+      font = "small",
+      keepArm = b.keepArm,
+      action = function()
+        b.action()
+        if imp._refreshMods then imp:_refreshMods() end
+      end
+    })
+    cy = cy + m.btnH + gap
+  end
+
+  btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "profact-close",
+    Strings("Close"), {
+      font = "small",
+      action = function() imp._singleProfileActions = nil end })
+end
+
+-- Modal for Mod Profiles (#593) - interactive profile manager (switch, edit, duplicate, delete)
+local function buildProfilesModal(imp, m)
+  local LauncherMods = require("src.mods.LauncherMods")
+  local SaveData = require("src.core.SaveData")
+  local options = SaveData.loadOptions()
+  local profiles, active = LauncherMods.getProfiles(options)
+
+  local pad = math.floor(18 * m.s)
+  local w = math.min(math.floor(460 * m.s), m.w - 2 * m.pad)
+  local gap = math.floor(8 * m.s)
+  local rowH = math.max(Kit.tapMin(), math.floor(40 * m.s))
+
+  local n = #profiles
+  local maxVisible = 4
+  local listH = math.min(maxVisible, math.max(1, n)) * (rowH + gap) - gap
+  local h = pad + Kit.textHeight("button") + math.floor(12 * m.s)
+    + m.btnH + gap + listH + math.floor(12 * m.s) + m.btnH + pad
+
+  local px, py, pw = modalPanel(m, w, h)
+  local cy = py + pad
+
+  Kit.text("button", Strings("Mod Profiles"), px + pad, cy, PAL.heading)
+  cy = cy + Kit.textHeight("button") + math.floor(12 * m.s)
+
+  -- New Profile button
+  btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "prof-new-top",
+    Strings("+ Create New Profile"), {
+      kind = "accent", font = "small",
+      action = function()
+        imp._profileSavePrompt = { text = "PROFILE " .. tostring(#profiles + 1) }
+        imp:_armTextInput(imp._profileSavePrompt.text)
+      end,
+    })
+  cy = cy + m.btnH + gap
+
+  -- Scrollable Profile Rows
+  local scrollMax = math.max(0, n * (rowH + gap) - gap - listH)
+  local scroll = clamp(imp._profScrollOffset or 0, 0, scrollMax)
+  if scrollMax > 0 and (Kit.wheelY or 0) ~= 0 and Kit.hit(px + pad, cy, pw - 2 * pad, listH) then
+    scroll = clamp(scroll - Kit.wheelY * math.floor(36 * m.s), 0, scrollMax)
+    Kit.wheelY = 0
+  end
+  imp._profScrollOffset = scroll
+
+  Kit.pushClip(px + pad, cy, pw - 2 * pad, listH)
+  for i, p in ipairs(profiles) do
+    local ry = cy + (i - 1) * (rowH + gap) - scroll
+    if ry + rowH >= cy and ry <= cy + listH then
+      local isCur = (p.name == active)
+      local rowKey = "prof-row-" .. i
+      Kit.card(px + pad, ry, pw - 2 * pad, rowH, isCur)
+
+      local rx = px + pad + math.floor(12 * m.s)
+      local editBtnW = math.floor(64 * m.s)
+      local swBtnW = isCur and 0 or math.floor(64 * m.s)
+      local rightClusterW = editBtnW + swBtnW + (isCur and 0 or math.floor(4 * m.s))
+      local nameW = math.max(math.floor(80 * m.s), pw - 2 * pad - 2 * math.floor(12 * m.s) - rightClusterW - math.floor(50 * m.s))
+      local nameText = Kit.ellipsize("small", p.name, nameW)
+      Kit.text("small", nameText, rx, ry + (rowH - Kit.textHeight("small")) / 2, isCur and PAL.heading or PAL.muted)
+
+      if isCur then
+        Kit.tag(rx + Kit.textWidth("small", nameText) + math.floor(6 * m.s),
+          ry + (rowH - Kit.textHeight("micro")) / 2,
+          Kit.textWidth("micro", Strings("Active")) + math.floor(8 * m.s),
+          Kit.textHeight("micro"), Strings("Active"), PAL.green)
+      end
+
+      -- Right side controls: [Switch] (if not active) + [Edit]
+      local place = Layout.rightCluster(px + pad, pw - 2 * pad, math.floor(4 * m.s))
+
+      -- Edit button (opens per-profile action sheet)
+      btn(imp, place(editBtnW), ry + math.floor(4 * m.s), editBtnW, rowH - math.floor(8 * m.s), "prof-ed-" .. i,
+        Strings("Edit"), {
+          font = "micro",
+          action = function()
+            imp._singleProfileActions = { name = p.name }
+          end,
+        })
+
+      -- Switch button (if not active)
+      if not isCur then
+        btn(imp, place(swBtnW), ry + math.floor(4 * m.s), swBtnW, rowH - math.floor(8 * m.s), "prof-sw-" .. i,
+          Strings("Switch"), {
+            kind = "good", font = "micro",
+            action = function()
+              LauncherMods.applyProfile(p.name, options)
+              if imp._refreshMods then imp:_refreshMods() end
+            end,
+          })
+      end
+    end
+  end
+  Kit.popClip()
+
+  cy = cy + listH + math.floor(12 * m.s)
+
+  btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "prof-close",
+    Strings("Close"), {
+      font = "small",
+      action = function() imp._profilesPopup = nil end })
+end
+
+-- Modal for MODS tab header actions on mobile / compact displays
+local function buildModHeaderActionsModal(imp, m)
+  local pad = math.floor(18 * m.s)
+  local w = math.floor(380 * m.s)
+  local gap = math.floor(8 * m.s)
+  local btns = {
+    { label = Strings("Mod profiles..."), action = function() imp._profilesPopup = true end },
+    { label = Strings("Check for updates"), action = function() imp:_syncModUpdateInfo(true) end },
+    { label = Strings("Enable all mods"), kind = "good", action = function() imp:_setAllMods(true) end },
+    { label = Strings("Disable all mods"), kind = "warn", action = function() imp:_setAllMods(false) end },
+    { label = Strings("Sort mods..."), action = function() imp._sortPopup = true end },
+  }
+  local h = pad + Kit.textHeight("button") + math.floor(12 * m.s)
+    + #btns * (m.btnH + gap) + m.btnH + pad
+  local px, py, pw = modalPanel(m, w, h)
+  local cy = py + pad
+  Kit.text("button", Strings("More Mod Actions"), px + pad, cy, PAL.heading)
+  cy = cy + Kit.textHeight("button") + math.floor(12 * m.s)
+
+  for i, b in ipairs(btns) do
+    btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "modheadact-" .. i, b.label, {
+      kind = b.kind or "ghost", font = "small",
+      action = function()
+        imp._modHeaderActionsPopup = nil
+        b.action()
+      end
+    })
+    cy = cy + m.btnH + gap
+  end
+
+  btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "modheadact-close",
+    Strings("Close"), { font = "small",
+      action = function() imp._modHeaderActionsPopup = nil end })
+end
+
 -- Sort chooser, shared by the MODS and FIND MODS tabs (they share the
 -- persisted key, so one popup serves both).
 local function buildSortModal(imp, m)
@@ -2034,11 +2355,13 @@ local function buildModActionsModal(imp, m)
   end
   if not mod then imp._modActions = nil return end
   local hasGit = mod.github and mod.github ~= ""
+  local depSpecs = mod.dependencySpecs or (mod.manifest and mod.manifest.dependencySpecs)
+  local hasDeps = depSpecs and #depSpecs > 0
   local info = hasGit and imp:_modUpdateInfo(mod.id)
   local pad = math.floor(18 * m.s)
   local w = math.floor(440 * m.s)
   local gap = math.floor(8 * m.s)
-  local nBtns = (hasGit and 2 or 0) + 2
+  local nBtns = (hasGit and 2 or 0) + (hasDeps and 1 or 0) + 2
   local h = pad + Kit.textHeight("button") + math.floor(4 * m.s)
     + Kit.textHeight("small") + math.floor(12 * m.s)
     + nBtns * (m.btnH + gap) - gap + pad
@@ -2072,6 +2395,20 @@ local function buildModActionsModal(imp, m)
     btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "modact-ver",
       Strings("Versions"), { kind = "accent", font = "small",
         action = function() imp:_modGithubAction(id, "versions") end })
+    cy = cy + m.btnH + gap
+  end
+  if hasDeps then
+    btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "modact-deps",
+      Strings("Check dependencies"), {
+        kind = "accent", font = "small",
+        action = function()
+          local LauncherMods = require("src.mods.LauncherMods")
+          local depCheck = LauncherMods.checkDependencies(mod.manifest or mod)
+          if depCheck then
+            imp._modDepResolver = depCheck
+          end
+          imp._modActions = nil
+        end })
     cy = cy + m.btnH + gap
   end
   local armed = deleteArmed(imp, "mod", id, nil)
@@ -2390,6 +2727,238 @@ local function buildSettingsModal(imp, m)
     Kit.pager(px + pad, cy, pw - 2 * pad, cur, n, perPage, "settings"))
 end
 
+local function buildDepResolverModal(imp, m)
+  local res = imp._modDepResolver
+  if not res then return end
+
+  local pad = math.floor(18 * m.s)
+  local w = math.floor(540 * m.s)
+  local chipH = math.max(Kit.tapMin(), math.floor(28 * m.s))
+  local rowH = math.floor(74 * m.s)
+  local gap = math.floor(8 * m.s)
+  local warnH = math.floor(38 * m.s)
+
+  local n = #(res.deps or {})
+  local anyUnsatisfied = false
+  for _, d in ipairs(res.deps or {}) do
+    if d.status ~= "satisfied" and d.status ~= "disabled" then anyUnsatisfied = true; break end
+  end
+
+  local totalContentH = n > 0 and (n * rowH + (n - 1) * gap) or 0
+
+  -- Calculate content height dynamically so modal auto-fits small lists snuggly
+  local headerH = Kit.textHeight("button") + math.floor(4 * m.s)
+    + Kit.textHeight("small") + math.floor(10 * m.s)
+  local warnTotalH = warnH + math.floor(12 * m.s)
+  local listMaxH = math.floor(240 * m.s)
+  local itemsH = math.min(totalContentH > 0 and totalContentH or rowH, listMaxH)
+  local footerH = math.floor(10 * m.s) + m.btnH
+  local wantedH = pad + headerH + warnTotalH + itemsH + footerH + pad
+  local h = math.floor(math.min(m.H - 2 * m.pad, math.max(260 * m.s, wantedH)))
+
+  local px, py, pw, ph = modalPanel(m, w, h)
+  local cy = py + pad
+
+  -- Title
+  local titleText = Strings("Dependency Resolver: ") .. tostring(res.targetMod.name or res.targetMod.id)
+  Kit.text("button", Kit.ellipsize("button", titleText, pw - 2 * pad), px + pad, cy, PAL.heading)
+  cy = cy + Kit.textHeight("button") + math.floor(4 * m.s)
+
+  -- Subtitle / intro
+  local subText = Strings("This mod requires additional dependencies or has conflicts:")
+  Kit.text("small", subText, px + pad, cy, PAL.muted)
+  cy = cy + Kit.textHeight("small") + math.floor(10 * m.s)
+
+  -- Security Disclaimer Banner Callout Card
+  Theme.fillRounded(px + pad, cy, pw - 2 * pad, warnH, PAL.rowBg, 1, Theme.radius())
+  Theme.strokeRounded(px + pad, cy, pw - 2 * pad, warnH, PAL.yellow, Theme.A.hover, 1, Theme.radius())
+  local warnMsg = Strings("Caution: Only pull dependencies from sources you trust.\nVerify source repositories before fetching.")
+  Kit.text("micro", warnMsg, px + pad + math.floor(12 * m.s), cy + math.floor(5 * m.s), PAL.yellow)
+  cy = cy + warnH + math.floor(12 * m.s)
+
+  -- List area bounds
+  local listH = (py + ph - pad) - cy - m.btnH - math.floor(10 * m.s)
+  local scrollMax = math.max(0, totalContentH - listH)
+
+  -- Mouse wheel scroll handling matching upstream pattern
+  if scrollMax > 0 and (Kit.wheelY or 0) ~= 0 and Kit.hit(px + pad, cy, pw - 2 * pad, listH) then
+    imp._depScrollOffset = clamp((imp._depScrollOffset or 0) - Kit.wheelY * math.floor(48 * m.s), 0, scrollMax)
+    Kit.wheelY = 0
+  elseif scrollMax == 0 then
+    imp._depScrollOffset = 0
+  else
+    imp._depScrollOffset = clamp(imp._depScrollOffset or 0, 0, scrollMax)
+  end
+
+  -- Pump active in-flight pulls
+  if imp._pumpDepPulls then
+    imp:_pumpDepPulls()
+  end
+
+  -- Clipped vertical scroll container
+  Kit.pushClip(px + pad, cy, pw - 2 * pad, listH)
+  local startY = cy - (imp._depScrollOffset or 0)
+
+  for i = 1, n do
+    local dep = res.deps[i]
+    local ry = startY + (i - 1) * (rowH + gap)
+
+    -- Cull rows completely outside the list viewport rectangle
+    if ry + rowH >= cy and ry <= cy + listH then
+      -- Item Card Fill & Stroke (matching launcher card interiors & radius)
+      local hot = Kit.hover(px + pad, ry, pw - 2 * pad, rowH)
+      Theme.row(px + pad, ry, pw - 2 * pad, rowH, hot and "hover" or "normal")
+
+      local ix = px + pad + math.floor(12 * m.s)
+      local innerW = pw - 2 * pad - math.floor(24 * m.s)
+
+      -- Dep title & range
+      local depHeader = tostring(dep.name or dep.id)
+      if dep.range and dep.range ~= "" then
+        depHeader = depHeader .. " (" .. dep.range .. ")"
+      end
+      Kit.text("small", Kit.ellipsize("small", depHeader, innerW - math.floor(210 * m.s)),
+        ix, ry + math.floor(8 * m.s), PAL.heading)
+
+      -- Status Badge & Subtext
+      local statusText, statusCol
+      if dep.status == "satisfied" then
+        statusText = Strings("Installed & Compatible (v%s)", tostring(dep.installedVersion or "?"))
+        statusCol = PAL.green
+      elseif dep.status == "incompatible" then
+        statusText = Strings("Incompatible (installed v%s, needs %s)", tostring(dep.installedVersion or "?"), tostring(dep.range or ""))
+        statusCol = PAL.yellow
+      elseif dep.status == "conflict" then
+        statusText = Strings("Incompatible mod enabled (v%s)", tostring(dep.installedVersion or "?"))
+        statusCol = PAL.red
+      elseif dep.status == "disabled" then
+        statusText = Strings("Disabled (conflict resolved)")
+        statusCol = PAL.green
+      else
+        statusText = Strings("Missing")
+        statusCol = PAL.red
+      end
+      Kit.text("micro", statusText, ix, ry + math.floor(8 * m.s) + Kit.textHeight("small") + math.floor(2 * m.s), statusCol)
+
+      -- Repo source line or Conflict reason
+      local repoLine
+      if dep.status == "conflict" or dep.kind == "conflict" then
+        repoLine = Strings("Listed as incompatible with ") .. tostring(res.targetMod.name or res.targetMod.id)
+      elseif dep.github then
+        repoLine = Strings("Source: github.com/") .. dep.github
+      else
+        repoLine = Strings("Source: Unknown (no repo listed)")
+      end
+      Kit.text("micro", repoLine, ix, ry + math.floor(8 * m.s) + Kit.textHeight("small") + Kit.textHeight("micro") + math.floor(4 * m.s), PAL.muted)
+
+      -- Action buttons right cluster (vertically centered inside card)
+      local ly = ry + math.floor((rowH - chipH) / 2)
+      local place = Layout.rightCluster(ix, innerW, math.floor(8 * m.s))
+
+      local pState = imp._depPullState and imp._depPullState[dep.id]
+
+      if pState and pState.stage ~= "done" and pState.stage ~= "error" then
+        local label = Strings("Pulling...")
+        if pState.stage == "fetching" then label = Strings("Fetching...")
+        elseif pState.stage == "downloading" then
+          if pState.progress and pState.progress > 0 then
+            label = Strings("Downloading %d%%", math.floor(pState.progress * 100))
+          else
+            label = Strings("Downloading...")
+          end
+        elseif pState.stage == "installing" then label = Strings("Installing...")
+        end
+        Kit.chip(place(Kit.textWidth("small", label) + math.floor(16 * m.s)), ly,
+          Kit.textWidth("small", label) + math.floor(16 * m.s), chipH, label, true, PAL.yellow, "dep-pulling-" .. i)
+      elseif dep.status == "conflict" then
+        local btnLabel = Strings("Disable mod")
+        local bw = Kit.textWidth("small", btnLabel) + math.floor(20 * m.s)
+        btn(imp, place(bw), ly, bw, chipH, "dep-dis-" .. i, btnLabel, {
+          kind = "warn", font = "small",
+          action = function()
+            local LauncherMods = require("src.mods.LauncherMods")
+            LauncherMods.setEnabled(dep.id, false, imp.modScope)
+            dep.status = "disabled"
+            if imp._refreshMods then imp:_refreshMods() end
+          end,
+        })
+      elseif dep.status == "disabled" then
+        local chipLabel = Strings("Disabled")
+        local cw = Kit.textWidth("small", chipLabel) + math.floor(16 * m.s)
+        Kit.chip(place(cw), ly, cw, chipH, chipLabel, true, PAL.green, "dep-dischip-" .. i)
+      else
+        -- Pull / Update button if github repo is known and not satisfied
+        if dep.github and dep.status ~= "satisfied" then
+          local btnLabel = dep.status == "incompatible" and Strings("Update") or Strings("Pull from GitHub")
+          local bw = Kit.textWidth("small", btnLabel) + math.floor(20 * m.s)
+          btn(imp, place(bw), ly, bw, chipH, "dep-pull-" .. i, btnLabel, {
+            kind = "accent", font = "small",
+            action = function()
+              if imp._startDepPull then
+                imp:_startDepPull(dep)
+              end
+            end,
+          })
+        end
+
+        -- Open Source link button if safeUrl is present
+        if dep.safeUrl then
+          local bw = Kit.textWidth("small", Strings("View Source")) + math.floor(20 * m.s)
+          btn(imp, place(bw), ly, bw, chipH, "dep-view-" .. i, Strings("View Source"), {
+            font = "small",
+            action = function()
+              if love and love.system and love.system.openURL then
+                love.system.openURL(dep.safeUrl)
+              end
+            end,
+          })
+        end
+      end
+    end
+  end
+  Kit.popClip()
+
+  -- Scrollbar indicator if scrollMax > 0
+  if scrollMax > 0 then
+    local barW = math.floor(4 * m.s)
+    local barX = px + pw - pad - barW
+    local thumbH = math.max(math.floor(20 * m.s), math.floor(listH * (listH / totalContentH)))
+    local thumbY = cy + (listH - thumbH) * ((imp._depScrollOffset or 0) / scrollMax)
+    Theme.fill(barX, cy, barW, listH, PAL.bg, 0.4)
+    Theme.fill(barX, thumbY, barW, thumbH, PAL.muted, 0.7)
+  end
+
+  cy = cy + listH + math.floor(10 * m.s)
+
+  -- Bottom Action Buttons
+  if anyUnsatisfied then
+    local btnW = math.floor((pw - 2 * pad - math.floor(10 * m.s)) / 2)
+    btn(imp, px + pad, cy, btnW, m.btnH, "depresolver-pullall", Strings("Pull All Available"), {
+      kind = "accent", font = "small",
+      action = function()
+        for _, dep in ipairs(res.deps or {}) do
+          if dep.github and dep.status ~= "satisfied" and dep.status ~= "disabled" and imp._startDepPull then
+            imp:_startDepPull(dep)
+          end
+        end
+      end,
+    })
+    btn(imp, px + pad + btnW + math.floor(10 * m.s), cy, btnW, m.btnH, "depresolver-close", Strings("Done"), {
+      font = "small",
+      action = function()
+        imp._modDepResolver = nil
+      end,
+    })
+  else
+    btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "depresolver-close", Strings("Done"), {
+      kind = "accent", font = "small",
+      action = function()
+        imp._modDepResolver = nil
+      end,
+    })
+  end
+end
+
 -- Whether ANY modal will draw this frame.  draw() consults this BEFORE the
 -- panels build: immediate mode hit-tests each control as it draws, so the
 -- panels underneath a modal must run with Kit.blockClicks already raised or
@@ -2398,12 +2967,60 @@ end
 local function modalUp(imp)
   return (imp._settingsText or imp._settings or imp._rename
     or imp._indexPrompt or imp._modConfirm or imp._modReleaseNotes
-    or imp._findDetails or imp._modVersions or imp._sortPopup
+    or imp._findDetails or imp._modVersions or imp._modDepResolver or imp._sortPopup
     or imp._filterPopup or imp._indexManage or imp._modActions
-    or imp._findEntry or imp._gameManage) ~= nil
+    or imp._modHeaderActionsPopup or imp._profilesPopup or imp._singleProfileActions or imp._profileSavePrompt
+    or imp._profileRenamePrompt or imp._findEntry or imp._gameManage) ~= nil
 end
 
 local function buildModals(imp, m)
+  if imp._profileRenamePrompt then
+    buildPrompt(imp, m, {
+      key = "profren", title = Strings("Rename profile"),
+      hint = Strings("Enter a new name for this profile:"),
+      text = imp._profileRenamePrompt.text or "", okLabel = Strings("Save"),
+      commit = function()
+        local txt = imp._profileRenamePrompt and imp._profileRenamePrompt.text
+        local old = imp._profileRenamePrompt and imp._profileRenamePrompt.oldName
+        if txt and txt ~= "" and old then
+          local LauncherMods = require("src.mods.LauncherMods")
+          LauncherMods.renameProfile(old, txt)
+          imp._profileRenamePrompt = nil
+          imp:_disarmTextInput()
+          if imp._refreshMods then imp:_refreshMods() end
+        end
+      end,
+      cancel = function()
+        imp._profileRenamePrompt = nil
+        imp:_disarmTextInput()
+      end,
+      footnote = Strings("Enter to save - Esc to cancel"),
+    })
+    return true
+  end
+  if imp._profileSavePrompt then
+    buildPrompt(imp, m, {
+      key = "profsave", title = Strings("Save mod profile"),
+      hint = Strings("Enter a name for this mod profile:"),
+      text = imp._profileSavePrompt.text or "", okLabel = Strings("Save"),
+      commit = function()
+        local txt = imp._profileSavePrompt and imp._profileSavePrompt.text
+        if txt and txt ~= "" then
+          local LauncherMods = require("src.mods.LauncherMods")
+          LauncherMods.saveProfile(txt)
+          imp._profileSavePrompt = nil
+          imp:_disarmTextInput()
+          if imp._refreshMods then imp:_refreshMods() end
+        end
+      end,
+      cancel = function()
+        imp._profileSavePrompt = nil
+        imp:_disarmTextInput()
+      end,
+      footnote = Strings("Enter to save - Esc to cancel"),
+    })
+    return true
+  end
   if imp._settingsText then
     local st = imp._settingsText
     buildPrompt(imp, m, {
@@ -2468,10 +3085,14 @@ local function buildModals(imp, m)
     return true
   end
   if imp._modVersions then buildVersionsModal(imp, m) return true end
+  if imp._modDepResolver then buildDepResolverModal(imp, m) return true end
   -- The lighter popups come after the deep ones on purpose: opening
   -- Versions or Details from inside an actions popup draws the deeper modal
   -- while the popup's own state stays set, so closing the deep one drops
   -- you back where you were.
+  if imp._singleProfileActions then buildSingleProfileActionsModal(imp, m) return true end
+  if imp._profilesPopup then buildProfilesModal(imp, m) return true end
+  if imp._modHeaderActionsPopup then buildModHeaderActionsModal(imp, m) return true end
   if imp._sortPopup then buildSortModal(imp, m) return true end
   if imp._filterPopup then buildFilterModal(imp, m) return true end
   if imp._indexManage then buildIndexesModal(imp, m) return true end

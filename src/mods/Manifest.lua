@@ -34,26 +34,6 @@ local function violation(strict, id, message)
   Logger.warn("[%s] %s", tostring(id), message)
 end
 
--- "id" or "id@<range>"; a malformed id or range fails for every api level
--- because there is no sane fallback reading for it
-local function parseSpecs(list, field)
-  local specs = {}
-  for _, entry in ipairs(list) do
-    assert(type(entry) == "string" and entry ~= "",
-      field .. " entries must be non-empty strings")
-    local id, range = entry:match("^([%w_%-]+)@(.+)$")
-    if not id then
-      id = entry:match("^([%w_%-]+)$")
-      assert(id, ("malformed %s entry %q"):format(field, entry))
-      range = nil
-    end
-    local ok, err = Semver.validRange(range)
-    assert(ok, ("malformed %s range in %q: %s"):format(field, entry, tostring(err)))
-    specs[#specs + 1] = { id = id, range = range }
-  end
-  return specs
-end
-
 -- Optional GitHub repo for launcher auto-update / other-versions.
 -- Accepts "owner/repo" or a github.com URL; empty/absent means no updates.
 function Manifest.parseGithub(value)
@@ -74,6 +54,47 @@ function Manifest.parseGithub(value)
     "github must be owner/repo or a github.com URL")
   repo = repo:gsub("%.git$", "")
   return owner .. "/" .. repo
+end
+
+-- "id", "id@<range>", "id@<range>#<github>", "id#<github>", or table entry
+local function parseSpecs(list, field, sources)
+  local specs = {}
+  sources = type(sources) == "table" and sources or {}
+  for _, entry in ipairs(list) do
+    local id, range, ghHint
+    if type(entry) == "table" then
+      id = entry.id
+      range = entry.range or entry.version
+      ghHint = entry.github or entry.repo
+    elseif type(entry) == "string" and entry ~= "" then
+      local main, hashRepo = entry:match("^([^#]+)#(.*)$")
+      if main then
+        entry = main
+        ghHint = hashRepo
+      end
+      id, range = entry:match("^([%w_%-]+)@(.+)$")
+      if not id then
+        id = entry:match("^([%w_%-]+)$")
+        assert(id, ("malformed %s entry %q"):format(field, entry))
+        range = nil
+      end
+    else
+      error(field .. " entries must be non-empty strings or tables")
+    end
+    assert(id, ("malformed %s entry"):format(field))
+    local ok, err = Semver.validRange(range)
+    assert(ok, ("malformed %s range in %q: %s"):format(field, tostring(entry), tostring(err)))
+
+    local parsedGh = nil
+    local rawGh = ghHint or sources[id]
+    if rawGh then
+      local okGh, cleanGh = pcall(Manifest.parseGithub, rawGh)
+      if okGh and cleanGh then parsedGh = cleanGh end
+    end
+
+    specs[#specs + 1] = { id = id, range = range, github = parsedGh }
+  end
+  return specs
 end
 
 -- conflicts + incompatible (alias) merged, first-wins on duplicate ids
@@ -277,8 +298,8 @@ function Manifest.validate(raw, path)
     optional_dependencies = array(raw.optional_dependencies),
     conflicts = conflicts,
     incompatible = array(raw.incompatible),
-    dependencySpecs = parseSpecs(array(raw.dependencies), "dependencies"),
-    optionalSpecs = parseSpecs(array(raw.optional_dependencies), "optional_dependencies"),
+    dependencySpecs = parseSpecs(array(raw.dependencies), "dependencies", raw.dependency_sources),
+    optionalSpecs = parseSpecs(array(raw.optional_dependencies), "optional_dependencies", raw.dependency_sources),
     conflictSpecs = parseSpecs(conflicts, "conflicts"),
     category = raw.category or "OTHER",
     game_version = raw.game_version,

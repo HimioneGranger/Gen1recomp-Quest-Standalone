@@ -334,9 +334,15 @@ function ModIndex.compatIssues(entry, ctx)
   local function eachSpec(spec, fn)
     if type(spec) ~= "table" then return end
     for k, v in pairs(spec) do
-      if type(k) == "number" and type(v) == "string" then
-        local id, range = v:match("^([^@]+)@(.+)$")
-        fn(id or v, range)
+      if type(k) == "number" then
+        if type(v) == "table" and type(v.id) == "string" then
+          fn(v.id, v.range or v.version, v.github or v.repo)
+        elseif type(v) == "string" then
+          local main, hashRepo = v:match("^([^#]+)#(.*)$")
+          if main then v = main end
+          local id, range = v:match("^([^@]+)@(.+)$")
+          fn(id or v, range, hashRepo)
+        end
       elseif type(k) == "string" then
         fn(k, type(v) == "string" and v or nil)
       end
