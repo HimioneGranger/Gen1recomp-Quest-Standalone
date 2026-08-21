@@ -32,6 +32,10 @@ check(not PlatformProfile.optionRowSupported({ key = "t_shift", label = "T-SHIFT
   "Quest hides the inactive T-shift row")
 check(not PlatformProfile.optionRowSupported({ key = "v_curved", label = "V CURVED" }),
   "Quest hides the inactive V Curved row")
+check(not PlatformProfile.optionRowSupported({ key = "v_curve", label = "V-CURVE" }),
+  "Quest hides the captured inactive V-Curve row")
+check(not PlatformProfile.optionRowSupported({ id = "legacy", label = "T-SHIFT" }),
+  "Quest checks the inactive label when an unrelated id is present")
 check(PlatformProfile.optionRowSupported({ key = "render_distance", label = "DISTANCE" }),
   "Quest retains a supported mod option")
 local preserved = { id = "legacy", key = "v_curve", label = "V-CURVE", value = true }
