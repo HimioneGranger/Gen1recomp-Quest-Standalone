@@ -307,6 +307,9 @@ PY
     mkdir -p "$stamp_dir/src/core"
     sed -E "s/(engine[[:space:]]*=[[:space:]]*\")[^\"]*(\")/\1$VERSION\2/" \
       "$ROOT/src/core/Version.lua" > "$stamp_dir/src/core/Version.lua"
+    # Keep the replacement entry byte-identical across independent builds.
+    # ZIP stores this file's modification time even when -X removes extras.
+    touch -t 202608210000.00 "$stamp_dir/src/core/Version.lua"
     if command -v zip >/dev/null 2>&1; then
       (cd "$stamp_dir" && zip -q -X "$LOVE_FILE" src/core/Version.lua)
     else
