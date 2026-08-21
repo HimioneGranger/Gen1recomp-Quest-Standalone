@@ -234,8 +234,12 @@ function SpriteRenderer:gen2Obp()
     self.objGroup .. "|" .. tostring(GbcPalette.mode)
 end
 
+local function liveTrueColor(def)
+  return def and def.trueColor and PaletteFX.honorsTrueColor()
+end
+
 function SpriteRenderer:resolveImage()
-  if self.def.trueColor then return self.image end
+  if liveTrueColor(self.def) then return self.image end
   if self.objColors then
     return getObpImage(self.def.image, self:gen2Obp())
   end
@@ -289,7 +293,7 @@ function SpriteRenderer:draw(px, py, camX, camY, facing, walkPhase, stepFlip,
   local redraw = false
   -- True-color sheets bypass every palette bake; the screen-space exemption
   -- is recorded below once the final frame/height is known.
-  if self.def.trueColor then
+  if liveTrueColor(self.def) then
     image = self.image
   elseif self.objColors then
     -- Gen 2: the palette came from the caller (setObjPalette).  Like RED++
@@ -349,7 +353,7 @@ function SpriteRenderer:draw(px, py, camX, camY, facing, walkPhase, stepFlip,
     drawHeight = math.max(1, self.frameHeight - math.min(8, self.frameHeight))
   end
   -- Full-color art claims exactly the portion of the frame that was drawn.
-  if self.def.trueColor then
+  if liveTrueColor(self.def) then
     PaletteFX.markTrueColor(x, y, self.frameWidth, drawHeight)
   end
   blitFrame(image, quad, x, y, flip, redraw, self.frameWidth)
@@ -362,7 +366,7 @@ end
 -- raw DMG shades (#384).
 function SpriteRenderer:drawTile(path, x, y, flip)
   local image, redraw = getImage(path), false
-  if self.def.trueColor then
+  if liveTrueColor(self.def) then
     PaletteFX.markTrueColor(x, y, 16, 8)
   elseif PaletteFX.usesGbcPack() then
     local colors, group = PaletteFX.spriteObp(self.def, self.seed)

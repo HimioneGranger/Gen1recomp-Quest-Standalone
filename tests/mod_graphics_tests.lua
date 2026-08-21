@@ -285,6 +285,7 @@ local map = {
                              "mods/aqua/w3.png" } },
               } },
   blockAt = function() return 0 end,
+  isGrassCell = function() return false end,
 }
 local renderer = TileRenderer.new(map)
 check(#renderer.anims == 1, "a declared animatedTiles entry builds one anim")
@@ -308,6 +309,7 @@ local sea = TileRenderer.new({
               tilesPerRow = 16, blocks = { waterTiles },
               animation = "TILEANIM_WATER" },
   blockAt = function() return 0 end,
+  isGrassCell = function() return false end,
 })
 check(#sea.anims == 1, "an OVERWORLD tileset animates its water with no record edit")
 check(#sea.anims[1].textures == 8, "the water entry builds 8 shifted variants")
@@ -358,12 +360,24 @@ local picData = {
 }
 local battle = setmetatable({ data = picData }, BattleState)
 
+local savedColors = PaletteFX.mode
+PaletteFX.setMode("og")
+check(not PaletteFX.honorsTrueColor(),
+      "a forced monochrome mode does not honor trueColor art")
 local shaded = battle:speciesSprite("SHADED", false)
 local r, g, b = shaded.data:getPixel(0, 0)
 -- r = 0.4 lands in shade bucket 2 (> 0.17), the palette's third color
 check(r == 0 and g == 0 and b == 1,
       "a 4-shade pic is palette-quantized onto its shade bucket")
 
+local monoFull = battle:speciesSprite("FULLCOLOR", false)
+r, g, b = monoFull.data:getPixel(0, 0)
+check(r == 0 and g == 0 and b == 1,
+      "a trueColor pic is quantized in a non-color display mode")
+
+PaletteFX.setMode("redpp")
+check(PaletteFX.honorsTrueColor(),
+      "ADVANCED honors trueColor art")
 local full = battle:speciesSprite("FULLCOLOR", false)
 r, g, b = full.data:getPixel(0, 0)
 check(math.abs(r - 0.4) < 1e-6 and math.abs(g - 0.7) < 1e-6
@@ -568,6 +582,7 @@ local litMap = {
   def = { width = 2, height = 2, tileset = "AQUA", borderBlock = 0 },
   tileset = aquaDef,
   blockAt = function() return 0 end,
+  isGrassCell = function() return false end,
 }
 local litRenderer = TileRenderer.new(litMap)
 
@@ -599,6 +614,7 @@ check(#PaletteFX.trueColorRects("world") == 0,
       "the same tileset without the flag reports nothing")
 Renderer:endWorldPass()
 Renderer:endFrame({ PaletteFX.whole(GRAYS) }, fullWorldZones())
+PaletteFX.setMode(savedColors)
 
 -- ------- font pages and charmap ordering
 
@@ -643,6 +659,11 @@ check(Font.draw("\227\129\130", 0, 0) == 6,
 
 -- ------- palettes registry consumption
 
+-- Quest defaults to ADVANCED, whose global pack intentionally overrides a
+-- record-local species map. Exercise the local registry contract in SGB mode,
+-- then restore the stronger Quest default before the RED++ checks below.
+local registryMode = PaletteFX.mode
+PaletteFX.setMode("gbc")
 local palData = { palettes = { palettes = { MODMON = monPalette },
                                pokemon = { TESTMON = "MODMON" } } }
 check(PaletteFX.pal(palData, "MODMON") == monPalette,
@@ -651,6 +672,7 @@ check(PaletteFX.monPal(palData, "TESTMON") == monPalette,
       "a pokemon:<species> mapping steers monPal")
 check(PaletteFX.monPal(palData, "UNKNOWN") == nil,
       "an unmapped species falls through to MEWMON (absent here)")
+PaletteFX.setMode(registryMode)
 
 -- RED++ pack: per-species SuperPalettes from data/palettes_gbc.lua
 local prevMode = PaletteFX.mode

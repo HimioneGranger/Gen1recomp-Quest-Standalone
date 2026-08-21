@@ -937,6 +937,49 @@ Focused verification:
 - Total focused checks: 441/441 passed.
 - Staged secret, private-path, whitespace, and diff checks passed.
 
+### Batch 22: mode-aware true-color rendering
+
+Audit lane: M5d, final ordered M5 renderer checkpoint.
+
+Upstream source:
+
+- `f7bdaa81f8b29f1e515161b1e5478b8b56fe9374`
+
+Exact integrated path set:
+
+```text
+src/battle/BattleState.lua
+src/render/PaletteFX.lua
+src/render/Renderer.lua
+src/render/SpriteRenderer.lua
+tests/mod_graphics_tests.lua
+```
+
+The audited shared and Gen 1 hunks now honor full-color battle and world art
+only when the active palette mode supports it. In Gen 1, ADVANCED keeps the
+unquantized asset. Forced mono and other non-authorized modes quantize it
+through the normal palette path and do not splice shader-free rectangles into
+the final zone list.
+
+The direct Gen 2 BattleState hunk and `tests/gen2_big_object_test.lua` remain
+excluded. The shared PaletteFX helper retains its upstream generation-aware
+compatibility branch, but no Gen 2 state, UI, world, package, or test path was
+changed. Q47's stronger ADVANCED default remains unchanged. The graphics test
+sets its local-palette fixture to SGB explicitly so that the Quest default does
+not hide that independent registry contract; it also supplies the no-grass
+method required by the preceding visible-cell renderer checkpoint.
+
+Focused verification:
+
+- Full mod graphics, including true-color quantization and ADVANCED exemption:
+  191/191 passed.
+- LuaJIT source compilation: 369/369 passed.
+- Advanced Gen 1 palette and render-compose seam: 26/26 passed.
+- Quest compositor geometry and panel placement: 21/21 passed.
+- Quest settings profile and faithful-ratio mobile behavior: 122/122 passed.
+- Total focused checks: 729/729 passed.
+- Staged secret, private-path, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -949,6 +992,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 21 completes the full-screen grass overdraw
-while preserving flat and tilted Quest rendering. Resume with M5d Gen 1/shared
-true-color mode filtering.
+Current recovery point: Batch 22 completes the ordered M5 renderer stack.
+Resume with the M6 link protocol and transport lane.

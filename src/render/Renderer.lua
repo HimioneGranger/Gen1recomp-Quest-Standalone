@@ -630,6 +630,7 @@ end
 -- or empty zone list is left alone: that already draws the whole canvas
 -- unshaded, which is what the rects were asking for.
 local function withTrueColor(zoneList, pass)
+  if not PaletteFX.honorsTrueColor() then return zoneList end
   local rects = PaletteFX.trueColorRects(pass)
   if not (rects[1] and zoneList and zoneList[1]) then return zoneList end
   local merged = {}
