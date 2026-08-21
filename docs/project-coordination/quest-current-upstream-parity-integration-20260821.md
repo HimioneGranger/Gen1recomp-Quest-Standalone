@@ -1392,6 +1392,42 @@ present in this successor. The source has no runtime delta and no applicable
 failing gate here, so it remains deferred rather than creating a comment-only
 parity commit.
 
+### Batch 30: title multi-box palette seam
+
+Audit lane: portable C8, dependency-safe title subset.
+
+Upstream source:
+
+- `90163a3ff28e1ef2def72c0078f02e1f96e658c9`
+
+Audited integrated path set:
+
+```text
+src/ui/TitleState.lua
+tests/engine/title_zone_seams.lua
+```
+
+The focused 26-line test hunk matches upstream inside the current Q47 fixture.
+`TitleState.lua` ports the multi-box palette-zone behavior into Q47's stronger
+object-palette path;
+the obsolete upstream sprite-replay helper is not restored because Q47 now
+uses `SpriteRenderer.obpImage` directly.
+
+The source commit's `StartMenu.lua` and `ui_layout_option.lua` hunks remain
+dependency-deferred. They assume the static kept-open SAVE panel introduced by
+audited M8 sources `0f8f6d0e` and `dbecc345`. Adding only `holdsUIAnchors` to
+the current one-shot TextBox would satisfy the fixture without reproducing the
+overlapping-menu behavior. Apply that field with its real foundation later.
+
+Focused verification:
+
+- Title zones, fill scale, and title cycle: 200/200 passed.
+- Current UI-layout behavior: 20/20 passed.
+- Quest settings and title-surround profile: 95/95 plus the load-report
+  profile driver passed.
+- Staged secret, private-path, protected-artifact, binary, whitespace, and
+  diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1404,6 +1440,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 29 completes the applicable M7 feed metrics and
-trending work while preserving the Q47 launcher and async importer. Resume with
-portable C8 source `90163a3ff28e1ef2def72c0078f02e1f96e658c9`.
+Current recovery point: Batch 30 completes the dependency-safe C8 title subset
+and records the SAVE-panel tail against its real M8 prerequisites. Resume with
+the open C9 subsets of `f5b8b6c85fb20b91de53f5f8ab274a3c799fb287`.
