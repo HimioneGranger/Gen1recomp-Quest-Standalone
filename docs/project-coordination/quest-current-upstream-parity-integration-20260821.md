@@ -591,6 +591,49 @@ Focused verification:
 - Corrected Gen1Tls module load: passed.
 - Staged diff and whitespace checks passed.
 
+### Batch 15: declared log reporting and final M1 sandbox guards
+
+Audit lanes: M1 plus its M8 size correction.
+
+Upstream sources, in dependency order:
+
+- `cf335f67dea01099febbeddf5e02a3f1e0986991`
+- `39df5bdfa6858efe11fe5a66473fb56aea9aa27a`
+- `2b5229e73f5145fd8b1f4de4fe938b61d6d6ad44`
+- `b739fa76c0fde6ab4dc89257b3272414ac3ae838`
+
+Exact integrated path set:
+
+```text
+docs/modding.md
+src/core/HostShell.lua
+src/mods/Loader.lua
+src/mods/Manifest.lua
+src/mods/Net.lua
+src/mods/Sandbox.lua
+src/net/Fetch.lua
+src/net/fetch_worker.lua
+tests/modkit/cases/mod_postlog.lua
+tests/modkit/cases/sandbox.lua
+```
+
+The code and tests apply the audited upstream hunks. Documentation was resolved
+against this branch's newer layout: the detailed `postLog` contract is present
+and states the corrected 512 KiB ceiling. Its one manifest-table row remains
+deferred until that table arrives with the required-import foundation. Log
+destinations are fixed by manifest, https-only, response-blind, and permission
+gated. `jit.util` stays blocked, and raw threads require the compute permission.
+
+Focused verification:
+
+- Declared one-way log reporting: 27/27 passed without a network request.
+- Mod fetch and job regression: 36/36 and 23/23 passed.
+- Sandbox guards: 99/99 passed.
+- Manifest validation: 99/99 passed.
+- Full Modkit: 21/21 suites passed.
+- Quest platform lifecycle hooks: 14/14 passed.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -603,5 +646,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 14 completes the TLS compatibility follow-up.
-Resume with M1 postLog and its security dependents.
+Current recovery point: Batch 15 completes the audited M1 sandbox/API chain.
+Resume with the next independent audited subsystem lane.

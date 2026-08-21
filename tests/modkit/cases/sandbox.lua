@@ -44,6 +44,11 @@ local PROBE = [[
   out.requireDebug = attempt(require, "debug")
   out.requirePackage = attempt(require, "package")
   out.requireFfi = attempt(require, "ffi")
+  -- jit.util exposes bytecode/constant introspection over any function this
+  -- chunk can reach -- the same class of escape the debug library is denied
+  -- for -- so it must fail the same way require("debug") does rather than
+  -- walking straight through under the bare "jit" global's cover.
+  out.requireJitUtil = attempt(require, "jit.util")
   out.requireSocket = attempt(require, "socket")
   out.requireSemver = select(2, pcall(require, "src.mods.Semver"))
 
@@ -180,6 +185,8 @@ T.eq(out.getfenv, nil, "getfenv is still absent, so a mod cannot read the real _
 T.eq(out.debug, nil, "the debug library is still absent")
 T.check(out.loveThread ~= false, "love.thread is still refused: it opens a full Lua state")
 T.check(out.requireFfi ~= false, "require(\"ffi\") is still refused: it is arbitrary C")
+T.check(out.requireJitUtil ~= false,
+  "require(\"jit.util\") is still refused: it is bytecode/constant introspection")
 T.check(out.requireDebug ~= false, "require(\"debug\") is still refused")
 T.check(out.requirePackage ~= false, "require(\"package\") is still refused")
 T.eq(out.popen, nil, "io.popen refuses rather than spawning a process")

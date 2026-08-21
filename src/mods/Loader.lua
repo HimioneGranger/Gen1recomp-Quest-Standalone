@@ -1059,6 +1059,23 @@ function Loader:_api(mod)
       return { available = function() return false end,
                get = refuse, poll = refuse, release = refuse, cancel = refuse }
     end)(),
+    -- One-way crash-log reporting to the https URL the manifest declares in
+    -- log_url.  The destination is reviewed at load, not chosen per call, so
+    -- a mod cannot aim this at arbitrary hosts; the response body is never
+    -- returned, and the worker pool bounds the transfer.  Same handle/poll/
+    -- release shape as mod.fetch, so mod.job's sibling patterns carry over.
+    postLog = (function()
+      if mod.manifest.permissionSet.network and mod.manifest.log_url then
+        return function(_, body, opts)
+          return Net.postLog(loader, modId, mod.manifest.log_url, body, opts)
+        end
+      end
+      local function refuse()
+        error(('[%s] mod.postLog needs the "network" permission and a '
+          .. "log_url in manifest.json"):format(modId), 2)
+      end
+      return refuse
+    end)(),
     -- Background compute, behind the "background" permission.  The worker
     -- rebuilds this mod's sandbox before loading the script, so a job is the
     -- one thing love.thread is not: off the main thread without a Lua state

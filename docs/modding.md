@@ -665,6 +665,39 @@ with a full standard library that the sandbox cannot reach, so handing one
 to a mod would undo every other rule; `mod.fetch`'s workers run engine
 code, so a mod gets asynchrony without gaining any new reach.
 
+## Log reporting
+
+`mod.postLog(body, opts)` is the one-way exception to the rule that a mod
+decides where it talks. It reports a debug/crash log to the https URL the
+manifest declares in `log_url`, and it is the only API that may not be
+pointed at a caller-chosen address:
+
+```json
+{
+  "permissions": ["network"],
+  "log_url": "https://logs.example.com/receive"
+}
+```
+
+The URL is validated at load: it must be `https://`, and declaring it
+without the `network` permission is a load violation for api 2 mods. The
+destination is reviewed when the mod ships, not chosen per call, so a mod
+cannot aim this at arbitrary hosts or read back anything a server replies.
+
+```lua
+-- fire and forget; poll() never blocks, same shape as mod.fetch
+local job = mod:postLog("session crashed at 0x1f3a\n" .. logText)
+```
+
+`postLog(body, opts)` returns the same opaque handle as `mod.fetch:get`,
+polled and released through `mod.fetch:poll` / `mod.fetch:release`. `opts`
+is a closed list with one switch: `format`, either `"text"` (the default)
+or `"json"`. `json` wraps the body in an envelope of `{ ts, mod, format,
+body }` so a server can attribute and sort reports; any other key or value
+is refused before a job is submitted. The body is capped at 512 KiB, the
+transfer is bounded by the same worker ceilings as `mod.fetch`, and the
+response body is never returned to the mod.
+
 ## Background jobs
 
 `mod.fetch` covers work waiting on a server. `mod.job` covers work waiting on

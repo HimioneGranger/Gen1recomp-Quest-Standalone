@@ -32,6 +32,14 @@ local Net = {}
 Net.MAX_INFLIGHT = 4
 -- Clamp on the caller's timeout, so a mod cannot pin a worker indefinitely.
 Net.MAX_SECONDS = 30
+-- A log body ceiling.  A diagnostic ring (boot evidence + recent lines +
+-- status) routinely exceeds 64 KiB on a long session, so the ceiling is
+-- 512 KiB: generous for real support logs, still far under the 5 MiB the
+-- reference loghook endpoint accepts, and small enough that a misbehaving
+-- mod cannot upload arbitrary megabytes.  The body is staged to a file and
+-- streamed by the transport, so the ceiling is a budget, not a memory
+-- spike; callers that stay under it never notice it.
+Net.MAX_BODY = 512 * 1024
 
 local function fetch()
   return require("src.net.Fetch")
@@ -93,6 +101,62 @@ function Net.get(loader, modId, url, opts)
     userAgent = "gen1recomp-mod/" .. tostring(modId),
     accept = type(opts.accept) == "string" and opts.accept or nil,
     maxSeconds = maxSeconds,
+  })
+  local handle = {}
+  b[handle] = id
+  return handle
+end
+
+-- The closed list of postLog format switches.  Anything outside it is a
+-- caller bug, rejected before a job is submitted, so the surface stays
+-- exactly two shapes on the wire.
+local POST_FORMATS = { text = true, json = true }
+
+-- A one-way log POST to the mod's manifest-declared log_url (https only,
+-- validated in Manifest.lua).  Same shape as get(): opaque handle, per-mod
+-- in-flight ceiling, user agent naming the mod.  The response body is never
+-- returned -- a postLog is fire-and-forget reporting, and the engine has no
+-- reason to hand a mod a server's reply.
+function Net.postLog(loader, modId, logUrl, body, opts)
+  if type(body) ~= "string" or body == "" then
+    return nil, "log body must be a non-empty string"
+  end
+  if #body > Net.MAX_BODY then
+    return nil, ("log body too large (%d bytes, limit %d)"):format(#body, Net.MAX_BODY)
+  end
+  opts = type(opts) == "table" and opts or {}
+  for key in pairs(opts) do
+    if key ~= "format" then
+      return nil, ("unknown log option %q (format is the only switch)"):format(tostring(key))
+    end
+  end
+  local format = opts.format or "text"
+  if not POST_FORMATS[format] then
+    return nil, ("unknown log format %q (text and json only)"):format(tostring(format))
+  end
+  local denial = Net.urlDenial(logUrl)
+  if denial then return nil, denial end
+  local b = bucket(loader, modId)
+  if inflight(b) >= Net.MAX_INFLIGHT then
+    return nil, ("too many requests in flight (limit %d); poll and release "
+      .. "the ones you have"):format(Net.MAX_INFLIGHT)
+  end
+  local payload = body
+  local contentType = "text/plain"
+  if format == "json" then
+    local Json = require("src.link.Json")
+    payload = Json.encode({
+      ts = os.time(),
+      mod = modId,
+      format = "json",
+      body = body,
+    })
+    contentType = "application/json"
+  end
+  local id = fetch().post(logUrl, payload, {
+    userAgent = "gen1recomp-mod/" .. tostring(modId),
+    contentType = contentType,
+    maxSeconds = Net.MAX_SECONDS,
   })
   local handle = {}
   b[handle] = id
