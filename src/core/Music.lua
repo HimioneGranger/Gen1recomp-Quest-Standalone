@@ -64,6 +64,7 @@ state = {
   fanfareResume = false, -- start/resume state.source when the fanfare ends
   fade = nil,         -- active volume-ramp fade-out (see Music.fadeOut)
   tempo = nil,        -- alternate-tempo override in force for `current`
+  start = nil,
   failed = {},        -- labels whose def could not be started; logged once
 }
 
@@ -215,9 +216,11 @@ function Music.play(data, song, loop, ctx)
   song = selectSong(song, ctx)
 
   local tempo = ctx and ctx.tempo or nil
+  local start = ctx and ctx.start or nil
   -- a hook may silence the cue outright, or swap in a label the dedupe
   -- below has to compare against
-  if not song or (song == state.current and tempo == state.tempo) then return end
+  if not song or (song == state.current and tempo == state.tempo
+      and start == state.start) then return end
   local def = songDef(data, song)
   if not def or state.failed[song] then return end
 
@@ -239,6 +242,17 @@ function Music.play(data, song, loop, ctx)
     for key, value in pairs(def) do slowed[key] = value end
     slowed.tempo = tempo
     def = slowed
+  end
+  if start == "rival" and song == "Music_MeetRival"
+     and def.bank == 2 and def.address == 17050 then
+    local started = {}
+    for key, value in pairs(def) do started[key] = value end
+    started.startChannels = {
+      { number = 1, address = 0x71a2 },
+      { number = 2, address = 0x721d },
+      { number = 3, address = 0x72b5 },
+    }
+    def = started
   end
   local wantLoop = loop ~= false
   local src, loopSrc, isChip, err = startSong(data, def, wantLoop)
@@ -276,6 +290,7 @@ function Music.play(data, song, loop, ctx)
   state.source, state.loopSource, state.chip = src, loopSrc, isChip
   state.current = song
   state.tempo = tempo
+  state.start = start
   if Runtime.wants("music.started") then
     Runtime.emit("music.started", {
       song = song, previous = previous, chip = isChip,
@@ -290,7 +305,7 @@ function Music.stop()
   stopSource(state.loopSource)
   require("src.core.ChipAudio").stopMusic()
   state.current, state.source, state.loopSource, state.fade = nil, nil, nil, nil
-  state.tempo = nil
+  state.tempo, state.start = nil, nil
   state.chip = false
   state.pendingRestore = nil
   if previous and Runtime.wants("music.stopped") then

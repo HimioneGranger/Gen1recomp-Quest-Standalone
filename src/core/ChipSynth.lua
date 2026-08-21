@@ -1230,8 +1230,17 @@ function Engine.new(data, header, options)
     engine.tempo = header.tempo
     engine.tempoLocked = true
   end
-  for _, spec in ipairs(chip and chip.channels
-      or headerChannels(banks, header)) do
+  local channels = chip and chip.channels or headerChannels(banks, header)
+  if header.startChannels then
+    local byNumber = {}
+    for _, start in ipairs(header.startChannels) do
+      byNumber[start.number] = start.address
+    end
+    for _, spec in ipairs(channels) do
+      spec.address = byNumber[spec.number] or spec.address
+    end
+  end
+  for _, spec in ipairs(channels) do
     local frameTicks = options.frameTicks
     local hardware = (spec.number - 1) % 4 + 1
     if hardware == 4 then

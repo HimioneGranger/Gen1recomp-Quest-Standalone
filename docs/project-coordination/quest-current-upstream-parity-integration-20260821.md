@@ -227,6 +227,40 @@ Focused verification:
   private ROM data exists.
 - Staged diff and whitespace checks passed.
 
+### Batch 4: Gen 1 boot facing and rival music entry points
+
+Audit lane: M8, separated Gen 1 core subset of the mixed upstream bundle.
+
+Upstream source:
+`37051a26b5b5732cc845441dbd66d1916a6925fb`.
+
+Exact imported path set:
+
+```text
+src/core/ChipSynth.lua
+src/core/Music.lua
+src/core/SaveData.lua
+tests/engine/rival_music_start_channels.lua
+```
+
+The batch sets the Red and Blue upstairs new-game facing direction, preserves
+the Yellow default, and supports the alternate Gen 1 rival-music channel entry
+points without mutating the shared audio registry definition. Gen 2 source and
+tests from the upstream bundle remain excluded.
+
+Focused verification:
+
+- Rival entry-point and same-song dedupe regression: 10/10 passed.
+- Chip analog path: 8/8 passed.
+- Music volume-hook state: 6/6 passed.
+- Resume music and map fade: 13/13 and 11/11 passed.
+- Trainer battle theme: 18/18 passed.
+- Fresh and restored playthrough identity: 4/4 and 18/18 passed.
+- Red, Blue, Yellow, and explicit custom new-game facing checks: 4/4 passed.
+- WSL LuaJIT engine: 197/197 suites passed, including all Quest contract
+  suites and the new regression.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -239,6 +273,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 3 follows equivalence record `347a7dce`. Resume
-with the next separated Gen 1 subsystem inside
+Current recovery point: Batch 4 follows the story/world split. Resume with the
+next separated Gen 1 subsystem inside
 `37051a26b5b5732cc845441dbd66d1916a6925fb`; do not replay its Gen 2 bundle.
