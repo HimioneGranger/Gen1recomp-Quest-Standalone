@@ -34,6 +34,14 @@ check(not launcher["TOUCH PAD"], "Quest launcher hides TOUCH PAD")
 check(not launcher["VIBRATION"], "Quest launcher hides VIBRATION")
 check(launcher["COLORS"], "Quest launcher keeps COLORS")
 check(launcher["PERFORMANCE"], "Quest launcher keeps PERFORMANCE")
+for _, label in ipairs({
+  "TEXT SPEED", "BATTLE ANIMATION", "BATTLE STYLE", "BATTLE LAYOUT",
+  "BATTLE SIZE", "BATTLE BG", "UI LAYOUT", "MUSIC VOL", "SFX VOL",
+  "MUSIC FILTER", "TILT", "VOID FILL", "FAITHFUL RATIO", "MAX FPS",
+  "OVERWORLD SPEED", "BATTLE SPEED", "MENU SPEED", "RESET REBINDS",
+}) do
+  check(launcher[label], "Quest launcher keeps supported row: " .. label)
+end
 
 local launcherColors
 for _, section in ipairs(LauncherSettings.open(nil, "red").sections) do
@@ -54,6 +62,14 @@ check(not rows.touchControls, "Quest in-game menu hides TOUCH PAD")
 check(not rows.haptics, "Quest in-game menu hides VIBRATION")
 check(rows.colors, "Quest in-game menu keeps COLORS")
 check(rows.performance, "Quest in-game menu keeps PERFORMANCE")
+for _, id in ipairs({
+  "textSpeed", "animations", "battleStyle", "battleLayout", "battleFit",
+  "battleBg", "uiLayout", "ruleset", "musicVol", "sfxVol", "musicFilter",
+  "tilt", "zoom", "voidFill", "faithfulRes", "fpsCap", "speedOverworld",
+  "speedBattle", "speedMenu", "mods", "controls", "dateFormat", "timeFormat",
+}) do
+  check(rows[id], "Quest in-game menu keeps supported row: " .. id)
+end
 local inGameColors
 for _, row in ipairs(inGame.rows) do
   if row.id == "colors" then inGameColors = row end
