@@ -30,6 +30,8 @@ static atomic_int questxr_bootstrap_started;
 static int questxr_bootstrap_joinable;
 static atomic_int questxr_bootstrap_shutdown_requested;
 static atomic_int questxr_bootstrap_stopped = 1;
+// 0 none, 1 launcher/gameplay handoff, 2 Android activity destruction.
+static atomic_int questxr_bootstrap_shutdown_reason;
 // Incremented by the Quest activity for every result from Android DocumentsUI.
 // It carries no file name, path, or content; the native thread uses it only to
 // bound post-return action/pose diagnostics.
@@ -275,6 +277,7 @@ static void *questxr_native_bootstrap(void *unused) {
     GLuint panel_vbo = 0;
     uint64_t uploaded_panel_generation = 0;
     int running = 0;
+    XrSessionState last_session_state = XR_SESSION_STATE_UNKNOWN;
     int white_environment_enabled = 0;
     int white_environment_eligible = 0;
     int white_environment_wait_logged = 0;
@@ -908,6 +911,10 @@ static void *questxr_native_bootstrap(void *unused) {
             if (event.type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED) {
                 XrEventDataSessionStateChanged *changed =
                     (XrEventDataSessionStateChanged *) &event;
+                XR_LOG("boundary diagnostic session-state old=%d new=%d shutdown-reason=%d",
+                    (int) last_session_state, (int) changed->state,
+                    atomic_load(&questxr_bootstrap_shutdown_reason));
+                last_session_state = changed->state;
                 if (changed->state == XR_SESSION_STATE_READY && !running) {
                     XrSessionBeginInfo begin = { XR_TYPE_SESSION_BEGIN_INFO };
                     begin.primaryViewConfigurationType =
@@ -1467,6 +1474,16 @@ static void *questxr_native_bootstrap(void *unused) {
     }
 
 done:
+    if (session != XR_NULL_HANDLE && xrGetReferenceSpaceBoundsRect) {
+        XrExtent2Df final_stage_bounds = {0};
+        XrResult final_stage_result = xrGetReferenceSpaceBoundsRect(
+            session, XR_REFERENCE_SPACE_TYPE_STAGE, &final_stage_bounds);
+        XR_LOG("boundary diagnostic shutdown reason=%d last-session-state=%d running=%d exit-requested=%d stage-result=%d stage-width=%.3f stage-height=%.3f",
+            atomic_load(&questxr_bootstrap_shutdown_reason),
+            (int) last_session_state, running, exit_requested,
+            (int) final_stage_result,
+            final_stage_bounds.width, final_stage_bounds.height);
+    }
     if (panel_vbo) glDeleteBuffers(1, &panel_vbo);
     if (panel_program) glDeleteProgram(panel_program);
     if (panel_texture) glDeleteTextures(1, &panel_texture);
@@ -1528,7 +1545,9 @@ QUESTXR_EXPORT unsigned int questxr_poll_saf_generation(void) {
 }
 
 QUESTXR_EXPORT void questxr_request_launcher_shutdown(void) {
+    questxr_bootstrap_shutdown_reason = 1;
     questxr_bootstrap_shutdown_requested = 1;
+    XR_LOG("boundary diagnostic shutdown source=launcher-handoff");
 }
 
 QUESTXR_EXPORT int questxr_launcher_stopped(void) {
@@ -1788,6 +1807,7 @@ Java_org_love2d_android_QuestGameActivity_nativeQuestXrStartBootstrap(
     (void) clazz;
     if (questxr_bootstrap_started) return;
     questxr_bootstrap_shutdown_requested = 0;
+    questxr_bootstrap_shutdown_reason = 0;
     questxr_bootstrap_started = 1;
     if (pthread_create(&questxr_bootstrap_thread, NULL,
                        questxr_native_bootstrap, NULL) != 0) {
@@ -1813,7 +1833,11 @@ JNIEXPORT void JNICALL
 Java_org_love2d_android_QuestGameActivity_nativeQuestXrDestroy(
     JNIEnv *env, jclass clazz) {
     (void) clazz;
+    if (atomic_load(&questxr_bootstrap_shutdown_reason) == 0)
+        questxr_bootstrap_shutdown_reason = 2;
     questxr_bootstrap_shutdown_requested = 1;
+    XR_LOG("boundary diagnostic shutdown source=activity-destroy reason=%d",
+        atomic_load(&questxr_bootstrap_shutdown_reason));
     if (questxr_bootstrap_joinable) {
         pthread_join(questxr_bootstrap_thread, NULL);
         questxr_bootstrap_joinable = 0;

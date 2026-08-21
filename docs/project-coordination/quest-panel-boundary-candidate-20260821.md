@@ -22,6 +22,15 @@ only: supported space types, current STAGE bounds, and detailed reference-space
 change events. It does not request Stationary, Roomscale, STAGE, or boundary
 visibility changes.
 
+A second exact reproduction showed an orderly app exit. Android paused the
+activity, OpenXR moved through `STOPPING` to `IDLE`, and `xrEndSession`
+completed. Quest then reported one active safety bound, made it visible, and
+changed Home from VR safety to MR passthrough. Its safety indicator changed
+from Stationary to Passthrough and removed the Guardian-valid flag. This is a
+Quest Home safety-mode transition after app exit, not an app request to disable
+the boundary. The candidate now also records every session state, the shutdown
+caller, and final STAGE bounds before destroying the OpenXR session.
+
 ## Panel placement
 
 The complete shared launcher/loading/game panel moves upward by 15 percent of
