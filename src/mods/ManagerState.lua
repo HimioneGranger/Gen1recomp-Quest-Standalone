@@ -1252,6 +1252,7 @@ function ManagerState:drawOverlay()
   love.graphics.rectangle("fill", 2 * 8, ty * 8, 16 * 8, th * 8)
   love.graphics.setColor(1, 1, 1, 1)
   Font.drawBox(2, ty, 16, th)
+  love.graphics.setColor(0, 0, 0, 1)
   for i, line in ipairs(lines) do
     drawTruncated(line, 4 * 8, (ty + i) * 8, 14)
   end
@@ -1280,6 +1281,7 @@ function ManagerState:draw()
   love.graphics.rectangle("fill", 0, 0, 160, 144)
   love.graphics.setColor(1, 1, 1, 1)
   Font.drawBox(0, 0, 20, 18)
+  love.graphics.setColor(0, 0, 0, 1)
   Font.draw(self.banner or Strings("MOD MANAGER"), 16, 8)
   if self.screen == "list" then
     self:drawList()
