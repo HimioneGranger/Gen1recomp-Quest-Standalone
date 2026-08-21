@@ -119,6 +119,13 @@ local function deposit(game)
     onChoose = function(item, list)
       local mon = game.save.party[item.value]
       if not mon then return end
+      local Follower = require("src.world.PikachuFollower")
+      if Follower.isFollowingDisabled(game.overworld)
+          and Follower.isStarterPikachu(game.save, mon) then
+        game.stack:push(TextBox.new(game, t._SleepingPikachuText2
+          or Strings("There isn't any\nresponse...")))
+        return
+      end
       monSubmenu(game, "DEPOSIT", mon, function()
         if #game.save.party <= 1 then
           list.footer = Strings("You need at least\none POKéMON!")

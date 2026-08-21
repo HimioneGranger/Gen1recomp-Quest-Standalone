@@ -220,6 +220,17 @@ function ItemEffects.use(data, save, itemId, target, battle, moveIndex, ow)
   -- (ItemUsePokeFlute, engine/items/item_effects.asm); never consumed.
   if itemId == "POKE_FLUTE" then
     if not battle then
+      if ow and ow.map and ow.map.id == "PEWTER_POKECENTER"
+          and ow.pikachuPewterSleepScene then
+        local Follower = require("src.world.PikachuFollower")
+        local pika = Follower.current(ow)
+        local player = ow.player
+        if pika and player
+            and math.abs(pika.cellX - player.cellX) + math.abs(pika.cellY - player.cellY) == 1 then
+          return "flute_wake_pikachu", { romText(data, "_PlayedFluteHadEffectText",
+            "{PLAYER} played the\nPOKé FLUTE.") }
+        end
+      end
       -- standing next to a not-yet-beaten Snorlax: this is the ONLY way
       -- Snorlax wakes -- using the flute from the item-use menu, never
       -- just talking to it with the flute in the bag (see

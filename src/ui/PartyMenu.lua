@@ -73,6 +73,21 @@ end
 
 local function sameItems(_, items) return items end
 
+local function followerUnavailable(game, mon)
+  local ow = game.overworld
+  local Follower = require("src.world.PikachuFollower")
+  return Follower.isFollowingDisabled(ow)
+    and Follower.isStarterPikachu(game.save, mon)
+end
+
+local function refuseUnavailable(self)
+  self.swapFrom = nil
+  local TextBox = require("src.render.TextBox")
+  local t = self.game.data and self.game.data.text or {}
+  self.game.stack:push(TextBox.new(self.game,
+    t._SleepingPikachuText1 or Strings("There isn't any\nresponse...")))
+end
+
 -- where DIG escapes work: escape_rope_tilesets.asm (Agatha's room is
 -- excluded by map id in ItemUseEscapeRope)
 local DIG_TILESETS = { FOREST = true, CEMETERY = true, CAVERN = true,
@@ -368,6 +383,10 @@ function PartyMenu:update(dt)
       self.submenu = nil
     elseif input:wasPressed("a") then
       local mon = party[self.index]
+      if followerUnavailable(self.game, mon) then
+        refuseUnavailable(self)
+        return
+      end
       local entry = self.subItems[self.subIndex]
       local action = entry.action
       if not action and entry.onSelect then
@@ -578,6 +597,10 @@ function PartyMenu:update(dt)
     if self.onCancel then self.onCancel() end
   elseif input:wasPressed("a") and #party > 0 then
     local mon = party[self.index]
+    if followerUnavailable(self.game, mon) then
+      refuseUnavailable(self)
+      return
+    end
     if self.softboiledFrom then
       local user = party[self.softboiledFrom]
       local heal = math.floor(user.stats.hp / 5)

@@ -358,6 +358,44 @@ Focused verification:
   because no generated private ROM data exists.
 - Staged diff and whitespace checks passed.
 
+### Batch 8: Gen 1 Yellow follower and item-menu behavior
+
+Audit lane: M8, separated Gen 1 item/menu subset of the mixed upstream bundle.
+
+Upstream source:
+`37051a26b5b5732cc845441dbd66d1916a6925fb`.
+
+Exact integrated path set:
+
+```text
+src/inventory/ItemEffects.lua
+src/ui/BagMenu.lua
+src/ui/BoxMenu.lua
+src/ui/PartyMenu.lua
+src/ui/ShopMenu.lua
+tests/engine/pewter_pikachu_flute.lua
+```
+
+The ItemEffects, PartyMenu, and ShopMenu source patch is byte-equivalent to
+the filtered upstream patch, with stable patch ID
+`35a78d52d77d5b631b55240b135f2561e1a5ecb7`. BagMenu was adapted inside the
+existing `item.use` mod-hook wrapper. BoxMenu imports the missing sleeping
+starter deposit refusal. Its Yellow release behavior was already present from
+`2bace9dbfd7c686543f9fbbff43af387b23e2bb6`; the stronger crash fix and ROM
+text routing from `54d614cd60e3bef647f2653c6a02778413093a37` were retained instead of the
+weaker upstream hunk.
+
+Focused verification:
+
+- Pewter Pikachu flute flow: 7/7 passed.
+- Item-use mod hook: 7/7 passed.
+- Evolution stone and rare-candy bag behavior: 8/8 and 20/20 passed.
+- Party field-move ordering: 6/6 passed.
+- Yellow Pikachu release crash repair: 3/3 passed.
+- Shop price ROM text and menu row layout: 4/4 and 28/28 passed.
+- Pewter Pikachu translation regression: 9/9 passed.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -370,6 +408,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 7 completes the mixed bundle's battle subset.
+Current recovery point: Batch 8 completes the mixed bundle's item/menu subset.
 Resume with the next separated Gen 1 subsystem inside
 `37051a26b5b5732cc845441dbd66d1916a6925fb`; do not replay its Gen 2 bundle.

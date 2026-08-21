@@ -70,6 +70,14 @@ local function vanillaUseOn(game, battle, id, target, list, moveIndex, picker)
     return
   end
 
+  if result == "flute_wake_pikachu" then
+    require("src.core.Sound").play(game.data, "Pokeflute")
+    showMessages(game, payload, function()
+      game.overworld.pikachuPewterSleepScene = nil
+    end)
+    return
+  end
+
   -- field POKé FLUTE next to a not-yet-beaten Snorlax: "had effect" text,
   -- then the woke-up/battle sequence (data/scripts/story.lua snorlaxWake)
   if result == "flute_wake" then
@@ -152,12 +160,9 @@ local function vanillaUseOn(game, battle, id, target, list, moveIndex, picker)
     list:close()
     local ow = game.overworld
     local p = ow and ow.player
-    if ow and p then
-      local fx, fy = p:facingCell()
-      if ow.map:inBounds(fx, fy) and ow.map:isWaterCell(fx, fy) then
-        ow:goFishing(id)
-        return
-      end
+    if ow and p and ow:facingIsShoreOrWater() then
+      ow:goFishing(id)
+      return
     end
     showMessages(game, { Strings("No good! It's not\neven near water.") })
     return
@@ -186,19 +191,25 @@ local function vanillaUseOn(game, battle, id, target, list, moveIndex, picker)
       end
       if #target.moves < 4 then
         table.insert(target.moves, { id = moveId, pp = mdef.pp })
+        require("src.core.Sound").play(game.data, "Get_Item1")
         showMessages(game, { Strings("%s learned\n%s!", target.nickname or
           game.data.pokemon[target.species].name, mdef.name) })
         if result == "learn" then consume(game, id) end
+        list.items = buildItems(game)
+        list.index = math.min(list.index, math.max(1, #list.items))
         taught()
       else
         require("src.ui.Screens").push(game, "MoveLearnMenu", target, moveId,
           function(learned)
             if learned and result == "learn" then consume(game, id) end
+            if learned then
+              list.items = buildItems(game)
+              list.index = math.min(list.index, math.max(1, #list.items))
+            end
             if learned then taught() end
           end)
       end
     end
-    list:close()
     teach()
     return
   end
@@ -332,6 +343,7 @@ local function vanillaUseOn(game, battle, id, target, list, moveIndex, picker)
             local mdef = game.data.moves[moveId]
             if #target.moves < 4 then
               table.insert(target.moves, { id = moveId, pp = mdef.pp })
+              require("src.core.Sound").play(game.data, "Get_Item1")
               local name = target.nickname or def.name
               showMessages(game, { Strings("%s learned\n%s!", name, mdef.name) },
                            nextStep)
