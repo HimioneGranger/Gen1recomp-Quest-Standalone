@@ -12,12 +12,20 @@ local Boxes = require("src.pokemon.Boxes")
 local BoxMenu = require("src.ui.BoxMenu")
 local ListMenu = require("src.ui.ListMenu")
 local ChoiceBox = require("src.ui.ChoiceBox")
+local TextBox = require("src.render.TextBox")
 local SaveData = require("src.core.SaveData")
 local Sound = require("src.core.Sound")
 
 local realCry, realPlay = Sound.playCry, Sound.play
 Sound.playCry = function() end
 Sound.play = function() end
+
+local captured = {}
+local realTextBoxNew = TextBox.new
+TextBox.new = function(testGame, text, onDone, opts)
+  captured[#captured + 1] = text
+  return realTextBoxNew(testGame, text, onDone, opts)
+end
 
 local stack = { states = {} }
 function stack:push(s) self.states[#self.states + 1] = s end
@@ -71,23 +79,36 @@ press("down"); press("down"); press("a")
 T.check(topMt() == ListMenu, "RELEASE opens the box list")
 T.eq(#box, 3, "box still has 3 before releases")
 
-local function releaseCurrent()
+local function releaseCurrent(expectedPrompt, expectedReleased)
   local before = #box
   press("a")
   T.check(mash("a", function() return topMt() == ChoiceBox end),
           "confirm choice opens")
+  T.eq(captured[#captured], expectedPrompt,
+       "release confirmation uses the expected ROM text path")
   press("up") -- defaultNo -> YES
   press("a")
   T.check(mash("a", function() return topMt() == ListMenu end),
           "returns to RELEASE list")
+  T.eq(captured[#captured], expectedReleased,
+       "release follow-up uses the expected ROM text path")
   T.eq(#box, before - 1, "one mon removed from the box")
 end
 
-releaseCurrent()
-releaseCurrent()
+local firstName = Data.pokemon[a].name
+Data.text._OnceReleasedText = "FAKE {RAM:wStringBuffer} release?"
+Data.text._MonWasReleasedText = "FAKE {RAM:wStringBuffer} left; bye {RAM:wStringBuffer}!"
+releaseCurrent("FAKE " .. firstName .. " release?",
+  "FAKE " .. firstName .. " left; bye " .. firstName .. "!")
+Data.text._OnceReleasedText = nil
+Data.text._MonWasReleasedText = nil
+local secondName = Data.pokemon[b].name
+releaseCurrent("Once released,\n" .. secondName .. " is\ngone forever. OK?",
+  secondName .. " was\nreleased outside.\fBye " .. secondName .. "!")
 T.eq(#box, 1, "two releases leave one mon")
 T.check(topMt() == ListMenu, "still on RELEASE list after the second")
 T.eq(box[1].species, c, "remaining mon is the third seeded one")
 
+TextBox.new = realTextBoxNew
 Sound.playCry, Sound.play = realCry, realPlay
 T.finish("pc_release")
