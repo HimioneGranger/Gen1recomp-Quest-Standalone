@@ -36,6 +36,7 @@ local ModTargets = require("src.mods.ModTargets")
 local Semver = require("src.mods.Semver")
 local Version = require("src.core.Version")
 local SaveData = require("src.core.SaveData")
+local GameVersion = require("src.core.GameVersion")
 local CacheFs = require("src.import.CacheFs")
 
 local LauncherMods = {}
@@ -107,8 +108,9 @@ end
 -- deriveList(manifests, options [, version]) -> the panel row list, pure.
 -- manifests is an array of validated manifests (Manifest.validate output);
 -- options is the options table (options.mods, options.modsByVersion and
--- options.modsGen2 are read).  `version` is the game the panel is showing:
--- nil keeps the pre-per-game view, where the shared flag is the whole answer.
+-- options.modsGen2 are read).  `version` is the game the panel is showing;
+-- each row also carries its answer for every game so the launcher can render
+-- the coloured game checkboxes together.
 -- Rows come back sorted by id so the panel order is stable.
 function LauncherMods.deriveList(manifests, options, version)
   local ordered = {}
@@ -126,8 +128,7 @@ function LauncherMods.deriveList(manifests, options, version)
     -- this game's choice, then the shared flag, then the default: enabled,
     -- matching the loader -- except experimental mods, which stay off until
     -- the player opts in.  Scoped through modScope, so this reads exactly what
-    -- setEnabled writes and the loader loads: while per-game flags are a
-    -- preview the shared flag is the whole answer on every surface.
+    -- setEnabled writes and the loader loads for the selected game.
     local decided = SaveData.modEnabled(options, m.id, SaveData.modScope(version))
     if decided == nil then decided = not m.experimental end
     if decided then enabledSet[m.id] = true end
@@ -152,6 +153,14 @@ function LauncherMods.deriveList(manifests, options, version)
       badge = badge,
       description = m.description or "",
       enabled = enabled,
+      enabledByVersion = (function()
+        local answers = {}
+        for _, game in ipairs(GameVersion.ORDER) do
+          local answer = SaveData.modEnabled(options, m.id, game)
+          answers[game] = answer == true or (answer == nil and not m.experimental)
+        end
+        return answers
+      end)(),
       status = status,
       statusDetail = detail,
       github = m.github,
@@ -281,7 +290,14 @@ end
 function LauncherMods.list(version)
   local ok, result = pcall(function()
     local options = SaveData.loadOptions()
-    return LauncherMods.deriveList(discover(), options, version)
+    local manifests = discover()
+    -- The first build containing game-specific switches turns the old shared
+    -- state into one explicit answer per installed mod and game.  Saving here
+    -- means users who only visit the launcher still receive the migration.
+    if SaveData.migrateModEnablement(options, manifests) then
+      SaveData.saveOptions(options)
+    end
+    return LauncherMods.deriveList(manifests, options, version)
   end)
   if not ok then
     -- a single bad options/mod file must not blank the launcher
@@ -364,10 +380,8 @@ function LauncherMods.translationStrings()
   return merged
 end
 
--- setEnabled(id, enabled [, version]): persist options.mods[id] in the exact
--- shape Loader:_saveState writes (a plain boolean), so the running game and
--- the in-game ManagerState pick it up unchanged.  With `version` the choice
--- lands in that game's overlay instead and no other game moves.
+-- setEnabled(id, enabled [, version]): with a game, persist just that game's
+-- answer.  The loader and the in-game manager use the same scope on next boot.
 function LauncherMods.setEnabled(id, enabled, version)
   local options = SaveData.loadOptions()
   SaveData.setModEnabled(options, id, enabled, SaveData.modScope(version))
@@ -384,7 +398,15 @@ function LauncherMods.setAllEnabled(ids, enabled, version)
   local options = SaveData.loadOptions()
   local scope = SaveData.modScope(version)
   for _, id in ipairs(ids or {}) do
-    SaveData.setModEnabled(options, id, enabled, scope)
+    if scope then
+      SaveData.setModEnabled(options, id, enabled, scope)
+    elseif SaveData.PER_VERSION_MODS then
+      for _, game in ipairs(GameVersion.ORDER) do
+        SaveData.setModEnabled(options, id, enabled, game)
+      end
+    else
+      SaveData.setModEnabled(options, id, enabled)
+    end
   end
   SaveData.saveOptions(options)
   return true
@@ -1405,7 +1427,7 @@ end
 
 -- uninstall(id) -> true  |  nil, errString
 -- Removes mods/<id>/ from wherever it was installed (the portable game folder
--- or the save directory, CacheFs decides -- #330) and clears options.mods[id]
+-- or the save directory, CacheFs decides -- #330) and clears every enable flag
 -- so the loader and in-game manager no longer see it.  Rejects missing ids.
 -- Does not touch other mods' enable state.
 function LauncherMods.uninstall(id)
@@ -1434,8 +1456,19 @@ function LauncherMods.uninstall(id)
   -- Drop the enable flag so a reinstall of the same id starts from the
   -- loader's default (enabled) rather than a stale false.
   local options = SaveData.loadOptions()
+  local changed = false
   if options.mods and options.mods[id] ~= nil then
     options.mods[id] = nil
+    changed = true
+  end
+  for _, version in ipairs(GameVersion.ORDER) do
+    local bucket = options.modsByVersion and options.modsByVersion[version]
+    if type(bucket) == "table" and bucket[id] ~= nil then
+      bucket[id] = nil
+      changed = true
+    end
+  end
+  if changed then
     SaveData.saveOptions(options)
   end
   return true

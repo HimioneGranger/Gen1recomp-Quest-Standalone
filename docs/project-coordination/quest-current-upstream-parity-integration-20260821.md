@@ -1044,6 +1044,57 @@ Focused verification:
 - Full Modkit: 21/21 suites passed, including link desync 40/40.
 - Staged secret, private-path, whitespace, and diff checks passed.
 
+### Batch 24: per-game launcher mod enablement
+
+Audit lane: M7 launcher foundation.
+
+Upstream source:
+
+- `941181d31c817525e690bd771649be19f70f1319`
+
+Exact integrated path set:
+
+```text
+docs/launcher.md
+docs/mod-api-gen2-compat.md
+docs/preparing-your-mod-for-gen2.md
+src/core/SaveData.lua
+src/import/LauncherView.lua
+src/import/RomImporter.lua
+src/mods/LauncherMods.lua
+src/mods/Loader.lua
+src/mods/ManagerState.lua
+tests/engine/launcher_mods_tests.lua
+tests/engine/mod_targets_tests.lua
+tests/mod_ui_tests.lua
+```
+
+The audited patch applied as one exact unit: its stable patch id is
+`cd521277bd4da43097ffaefc7bf5ce668a1918a7` both at the upstream source and
+in the successor index. The destination blobs still contain the existing Q47
+launcher, Quest profile, SAF, lifecycle, compatibility, and mod-sandbox work.
+The two Gen 2-named documents describe the shared cross-game mod target
+contract; no Gen 2 runtime path was added.
+
+Existing shared choices now migrate once to explicit per-game answers. The
+launcher renders a separate accessible checkbox for each supported game, and
+the launcher, loader, and in-game manager use the same version scope. Removing
+a mod clears both legacy and per-game flags.
+
+Focused verification:
+
+- Launcher mod list, scope, status, and migration: 118/118 passed.
+- Mod target and enablement contract: 70/70 passed.
+- Quest launcher focus, touch, modal, text, row, reflow, scroll, profile, SAF,
+  launch-progress, and lifecycle checks: 536 checks plus 3 contract drivers
+  passed.
+- Full Modkit: 21/21 suites passed.
+- The direct `tests/mod_ui_tests.lua` run reached the existing private
+  generated-data boundary at missing `data/generated/field.lua`; its changed
+  per-game assertion is covered by the ROM-free launcher and target suites.
+- Staged secret, private-path, protected-artifact, binary, whitespace, and
+  diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1056,5 +1107,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 23 completes the isolated M6 link-security lane
-without using a network. Resume with the ordered M7 launcher lane.
+Current recovery point: Batch 24 starts the ordered M7 launcher lane with the
+per-game enablement foundation. Resume with its dependent profile controls.

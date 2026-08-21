@@ -56,8 +56,22 @@ do
   local m = byId(LauncherMods.deriveList(manifests, { mods = { bbb = false } }))
   check(m.aaa.enabled, "a mod with no options entry defaults to enabled")
   check(not m.bbb.enabled, "an explicit false disables the mod")
+  check(m.aaa.enabledByVersion.red and m.aaa.enabledByVersion.gold,
+    "every row exposes its enabled answer for each game")
   eq(m.aaa.status, "ok", "a healthy enabled mod is ok")
   eq(m.aaa.statusDetail, "Ready", "ok detail reads Ready")
+end
+
+do
+  local manifests = {
+    mf({ id = "one", name = "One", version = "1.0.0", entry = "m.lua" }),
+  }
+  local row = byId(LauncherMods.deriveList(manifests, {
+    mods = { one = true }, modsByVersion = { gold = { one = false } },
+  }, "gold")).one
+  check(row.enabledByVersion.red, "the Red checkbox keeps the shared answer")
+  check(not row.enabledByVersion.gold, "the Gold checkbox reads Gold's answer")
+  check(not row.enabled, "the selected game's row state matches its checkbox")
 end
 
 -- ------- experimental defaults to disabled; github surfaces on the row
@@ -291,10 +305,9 @@ end
 
 -- ------- enable flags: the panel reads exactly what the switch writes
 --
--- One scope for both halves (SaveData.modScope).  While per-game flags are a
--- preview the shared flag is the whole answer, so a modsByVersion overlay --
--- which an imported .g1rmodlist can plant, ModProfile.restoreVersions -- can
--- never leave the switch showing an answer no writer can reach.
+-- One scope for both halves (SaveData.modScope).  Per-game flags are live, so
+-- a modsByVersion answer -- including one restored from a .g1rmodlist -- is
+-- both what the launcher shows and what the next boot reads.
 
 local SaveData = require("src.core.SaveData")
 
@@ -309,9 +322,8 @@ do
   }
   local planted = { mods = { one = true },
                     modsByVersion = { gold = { one = false } } }
-  local expected = SaveData.PER_VERSION_MODS and false or true
   eq(byId(LauncherMods.deriveList(manifests, planted, "gold")).one.enabled,
-    expected, "the overlay is read exactly when a write can reach it")
+    false, "the overlay is read exactly when a write can reach it")
 
   -- the round trip, the thing the dead switch failed: flip it, re-derive
   local options = { mods = {} }

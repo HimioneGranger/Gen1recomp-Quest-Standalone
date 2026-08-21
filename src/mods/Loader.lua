@@ -290,8 +290,7 @@ function Loader:_targetVersion()
   return version
 end
 
--- The version an enable flag is read and written under: this game once
--- per-game flags are live, nil (the shared flag) while they are a preview.
+-- The version an enable flag is read and written under: this running game.
 -- Reads and writes go through the same answer so the two can never drift.
 function Loader:_enableScope()
   return SaveData.modScope(self:_targetVersion())
@@ -1496,13 +1495,30 @@ function Loader:load(data)
   require("src.mods.Builtins").install(self.content, data, self.generation)
   self:_loadState()
   self:_discover()
+  -- Existing installs stored one shared answer.  Once their manifests are
+  -- known, split that answer across every game before the next launcher/game
+  -- toggle can change one independently.  _loadState already used the same
+  -- fallback, so this write cannot change the current boot's result.
+  do
+    local options = SaveData.loadOptions(self.fs)
+    local installed = {}
+    for id, mod in pairs(self.mods) do
+      installed[#installed + 1] = {
+        id = id,
+        experimental = mod.manifest and mod.manifest.experimental == true,
+      }
+    end
+    if SaveData.migrateModEnablement(options, installed) and self.fs.write then
+      SaveData.saveOptions(options, self.fs)
+    end
+  end
   -- Experimental mods stay off until the player opts in: a missing
   -- options.mods entry normally means enabled, but experimental flips that.
   do
     local options = SaveData.loadOptions(self.fs)
-    local modsOpt = options.mods or {}
+    local scope = self:_enableScope()
     for id, mod in pairs(self.mods) do
-      if not self.disabled[id] and modsOpt[id] == nil
+      if not self.disabled[id] and SaveData.modEnabled(options, id, scope) == nil
           and mod.manifest.experimental then
         self.disabled[id] = true
       end

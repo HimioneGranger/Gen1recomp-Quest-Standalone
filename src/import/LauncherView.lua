@@ -1139,6 +1139,28 @@ local function drawCheck(x, y, size, color)
   love.graphics.pop()
 end
 
+-- One compact coloured checkbox for each game.  The cartridge colour carries
+-- the game identity even when the row is narrow; the letter keeps an unchecked
+-- box legible without relying on colour alone.
+local function modGameCheckbox(x, y, size, checked, game, id)
+  local color = cartColor(game)
+  local focused = Kit.focusable(id, x, y, size, size)
+  local hot = focused or Kit.hover(x, y, size, size)
+  if love.graphics then
+    if checked then
+      Theme.fillRounded(x, y, size, size, color, 1)
+      drawCheck(x, y, size, PAL.inverse)
+    else
+      Theme.fillRounded(x, y, size, size, PAL.bg, 1)
+      Kit.textCenterBold("micro", game:sub(1, 1):upper(), x,
+        y + (size - Kit.textHeight("micro")) / 2, size, color)
+    end
+    Theme.strokeRounded(x, y, size, size, color,
+      hot and Theme.A.focus or Theme.A.hover, 1)
+  end
+  return Kit.press(x, y, size, size) or Kit._activateId == id
+end
+
 local function buildModsPanel(imp, x, y, w, availH, m)
   imp:_ensureMods()
   local ModUpdate = require("src.mods.ModUpdate")
@@ -1225,15 +1247,14 @@ local function buildModsPanel(imp, x, y, w, availH, m)
     mods = sorted
   end
 
-  -- A mod row is a fixed height: name line, version + status line, one line
-  -- of description, and an action row.  Fixed because a page of uniform rows
-  -- is what lets perPage come from the viewport.
-  local chipH = math.max(Kit.tapMin(), math.floor(30 * m.s))
-  -- Text block on the left, chips right-aligned beside it: one row, not a
-  -- text block with a button strip stacked under it.
+  -- A mod row is a fixed height: its details first, then a dedicated second
+  -- line of per-game checkboxes.  Fixed because a page of uniform rows is
+  -- what lets perPage come from the viewport.
+  local togH = math.floor(26 * m.s)
+  local gamesLabel = Strings("Enable for:")
   local textH = Kit.textHeight("button") + math.floor(4 * m.s)
     + Kit.textHeight("small") + math.floor(2 * m.s) + Kit.textHeight("small")
-  local rowH = math.floor(8 * m.s) + math.max(textH, chipH)
+  local rowH = math.floor(8 * m.s) + textH + math.floor(8 * m.s) + togH
     + math.floor(8 * m.s)
   local pagerH = math.max(Kit.tapMin(), math.floor(30 * m.s))
   local listH = availH - (cy - y) - pagerH - gap
@@ -1258,28 +1279,36 @@ local function buildModsPanel(imp, x, y, w, availH, m)
     local px, inner = x + pad, w - 2 * pad
     local ly = ry + math.floor(10 * m.s)
 
-    local togW = math.floor(56 * m.s)
-    local togH = math.floor(26 * m.s)
+    local togGap = math.floor(4 * m.s)
     local info = mod.github and mod.github ~= "" and imp:_modUpdateInfo(mod.id)
 
-    local togKey = "mod-toggle-" .. mod.id
-    -- The toggle reports its own new value, but the importer owns the state:
-    -- queue the flip and let _toggleMod (which may raise an experimental-mod
-    -- confirm) decide what actually happens.
-    local _, flipped = Kit.toggle(px + inner - togW,
-      ry + (rowH - togH) / 2, togW, togH, mod.enabled, togKey)
-    if flipped then
-      queueAction(imp, togKey, function() imp:_toggleMod(mod.id) end)
+    -- These answer separate games, not a single shared install flag.  The
+    -- importer receives the game id so an experimental confirmation also
+    -- applies only to the checkbox the player pressed.
+    local flipped = false
+    local gamesY = ry + math.floor(8 * m.s) + textH + math.floor(8 * m.s)
+    Kit.text("micro", gamesLabel, px,
+      gamesY + (togH - Kit.textHeight("micro")) / 2, PAL.muted)
+    local tx = px + Kit.textWidth("micro", gamesLabel) + math.floor(10 * m.s)
+    for _, game in ipairs(GameVersion.ORDER) do
+      local togKey = "mod-toggle-" .. mod.id .. "-" .. game
+      if modGameCheckbox(tx, gamesY, togH,
+          mod.enabledByVersion and mod.enabledByVersion[game] == true,
+          game, togKey) then
+        local version = game
+        queueAction(imp, togKey, function() imp:_toggleMod(mod.id, nil, version) end)
+        flipped = true
+      end
+      tx = tx + togH + togGap
     end
-    -- The toggle sits inside the row's rect, so its press also passes the
-    -- row's hit test; `flipped` gates the row action to everywhere else.
+    -- The checkboxes sit inside the row's rect, so their press also passes the
+    -- row hit test; `flipped` gates the row action to everywhere else.
     if not flipped
         and (Kit.press(x, ry, w, rowH) or Kit._activateId == rowKey) then
       local id = mod.id
       queueAction(imp, rowKey, function() imp._modActions = id end)
     end
-    local chipsW = togW + math.floor(6 * m.s)
-    local textW = inner - chipsW - math.floor(12 * m.s)
+    local textW = inner
 
     local badgeW = Kit.textWidth("micro", mod.badge) + math.floor(12 * m.s)
     -- the games the mod is for, beside its category: the same chip the
@@ -1743,7 +1772,7 @@ local function buildConfirmModal(imp, m)
         elseif c.kind == "importOversize" then
           imp:_importSave(c.version, c.source, true)
         else
-          imp:_toggleMod(c.id, true)
+          imp:_toggleMod(c.id, true, c.version)
         end
       end,
     })

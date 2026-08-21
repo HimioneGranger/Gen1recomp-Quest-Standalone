@@ -1017,8 +1017,10 @@ press(ms, "select")
 check(avail[1].enabled == false, "SELECT quick-toggles the focused mod")
 check(ms:isStaged(avail[1]), "a flip against boot state is staged")
 check(ms:glyphFor(avail[1]) == ".", "staged mods show the staged glyph")
-check(mgame.save.options.mods.badmod == false,
-  "the live options table mirrors the flip")
+local managerScope = ms:enableScope()
+check(managerScope and mgame.save.options.modsByVersion
+  and mgame.save.options.modsByVersion[managerScope].badmod == false,
+  "the live options table mirrors the flip for this game")
 check(ms.restartPending, "staged changes arm the apply screen")
 ms:discardChanges()
 check(avail[1].enabled == true and not ms.restartPending,

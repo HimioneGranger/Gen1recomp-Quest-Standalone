@@ -737,8 +737,7 @@ function ManagerState:toggleGen2Force(m)
   }, apply)
 end
 
--- Where the loader persisted an enable flag: this game's slot once it keeps
--- them per game, the shared flag until then (SaveData.modScope).
+-- Where the loader persists an enable flag: this running game's slot.
 function ManagerState:enableScope()
   return SaveData.modScope((self:targetGame()))
 end
