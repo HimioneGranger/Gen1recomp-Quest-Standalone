@@ -63,7 +63,7 @@ def packager_targets() -> tuple[str, ...]:
     )
 
     shell_match = re.search(
-        r'zip -q -9 -r "\$LOVE_FILE"\s+\\\s*\n(.*?)\n\s+-x ',
+        r'zip -q -X -9 -r "\$LOVE_FILE"\s+\\\s*\n(.*?)\n\s+-x ',
         source,
         re.DOTALL,
     )
