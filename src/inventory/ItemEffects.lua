@@ -59,6 +59,16 @@ local STONES = {
   LEAF_STONE = true, MOON_STONE = true,
 }
 
+-- Strings.source, not Strings: harvested at require time so the catalog
+-- generator can see the literal, same pattern as MoveEffects.lua's
+-- STAT_LABEL (#811) -- Strings(stat:upper()) alone is a dynamic argument
+-- the harvester can't discover.
+local STAT_LABEL = {
+  hp = Strings.source("HP"), attack = Strings.source("ATTACK"),
+  defense = Strings.source("DEFENSE"), speed = Strings.source("SPEED"),
+  special = Strings.source("SPECIAL"), accuracy = Strings.source("ACCURACY"),
+}
+
 -- vitamins: stat-exp boosters (ItemUseVitamin)
 local VITAMINS = { HP_UP = "hp", PROTEIN = "attack", IRON = "defense",
                    CARBOS = "speed", CALCIUM = "special" }
@@ -277,7 +287,7 @@ function ItemEffects.use(data, save, itemId, target, battle, moveIndex, ow)
           "Nothing happened!") }
       end
       b.stages[stat] = cur + 1
-      return "consumed", { Strings("%s's\n%s rose!", b.name, stat:upper()) }
+      return "consumed", { Strings("%s's\n%s rose!", b.name, Strings(STAT_LABEL[stat])) }
     end
     -- ItemUseDireHit/ItemUseGuardSpec always set the bit and consume
     -- the item, even when it is already active
@@ -476,7 +486,7 @@ function ItemEffects.use(data, save, itemId, target, battle, moveIndex, ow)
     -- Spanish ROM puts the stat before the name), so the extracted line
     -- cannot be filled positionally; the engine wording stands
     return "consumed", { Strings("%s's %s\nrose!", monName(data, target),
-      vitaminStat == "hp" and "HP" or vitaminStat:upper()) }
+      Strings(STAT_LABEL[vitaminStat])) }
   end
 
   -- PP UP boosts the move the player picked (ItemUsePPUp's move menu)
