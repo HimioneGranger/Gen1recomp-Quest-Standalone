@@ -287,6 +287,40 @@ Focused verification:
 - Pewter Pikachu translation regression: 9/9 passed.
 - Staged diff and whitespace checks passed.
 
+### Batch 6: Gen 1 named ROM text and hidden-item save state
+
+Audit lane: M8, separated Gen 1 text/save/menu subset of the mixed upstream
+bundle.
+
+Upstream source:
+`37051a26b5b5732cc845441dbd66d1916a6925fb`.
+
+Exact imported path set:
+
+```text
+src/core/RomText.lua
+src/render/TextBox.lua
+src/save_convert/GenSave.lua
+src/save_convert/SaveConvert.lua
+src/save_convert/data/hidden_items.lua
+src/save_convert/data/hidden_items_yellow.lua
+src/ui/StartMenu.lua
+tests/engine/open_menu_bugs_949_1149.lua
+```
+
+This imports named translated ROM tokens, the Gen 1 hidden-item SRAM mapping
+for Red/Blue and Yellow, and the empty-party start-menu behavior. It does not
+import any Gen 2 codec or menu path.
+
+Focused verification:
+
+- Open-menu, named-token, and hidden-item codec regression: 5/5 passed.
+- Status and stat-rise translation regressions: 10/10 and 6/6 passed.
+- Launcher modal-focus regression: 24/24 passed.
+- Generated-data save-conversion suites were skipped at their existing ROM
+  boundary; this batch did not create generated data.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -299,7 +333,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 5 completes the story command dependencies.
-Resume with the
-next separated Gen 1 subsystem inside
+Current recovery point: Batch 6 completes the text/save/start-menu subset.
+Resume with the next separated Gen 1 subsystem inside
 `37051a26b5b5732cc845441dbd66d1916a6925fb`; do not replay its Gen 2 bundle.
