@@ -321,6 +321,43 @@ Focused verification:
   boundary; this batch did not create generated data.
 - Staged diff and whitespace checks passed.
 
+### Batch 7: Gen 1 battle queue, damage, and move-learning parity
+
+Audit lane: M8, separated Gen 1 battle subset of the mixed upstream bundle.
+
+Upstream source:
+`37051a26b5b5732cc845441dbd66d1916a6925fb`.
+
+Exact imported path set:
+
+```text
+src/battle/BattleState.lua
+src/battle/EffectRegistry.lua
+src/battle/MoveEffects.lua
+src/battle/Status.lua
+src/pokemon/Evolution.lua
+src/ui/MoveLearnMenu.lua
+tests/parity_applying_attack_anim.lua
+tests/run_tests.lua
+```
+
+This unit imports only Gen 1 battle behavior. It preserves the Quest battle
+auxiliary action and current transition, rendering, and checkpoint repairs.
+
+Focused verification:
+
+- Disable same-turn behavior: 25/25 passed.
+- Multi-hit HP drain: 18/18 passed.
+- Quest battle-menu auxiliary action: 13/13 passed.
+- Battle checkpoint boundary: 21/21 passed.
+- Evolution cancel and hold-B suites: 8/8 and 15/15 passed.
+- Text-choice overlap and fanfare hold: 10/10 and 18/18 passed.
+- Status and stat-rise translation: 10/10 and 6/6 passed.
+- WSL LuaJIT engine: 199/199 suites passed, including all Quest contracts.
+- ROM-backed applying-attack and aggregate damage cases remain unavailable
+  because no generated private ROM data exists.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -333,6 +370,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 6 completes the text/save/start-menu subset.
+Current recovery point: Batch 7 completes the mixed bundle's battle subset.
 Resume with the next separated Gen 1 subsystem inside
 `37051a26b5b5732cc845441dbd66d1916a6925fb`; do not replay its Gen 2 bundle.

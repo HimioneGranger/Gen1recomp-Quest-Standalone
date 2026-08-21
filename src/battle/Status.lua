@@ -258,7 +258,9 @@ function Status.beforeMove(battler, rng, battle, selectedMoveId)
       local shown = moves and moves[selectedMoveId] and moves[selectedMoveId].name
                     or tostring(selectedMoveId)
       table.insert(msgs, romText(battle and battle.data, "_MoveIsDisabledText",
-        "%s's\n%s is\ndisabled!", name(battler), shown))
+        "%s's\n%s is\ndisabled!", {
+          USER = name(battler), ["RAM:wNameBuffer"] = shown,
+        }))
       return false, msgs
     end
   end

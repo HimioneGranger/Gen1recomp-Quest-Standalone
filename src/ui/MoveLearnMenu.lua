@@ -17,12 +17,13 @@ local HM_MOVES = {
   CUT = true, FLY = true, SURF = true, STRENGTH = true, FLASH = true,
 }
 
-function MoveLearnMenu.new(game, mon, newMoveId, onDone)
+function MoveLearnMenu.new(game, mon, newMoveId, onDone, learnedSound)
   local self = setmetatable({}, MoveLearnMenu)
   self.game = game
   self.mon = mon
   self.newMoveId = newMoveId
   self.onDone = onDone
+  self.learnedSound = learnedSound or "Get_Item1"
   self.index = 1
   -- forget-list UI only after TryingToLearn YES (learn_move.asm .loop)
   self.selecting = false
@@ -118,6 +119,7 @@ function MoveLearnMenu:finish(learned)
   self.selecting = false
   game.stack:pop()
   local msg
+  local opts
   if learned then
     -- pokered pages this as four texts in a row; _ForgotAndText carries
     -- the "And..." tail
@@ -127,13 +129,16 @@ function MoveLearnMenu:finish(learned)
            "\f%s forgot\n%s!\fAnd...", name, self.forgot)
       .. "\f" .. romText(game.data, "_LearnedMove1Text",
            "%s learned\n%s!", name, mdef.name)
+    opts = { auto = { sound = function()
+      return require("src.core.Sound").play(game.data, self.learnedSound)
+    end, wait = true } }
   else
     msg = romText(game.data, "_DidNotLearnText",
       "%s\ndid not learn\v%s!", name, mdef.name)
   end
   game.stack:push(TextBox.new(game, msg, function()
     if self.onDone then self.onDone(learned) end
-  end))
+  end, opts))
 end
 
 function MoveLearnMenu:draw()

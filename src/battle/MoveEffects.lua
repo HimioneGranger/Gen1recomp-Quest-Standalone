@@ -348,8 +348,9 @@ MoveEffects.primary = {
     target.disabledTurns = battle.rng(1, 8)
     local id = target.curMoves[slot].id
     -- _MoveWasDisabledText: "X's / MOVE was / disabled!"
-    return { romText(battle.data, "_MoveWasDisabledText", "%s's\n%s was\ndisabled!", displayName(target),
-                                                battle.data.moves[id].name) }
+    return { romText(battle.data, "_MoveWasDisabledText", "%s's\n%s was\ndisabled!",
+      { TARGET = displayName(target),
+        ["RAM:wNameBuffer"] = battle.data.moves[id].name }) }
   end,
 
   SPLASH_EFFECT = function(battle)
@@ -441,11 +442,10 @@ local function hitsFrom(dist, ctx)
   return dist[r + 1]
 end
 
--- drain_hp.asm halves the RAW wDamage IN PLACE (minimum 1) and heals
--- that amount, so Counter would see the halved value
+-- engine/battle/core.asm ApplyDamageToEnemyPokemon
 local function drainHalf(label, text)
   return function(ctx)
-    local heal = math.max(1, math.floor(ctx.rawDamage / 2))
+    local heal = math.max(1, math.floor(ctx.totalDealt / 2))
     ctx.battle.lastDamage = heal
     local mon = ctx.user.mon
     mon.hp = math.min(mon.stats.hp, mon.hp + heal)
@@ -529,9 +529,8 @@ MoveEffects.full = {
 
   RECOIL_EFFECT = {
     afterDamage = function(ctx)
-      -- recoil.asm reads the RAW computed wDamage (not the HP actually
-      -- removed): overkill and substitute hits recoil at full strength
-      local recoil = math.max(1, math.floor(ctx.rawDamage
+      -- engine/battle/move_effects/recoil.asm
+      local recoil = math.max(1, math.floor(ctx.totalDealt
                                             / (ctx.moveInst.struggle and 2 or 4)))
       ctx.say(romText(ctx.battle.data, "_HitWithRecoilText", "%s's\nhit with recoil!", displayName(ctx.user)))
       ctx.battle:applyDamage(ctx.user, recoil)

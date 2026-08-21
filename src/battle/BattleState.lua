@@ -613,6 +613,7 @@ local function newBattle(game)
   self.phase = "intro"
   self.menuIndex = 1
   self.moveIndex = 1
+  self.playerMoveListIndex = 1
   self.frame = 0
   return self
 end
@@ -927,6 +928,11 @@ end
 function BattleState:sayNext(text)
   self.nextInsert = (self.nextInsert or 0) + 1
   table.insert(self.queue, self.nextInsert, { text = text })
+end
+
+function BattleState:sayNextWaitSfx(text, sfx)
+  self.nextInsert = (self.nextInsert or 0) + 1
+  table.insert(self.queue, self.nextInsert, { text = text, waitForLearningSfx = sfx })
 end
 
 -- sayNext for a page that ends in `text_end` (see sayAuto) (#765)
@@ -1263,13 +1269,13 @@ function BattleState:updateQueue()
         -- no subanimation player: keep the single-sound fallback (with
         -- the move's pitch/tempo modifiers; GROWL/ROAR play the
         -- attacker's cry -- GetMoveSound/IsCryMove)
-        if item.anim == "GROWL" or item.anim == "ROAR" then
+        if self:animationsOn() and (item.anim == "GROWL" or item.anim == "ROAR") then
           local attacker = item.attackerIsPlayer and self.player or self.enemy
           if attacker then
             require("src.core.Sound").playMoveCry(self.data, attacker.mon.species,
                                                    anim and anim.tempo)
           end
-        elseif anim and anim.sound then
+        elseif self:animationsOn() and anim and anim.sound then
           local Sound = require("src.core.Sound")
           if Sound.playMove then
             Sound.playMove(self.data, anim)
@@ -1369,6 +1375,11 @@ function BattleState:updateQueue()
         self.current = nil
       end
     elseif not (item and item.choice) then
+      if item and item.waitForLearningSfx and not item.soundStarted then
+        item.soundStarted = true
+        self.waitingSound = item.waitForLearningSfx()
+        return true
+      end
       -- The page is typed out and waiting on the player: PromptText
       -- (home/text.asm:209-217) writes '▼' at (18,16) and ManualTextScroll
       -- blinks it until A/B, so the arrow belongs on a finished page and not
@@ -1754,6 +1765,7 @@ end
 local function sendOutMonCursors(self)
   self.menuIndex = 1
   self.moveIndex = 1
+  self.playerMoveListIndex = 1
 end
 
 -- core.asm:297-300: both sides' FLINCHED bits are cleared as a turn's move
@@ -2052,8 +2064,10 @@ function BattleState:update(dt)
       if self.moveSwapIndex then
         self:swapMoves(self.moveSwapIndex, self.moveIndex)
         self.moveSwapIndex = nil
+        self.moveIndex = math.min(self.playerMoveListIndex or 1, #moves)
       else
         self.moveSwapIndex = self.moveIndex
+        self.moveIndex = math.min(self.playerMoveListIndex or 1, #moves)
       end
     elseif input:wasPressed("b") then
       require("src.core.Sound").play(self.data, "Press_AB")
@@ -2076,6 +2090,7 @@ function BattleState:update(dt)
         self.phase = "messages"
         self.afterQueue = "menu"
       else
+        self.playerMoveListIndex = self.moveIndex
         self:resolveTurn(mv)
       end
     end
@@ -2427,11 +2442,9 @@ function BattleState:resolveTurn(playerAction)
   end
   local order
   if pFirst then
-    order = { { self.player, self.enemy, playerAction },
-              { self.enemy, self.player, enemyAction } }
+    order = { { true, playerAction }, { false, enemyAction } }
   else
-    order = { { self.enemy, self.player, enemyAction },
-              { self.player, self.enemy, playerAction } }
+    order = { { false, enemyAction }, { true, playerAction } }
   end
 
   self.phase = "messages"
@@ -2439,7 +2452,9 @@ function BattleState:resolveTurn(playerAction)
 
   for _, entry in ipairs(order) do
     self:act(function()
-      self:executeAction(entry[1], entry[2], entry[3])
+      local user = entry[1] and self.player or self.enemy
+      local target = entry[1] and self.enemy or self.player
+      self:executeAction(user, target, entry[2])
     end)
   end
   self:act(function() self:endOfTurn() end)
@@ -2949,7 +2964,7 @@ function BattleState:applyHitFx(hit)
       Sound.play(self.data, hit.sfx)
     end
   end
-  if not t or not self:animationsOn() then return end
+  if not t then return end
   if t == 1 then
     -- PredefShakeScreenVertically b=8: the window drops by b for 3 frames
     -- then home for 3, b counting down
@@ -3843,9 +3858,12 @@ function BattleState:awardExp()
     participants, alive = 1, { self.player.mon }
   end
   local function applyShare(mon, split, announce)
+    local playerId = self.game.save.player and self.game.save.player.id
+    local traded = mon.otId ~= nil and playerId ~= nil
+      and mon.otId ~= playerId or mon.traded == true and mon.otId == nil
     local levels, gained = Experience.apply(self.data, mon, self.enemy.def,
                                             self.enemy.mon.level, self.kind == "trainer",
-                                            split, mon.traded)
+                                            split, traded)
     -- Track level-ups for EvolveAfterBattle (OverworldState:afterBattle ->
     -- Evolution.checkParty).  B-cancel leaves the mon at/above threshold;
     -- without this gate it re-triggers after every later fight (#213).
@@ -3869,7 +3887,7 @@ function BattleState:awardExp()
       local text = Strings.source("%s gained\n%d EXP. Points!")
       if announce == "expAll" then
         text = Strings.source("%s gained\nwith EXP.ALL,\v%d EXP. Points!")
-      elseif mon.traded then
+      elseif traded then
         text = Strings.source("%s gained\na boosted\v%d EXP. Points!")
       end
       self:sayNext(Strings(text, name, gained))
@@ -4133,15 +4151,17 @@ function BattleState:learnMove(mon, moveId)
   if #mon.moves < 4 then
     table.insert(mon.moves, { id = moveId, pp = mdef.pp })
     Runtime.emit("pokemon.move_learned", { mon = mon, moveId = moveId })
-    self:sayNext(self:romText("_MimicLearnedMoveText", "%s learned\n%s!", mon.nickname or self.data.pokemon[mon.species].name,
-                                            mdef.name))
+    self:sayNextWaitSfx(self:romText("_MimicLearnedMoveText", "%s learned\n%s!", mon.nickname or self.data.pokemon[mon.species].name,
+                                            mdef.name), function()
+      return require("src.core.Sound").play(self.data, "Level_Up")
+    end)
     return
   end
   -- the "trying to learn" preamble lives inside MoveLearnMenu:enter;
   -- ordered insert so multi-level gains keep each level's checks
   -- between its own stat box and the next "grew to level" text
   self:uiNext(function()
-    return self:buildScreen("MoveLearnMenu", mon, moveId)
+    return self:buildScreen("MoveLearnMenu", mon, moveId, nil, "Level_Up")
   end)
 end
 
@@ -5795,6 +5815,7 @@ function BattleState:drawTextArea()
       Font.draw(self.data.moves[m.id].name, 16, (7 + i) * 8)
     end
     Font.drawCode(0xED, 8, (7 + self.mimicIndex) * 8)
+    Font.draw(Strings("WHICH TECHNIQUE?"), 8, 112)
   end
 end
 

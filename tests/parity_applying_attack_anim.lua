@@ -203,13 +203,13 @@ do
   eq(tb.waitFrames, 60, "for the 60 frames AnimationBlinkEnemyMon takes")
 end
 
--- the OPTIONS animation toggle still gates the whole thing; the sound does not
+-- engine/battle/animations.asm PlayApplyingAttackAnimation
 do
   local tb = freshBattle()
   Game.save.options.animations = false
   tb:applyHitFx({ animType = 5, sfx = "Damage" })
-  eq(tb.fx.shakeProg, nil, "animations off arms no shake")
-  eq(tb.fx.blink, nil, "and no blink")
+  check(tb.fx.shakeProg ~= nil, "animations off keeps the hit shake")
+  eq(tb.fx.blink, nil, "type 5 remains a shake, not a blink")
   Game.save.options.animations = true
 end
 
