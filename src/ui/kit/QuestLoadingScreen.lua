@@ -8,7 +8,15 @@ local Screen = {}
 
 Screen.REFERENCE_W = 1915
 Screen.REFERENCE_H = 821
-Screen.LOGO_PATH = "assets/logo/gen1recomp_unplugged.png"
+Screen.LOGO_PATH = "assets/logo/gen1recomp_unplugged_tight.png"
+Screen.PROTECTED_MARGIN = 14
+Screen.MOTIF_COUNT = 36
+Screen.V4_MOTIF_COUNT = 32
+
+local LOGO_SOURCE_W = 1344
+local LOGO_SOURCE_H = 759
+local LOGO_MAX_W = 710
+local LOGO_MAX_H = 520
 
 local COLORS = {
   navy = { 0.02, 0.23, 0.51, 1 },
@@ -19,50 +27,33 @@ local COLORS = {
   paper = { 0.995, 0.995, 0.99, 1 },
 }
 
-local STATIC_PROTECTED_ZONES = {
-  { id = "logo", x = 85, y = 90, w = 790, h = 640 },
-  { id = "progress", x = 970, y = 390, w = 875, h = 145 },
-  { id = "copy", x = 1050, y = 545, w = 745, h = 125 },
+-- V8 keeps the 32 surviving V4 anchors and four surviving V5 left-side
+-- anchors. It retains the four approved V6 color changes and removes the six
+-- user-marked motifs. Destination-seeded fallback placement remains active
+-- for every anchor when measured foreground bounds conflict.
+local MOTIF_ANCHORS = {
+  { 89, 35, 17, "blue" }, { 262, 48, 21, "yellow" },
+  { 435, 38, 17, "red" }, { 580, 65, 17, "yellow" },
+  { 1069, 76, 27, "blue" }, { 1192, 76, 13, "yellow" },
+  { 1492, 96, 17, "red" },
+  { 1705, 92, 17, "red" }, { 1715, 174, 17, "yellow" },
+  { 1069, 193, 17, "red" },
+  { 1229, 205, 22, "blue" }, { 1349, 175, 13, "red" },
+  { 71, 372, 22, "red" }, { 1011, 329, 17, "red" },
+  { 1362, 320, 27, "blue" },
+  { 1486, 342, 13, "yellow" }, { 1872, 328, 27, "red" },
+  { 889, 446, 22, "yellow" }, { 911, 619, 22, "red" },
+  { 1198, 630, 13, "red" }, { 1645, 596, 27, "yellow" },
+  { 1814, 634, 27, "blue" }, { 61, 750, 22, "red" },
+  { 263, 760, 27, "red" }, { 405, 758, 17, "yellow" },
+  { 579, 750, 27, "blue" }, { 864, 761, 22, "blue" },
+  { 1186, 744, 13, "blue" },
+  { 1351, 778, 27, "yellow" }, { 1530, 723, 27, "red" },
+  { 1669, 747, 13, "red" }, { 1819, 734, 22, "yellow" },
+  { 125, 150, 14, "blue" }, { 330, 150, 20, "red" },
+  { 815, 165, 23, "blue" },
+  { 75, 575, 18, "yellow" },
 }
-
--- These are the 27 outlines visible in the reviewed v2 preview. Keep their
--- exact positions, sizes, and colors unless a live destination bound requires
--- a bounded collision-avoidance shift.
-local BASE_BALLS = {
-  { 105, 58, 31, "red" }, { 275, 62, 17, "blue" },
-  { 470, 62, 24, "yellow" }, { 700, 48, 17, "red" },
-  { 920, 62, 27, "blue" }, { 1100, 55, 18, "yellow" },
-  { 1300, 54, 23, "red" }, { 1545, 48, 27, "blue" },
-  { 1750, 72, 21, "yellow" }, { 1872, 155, 27, "red" },
-  { 54, 268, 25, "blue" }, { 930, 275, 18, "yellow" },
-  { 1880, 350, 26, "red" }, { 52, 520, 24, "yellow" },
-  { 935, 595, 18, "red" }, { 1878, 535, 25, "blue" },
-  { 62, 765, 27, "blue" }, { 255, 776, 17, "yellow" },
-  { 925, 765, 25, "red" }, { 1100, 752, 18, "blue" },
-  { 1320, 765, 24, "yellow" }, { 1545, 760, 17, "red" },
-  { 1765, 760, 27, "blue" }, { 1890, 700, 24, "yellow" },
-  { 955, 360, 15, "blue" },
-  { 965, 690, 15, "yellow" }, { 1830, 690, 16, "red" },
-}
-
--- Approximate the user's black-X guide density and locations. The guide marks
--- are data only; rendering always draws colored outline Pokeballs.
-local GUIDE_POINTS = {
-  { 310, 85 }, { 810, 48 }, { 560, 145 }, { 990, 125 },
-  { 1200, 90 }, { 1430, 115 }, { 1705, 155 }, { 120, 180 },
-  { 240, 195 }, { 460, 205 }, { 735, 205 }, { 1090, 185 },
-  { 1210, 190 }, { 1400, 185 }, { 1580, 190 }, { 1760, 260 },
-  { 70, 410 }, { 210, 480 }, { 270, 585 }, { 390, 750 },
-  { 470, 640 }, { 550, 770 }, { 685, 650 }, { 770, 760 },
-  { 800, 570 }, { 865, 645 }, { 885, 365 }, { 1080, 350 },
-  { 1180, 330 }, { 1190, 550 }, { 1040, 585 }, { 1150, 665 },
-  { 1280, 650 }, { 1400, 690 }, { 1500, 660 }, { 1535, 610 },
-  { 1650, 730 }, { 1700, 600 }, { 1750, 650 }, { 1600, 350 },
-  { 1420, 350 }, { 1310, 270 }, { 1250, 375 }, { 900, 480 },
-}
-
-local BALL_SIZES = { 13, 16, 19, 23, 27, 31 }
-local BALL_COLORS = { "red", "blue", "yellow" }
 local FALLBACK_OFFSETS = { { 0, 0 } }
 for _, distance in ipairs({ 45, 90, 140, 200, 280, 360, 430 }) do
   for _, direction in ipairs({
@@ -75,12 +66,23 @@ for _, distance in ipairs({ 45, 90, 140, 200, 280, 360, 430 }) do
   end
 end
 
-local function copyStaticZones()
-  local out = {}
-  for i, z in ipairs(STATIC_PROTECTED_ZONES) do
-    out[i] = { id = z.id, x = z.x, y = z.y, w = z.w, h = z.h }
-  end
-  return out
+local function protectedZone(id, x, y, w, h)
+  local margin = Screen.PROTECTED_MARGIN
+  return {
+    id = id, x = x - margin, y = y - margin,
+    w = w + margin * 2, h = h + margin * 2,
+  }
+end
+
+local function logoGeometry()
+  local scale = math.min(LOGO_MAX_W / LOGO_SOURCE_W,
+    LOGO_MAX_H / LOGO_SOURCE_H)
+  local w, h = LOGO_SOURCE_W * scale, LOGO_SOURCE_H * scale
+  return {
+    x = Screen.REFERENCE_W / 4, y = Screen.REFERENCE_H / 2,
+    w = w, h = h,
+  }, protectedZone("logo", Screen.REFERENCE_W / 4 - w / 2,
+    Screen.REFERENCE_H / 2 - h / 2, w, h)
 end
 
 local function destinationLines(name)
@@ -118,12 +120,10 @@ local function destinationGeometry(name, measureText)
     minX = math.min(minX, 1410 - width / 2)
     maxX = math.max(maxX, 1410 + width / 2)
   end
-  local padding = 18
-  return lines, size, firstY, lineHeight, {
-    id = "destination", x = minX - padding, y = firstY - padding,
-    w = maxX - minX + padding * 2,
-    h = height + (#lines - 1) * lineHeight + padding * 2,
-  }
+  local contentY = firstY - height / 2
+  return lines, size, firstY, lineHeight,
+    protectedZone("destination", minX, contentY, maxX - minX,
+      height + (#lines - 1) * lineHeight)
 end
 
 local function destinationSeed(destination)
@@ -194,23 +194,28 @@ function Screen.layout(destination, progress, total, measureText)
   local complete = math.min(total, math.floor(progress * total + 0.00001))
   local lines, destinationFontSize, destinationY, destinationLineHeight,
     destinationZone = destinationGeometry(destination, measureText)
-  local zones = copyStaticZones()
-  zones[#zones + 1] = destinationZone
+  local logoGeometryValue, logoZone = logoGeometry()
+  local pct = math.floor(progress * 100 + 0.5)
+  local copy = ("LOADING MAP DATA - %d%%  (%d / %d)")
+    :format(pct, complete, total)
+  local copyWidth, copyHeight
+  if measureText then copyWidth, copyHeight = measureText(copy, 25) end
+  copyWidth = tonumber(copyWidth) or (#copy * 25 * 0.62)
+  copyHeight = tonumber(copyHeight) or 25
+  local zones = {
+    logoZone,
+    destinationZone,
+    protectedZone("progress", 988, 443, 804, 44),
+    protectedZone("copy", 1422.5 - copyWidth / 2,
+      585 - copyHeight / 2, copyWidth, copyHeight),
+  }
   local background = {}
   local seed = destinationSeed(destination)
-  for i, c in ipairs(BASE_BALLS) do
+  for i, c in ipairs(MOTIF_ANCHORS) do
     local ball = placeBall({
-      x = c[1], y = c[2], r = c[3], color = c[4], source = "base",
+      x = c[1], y = c[2], r = c[3], color = c[4],
+      source = i <= Screen.V4_MOTIF_COUNT and "v4" or "v5-left",
     }, zones, background, seed, i)
-    if ball then background[#background + 1] = ball end
-  end
-  for i, point in ipairs(GUIDE_POINTS) do
-    local ball = placeBall({
-      x = point[1], y = point[2],
-      r = BALL_SIZES[((seed + i * 37) % #BALL_SIZES) + 1],
-      color = BALL_COLORS[((seed + i * 53) % #BALL_COLORS) + 1],
-      source = "guide", guideIndex = i,
-    }, zones, background, seed, #BASE_BALLS + i)
     if ball then background[#background + 1] = ball end
   end
 
@@ -227,7 +232,7 @@ function Screen.layout(destination, progress, total, measureText)
   end
 
   return {
-    logo = { x = 478.75, y = 410.5, w = 710, h = 520 },
+    logo = logoGeometryValue,
     zones = zones,
     destination = destination,
     destinationLines = lines,
@@ -239,6 +244,7 @@ function Screen.layout(destination, progress, total, measureText)
     progress = progress,
     complete = complete,
     total = total,
+    loadingCopy = copy,
   }
 end
 
@@ -321,7 +327,8 @@ function Screen.draw(m, spec)
   G.setFont(nameFont)
   for i, line in ipairs(lines) do
     G.printf(line, 1030,
-      layout.destinationY + (i - 1) * layout.destinationLineHeight,
+      layout.destinationY + (i - 1) * layout.destinationLineHeight
+        - layout.destinationFontSize / 2,
       760, "center")
   end
 
@@ -331,16 +338,14 @@ function Screen.draw(m, spec)
   for _, ball in ipairs(layout.progressBalls) do drawProgressBall(ball) end
 
   G.setFont(font(25))
-  local pct = math.floor(layout.progress * 100 + 0.5)
-  local copy = ("LOADING MAP DATA - %d%%  (%d / %d)")
-    :format(pct, layout.complete, layout.total)
   setColor("navy")
-  G.printf(copy, 1060, 570, 725, "center")
+  G.printf(layout.loadingCopy, 1060, 570, 725, "center")
   G.pop()
 end
 
 Screen.intersectsBall = intersectsBall
-Screen.baseBalls = BASE_BALLS
-Screen.guidePoints = GUIDE_POINTS
+Screen.ballsOverlap = ballsOverlap
+Screen.motifAnchors = MOTIF_ANCHORS
+Screen.protectedZone = protectedZone
 
 return Screen
