@@ -261,6 +261,32 @@ Focused verification:
   suites and the new regression.
 - Staged diff and whitespace checks passed.
 
+### Batch 5: Gen 1 story command bridges
+
+Audit lane: M8, dependent Gen 1 command subset of the mixed upstream bundle.
+
+Upstream source:
+`37051a26b5b5732cc845441dbd66d1916a6925fb`.
+
+Exact imported path set:
+
+```text
+src/script/Commands.lua
+tests/engine/story_command_bridges.lua
+```
+
+This completes the command-side dependencies for the Oak, rival-music, and
+Yellow Pikachu script paths from Batches 3 and 4. It forwards all music cue
+options and preserves the existing one-transition music hold.
+
+Focused verification:
+
+- Story command bridge regression: 11/11 passed.
+- Yellow Oak starter regression: 24/24 passed.
+- Rival start-channel regression: 10/10 passed.
+- Pewter Pikachu translation regression: 9/9 passed.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -273,6 +299,7 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 4 follows the story/world split. Resume with the
+Current recovery point: Batch 5 completes the story command dependencies.
+Resume with the
 next separated Gen 1 subsystem inside
 `37051a26b5b5732cc845441dbd66d1916a6925fb`; do not replay its Gen 2 bundle.
