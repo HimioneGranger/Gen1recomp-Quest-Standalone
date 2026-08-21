@@ -980,6 +980,70 @@ Focused verification:
 - Total focused checks: 729/729 passed.
 - Staged secret, private-path, whitespace, and diff checks passed.
 
+### Batch 23: bounded link wire and failure containment
+
+Audit lane: M6, the dedicated link protocol and transport unit.
+
+Upstream source:
+
+- `7b1e796c4872962d3fdd038aa8b136d118840ae5`
+
+Exact integrated path set:
+
+```text
+README.md
+docs/link-security.md
+src/core/Game.lua
+src/link/Handshake.lua
+src/link/Json.lua
+src/link/LinkBattle.lua
+src/link/Net.lua
+src/link/Protocol.lua
+src/link/Session.lua
+src/link/Wire.lua
+tests/engine/link_desync_fixture.lua
+tests/engine/link_game_containment.lua
+tests/engine/link_hostile_fixture.lua
+tests/engine/link_session.lua
+tests/link_desync_fuzz.lua
+tests/link_hostile.lua
+tests/run_link_tests.lua
+```
+
+The security document, Handshake, Json, Net, Protocol, Session, Wire, link
+session test, hostile corpus, and link runner are byte-identical to the
+audited commit. Session is now the single typed-message boundary. Wire rebuilds
+bounded messages, malformed input is dropped, Json depth and length are
+bounded for link callers, Net caps receive buffers and per-frame reads, and
+protocol conversion keeps its independent gameplay clamps.
+
+The four diverged paths were integrated semantically. The Quest README keeps
+its VR content and adds the security-model link. Game keeps all current speed,
+viewport, Quest, and mod behavior while containing transport or linked-state
+throws only during an active link. LinkBattle keeps the successor's current
+replacement behavior and receives only the finite integer RNG seed guard. The
+mutation fuzz keeps the successor's current drive path while adding the
+audited hostile-field sanitization runs.
+
+No real socket, relay, external host, or network connection was used. The
+upstream full link runner reached the existing private generated-data boundary
+at missing `data/generated/constants.lua` before running. It was not weakened
+or redirected. Two ROM-free wrappers seed the existing public fixture data for
+the same hostile corpus and deterministic lockstep/mutation fuzz; they do not
+write generated data.
+
+Focused verification:
+
+- Typed session, ordering, lifecycle, malformed-message, and source boundary:
+  87/87 passed.
+- Hostile corpus: 1,023 messages, 0 failures.
+- Deterministic lockstep fuzz: 20 runs and 146 turns, 0 failures.
+- Sanitized mutation fuzz: 5 runs, 0 failures.
+- Game transport/state containment and non-link loud failure: 12/12 passed.
+- LuaJIT source compilation: 370/370 passed.
+- Full Modkit: 21/21 suites passed, including link desync 40/40.
+- Staged secret, private-path, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -992,5 +1056,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 22 completes the ordered M5 renderer stack.
-Resume with the M6 link protocol and transport lane.
+Current recovery point: Batch 23 completes the isolated M6 link-security lane
+without using a network. Resume with the ordered M7 launcher lane.

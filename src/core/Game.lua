@@ -186,6 +186,26 @@ function Game:returnToTitle()
   self.stack:push(self:makeTitleState())
 end
 
+function Game:breakLink(err)
+  Logger.error("link: torn down after an error\n%s", tostring(err))
+  self.linkSession = nil
+  local net = self.linkNet
+  self.linkNet = nil
+  if net then pcall(net.close, net) end
+  pcall(ModRuntime.emit, "link.ended", { reason = "error" })
+  local stack = self.stack
+  local guard = 0
+  while #stack.states > 1 and stack:top() ~= self.overworld and guard < 64 do
+    guard = guard + 1
+    pcall(stack.pop, stack)
+  end
+  pcall(function()
+    local Strings = require("src.core.Strings")
+    local TextBox = require("src.render.TextBox")
+    stack:push(TextBox.new(self, Strings("The link was\nbroken.")))
+  end)
+end
+
 function Game:step(dt)
   -- Tool mods (autoplay, accessibility drivers, input visualizers) act on
   -- the same fixed-step boundary as a physical controller.  Run them before
@@ -213,9 +233,22 @@ function Game:step(dt)
   -- stall just because PartyMenu/ChoiceBox/NamingScreen is temporarily
   -- on top of BattleState (see LinkBattle.new)
   if self.linkNet and not self.linkNet.closed then
-    self.linkNet:update()
+    local ok, err = pcall(self.linkNet.update, self.linkNet)
+    if not ok then
+      self:breakLink(err)
+      return
+    end
   end
-  self.stack:update(dt)
+  if self.linkSession or self.linkNet then
+    local ok, err = xpcall(function() self.stack:update(dt) end,
+      function(e) return debug.traceback(tostring(e), 2) end)
+    if not ok then
+      self:breakLink(err)
+      return
+    end
+  else
+    self.stack:update(dt)
+  end
   -- play time for the trainer card / save screen
   self.save.playTime = (self.save.playTime or 0) + dt
   -- Music.update is NOT serviced here: it decrements fade counters and
