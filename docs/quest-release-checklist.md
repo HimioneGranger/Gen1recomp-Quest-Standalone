@@ -62,13 +62,19 @@ never paste its password into an issue, pull request, workflow log, or chat.
 ### Cloud C2 paired-headset gate
 
 For the external DRAMALESS `cloud-c2-advanced` dependency, follow
-`docs/project-coordination/cloud-c2-quest-compatibility-handoff-20260821.md`.
+`docs/project-coordination/cloud-c2-headset-execution-plan-20260821.md` as the
+sole authoritative device procedure. It takes precedence over all earlier
+physical instructions. Use
+`docs/project-coordination/cloud-c2-quest-compatibility-handoff-20260821.md`
+for the compatibility boundary and immutable identities.
 Do not infer device acceptance from host tests or
 `skyCloudResource=ready`. Require exact package re-hash and matching
 build/schema diagnostics, an awake and actively worn headset with display and
 proximity on, and separate authority for installation, staging, launch, and
-capture. Acceptance needs the complete 12-cell configured-refresh matrix plus
-continuous video and timestamp-aligned unfiltered logs for each same interval.
+capture. Acceptance needs the complete 12-cell configured-target-refresh
+matrix, with a 10-second warm-up and one continuous 60-second measurement per
+cell, plus continuous video and timestamp-aligned unfiltered logs for each
+same interval.
 
 Use `docs/quest-openxr-backend.md` for the validated backend boundaries and
 known lifecycle risks.

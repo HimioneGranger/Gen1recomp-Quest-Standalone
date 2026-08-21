@@ -2,7 +2,7 @@
 
 Date: 2026-08-21
 
-Status: `host-eligible, independent host accepted, paired-headset pending`.
+Status: `host candidate, independent rereview pending, paired-headset pending`.
 This record does not claim current device readiness or acceptance. The pair is
 not installed, staged, launched, accepted, merged, pushed, published, or
 released.
@@ -61,6 +61,11 @@ not match.
 
 ## Paired-headset acceptance gates
 
+The sole authoritative device procedure is
+`docs/project-coordination/cloud-c2-headset-execution-plan-20260821.md`. It
+takes precedence over every earlier physical procedure, including the
+preserved `PAIRED_HEADSET_GATE_PLAN.md` with its rejected 30-second cell rule.
+
 Use one continuous video and timestamp-aligned, unfiltered logs for the same
 capture interval. Both items are mandatory. Host logs, source tests, resource
 readiness, or an old capture cannot replace this paired evidence.
@@ -105,6 +110,11 @@ yaw across the sun and cloud field, and 20 seconds at a low-angle Water
 reflection. Judge frame time in milliseconds against the configured refresh.
 
 ## Preservation and rollback
+
+All Q43, Q44, Q45, post-Q44, post-parity, paired-launcher, failed Cloud C2
+`-001`, and other prior pair/evidence directories remain preserved. The new
+`-002` pair supersedes them only as the candidate for this Cloud C2 test. It
+does not accept or replace their historical results for any other lane.
 
 Preserve the source split at
 `0bfdc360178f2c31f5b12e956ad88221a007756c`. The app compatibility checkpoint
