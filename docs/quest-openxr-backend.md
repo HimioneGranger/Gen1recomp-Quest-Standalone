@@ -7,8 +7,13 @@ The desktop and stock Android variants neither compile nor package this host.
 
 ## Boundaries
 
-- `src/core/HostDisplay.lua` remains a generic no-op interface unless a
-  packaged backend is detected.
+- `HostBootstrap`, `HostDisplay`, `HostLifecycle`, and `ImportHost` are neutral,
+  versioned API v1 boundaries. They contain no Quest or OpenXR policy.
+- A packaged Android flavor can return one exact Lua adapter name through
+  `love.system.getHostModule()`. Standard Android returns an empty name.
+- `src/core/HostDisplay.lua` remains a generic no-op interface unless a host
+  adapter installs a backend. The older packaged-display detector remains as
+  a temporary rollback fallback until physical verification passes.
 - `src/host/android/QuestOpenXRDisplay.lua` converts Quest Touch input into the
   launcher's existing virtual-pointer and button paths, and submits completed
   launcher-frame metadata to the native host.

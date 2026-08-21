@@ -95,6 +95,12 @@ int w_vibrate(lua_State *L)
 	return 0;
 }
 
+int w_getHostModule(lua_State *L)
+{
+	luax_pushstring(L, instance()->getHostModule());
+	return 1;
+}
+
 int w_pickFile(lua_State *L)
 {
 	const char *kind = luaL_optstring(L, 1, nullptr);
@@ -231,6 +237,7 @@ static const luaL_Reg functions[] =
 	{ "getPowerInfo", w_getPowerInfo },
 	{ "openURL", w_openURL },
 	{ "vibrate", w_vibrate },
+	{ "getHostModule", w_getHostModule },
 	{ "pickFile", w_pickFile },
 	{ "createFile", w_createFile },
 	{ "syncHealthSteps", w_syncHealthSteps },
