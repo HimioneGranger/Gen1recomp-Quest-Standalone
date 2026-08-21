@@ -9,6 +9,7 @@ local GameVersion = require("src.core.GameVersion")
 local Strings = require("src.core.Strings")
 local Runtime = require("src.mods.Runtime")
 local Logger = require("src.core.Logger")
+local PlatformProfile = require("src.core.PlatformProfile")
 
 local TitleState = {}
 TitleState.__index = TitleState
@@ -175,6 +176,8 @@ function TitleState.new(game, opts)
   opts = opts or {}
   local self = setmetatable({}, TitleState)
   self.game = game
+  self.letterboxWhite = PlatformProfile.isQuestStandalone()
+  self.questLetterboxWhite = self.letterboxWhite
   self.onNewGame = opts.onNewGame
   self.onContinue = opts.onContinue
   -- branding comes from field.title with the shipped art as fallback, so

@@ -14,4 +14,15 @@ function PlatformProfile.isQuestStandalone()
   return rawget(_G, "QUEST_PANEL_ACTIVE") == true
 end
 
+-- These two legacy DRAMALESS option rows control flat render pipelines that
+-- are inactive in the Quest compositor.  Match stable keys first and labels as
+-- a compatibility fallback.  Filtering never mutates the saved value.
+function PlatformProfile.optionRowSupported(row)
+  if not PlatformProfile.isQuestStandalone() then return true end
+  row = type(row) == "table" and row or {}
+  local value = tostring(row.id or row.key or row.label or ""):lower()
+  value = value:gsub("[^%w]", "")
+  return value ~= "tshift" and value ~= "vcurved"
+end
+
 return PlatformProfile

@@ -28,6 +28,25 @@ end
 local PlatformProfile = require("src.core.PlatformProfile")
 check(PlatformProfile.isQuestStandalone(),
   "Quest flavor selects its profile without the panel FFI backend")
+check(not PlatformProfile.optionRowSupported({ key = "t_shift", label = "T-SHIFT" }),
+  "Quest hides the inactive T-shift row")
+check(not PlatformProfile.optionRowSupported({ key = "v_curved", label = "V CURVED" }),
+  "Quest hides the inactive V Curved row")
+check(PlatformProfile.optionRowSupported({ key = "render_distance", label = "DISTANCE" }),
+  "Quest retains a supported mod option")
+
+for _, path in ipairs({
+  "src/import/LauncherSettings.lua",
+  "src/ui/OptionsMenu.lua",
+  "src/ui/gen2/OptionsMenu.lua",
+  "src/mods/ManagerState.lua",
+}) do
+  local file = assert(io.open(path, "rb"))
+  local source = assert(file:read("*a"))
+  file:close()
+  check(source:find("optionRowSupported", 1, true),
+    "Quest row filter is active at menu consumer: " .. path)
+end
 
 local LauncherSettings = require("src.import.LauncherSettings")
 local SaveData = require("src.core.SaveData")
@@ -99,13 +118,15 @@ do
 end
 check(yellowSource:find("self.questLetterboxWhite = self.letterboxWhite", 1, true),
   "Quest Yellow Intro opts into the paper side fill")
-
 local function read(path)
   local file = assert(io.open(path, "rb"))
   local text = assert(file:read("*a"))
   file:close()
   return text
 end
+check(read("src/ui/TitleState.lua"):find(
+  "self.questLetterboxWhite = self.letterboxWhite", 1, true),
+  "Quest Red Blue Yellow titles opt into the paper side fill")
 check(read("src/core/SaveData.lua"):find('colors = "redpp"', 1, true),
   "new Quest saves default to Advanced colors")
 check(read("src/save_convert/SaveConvert.lua"):find('colors = "redpp"', 1, true),

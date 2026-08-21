@@ -2201,6 +2201,17 @@ end
 
 function RomImporter:update(dt)
   self.pulse = self.pulse + dt
+  if self._questLaunch then
+    local LaunchProgress = require("src.import.QuestLaunchProgress")
+    if LaunchProgress.advance(self._questLaunch, dt) then
+      local version = self._questLaunch.version
+      self._questLaunch = nil
+      resetPointerCursor(self)
+      if self._flex then require("src.import.LauncherView").detach(self) end
+      if self.onComplete then self.onComplete(version) end
+      return
+    end
+  end
   self:_updatePadCursor(dt)
   self:_stepBaseRomScan()
   -- Pump the FlexLove view (input polling + the queued click actions).  The
@@ -2616,7 +2627,7 @@ end
 
 -- Player pressed Play on a game whose ROM is imported: hand off to boot.
 function RomImporter:play(version)
-  if self.workState == "working" then return end
+  if self.workState == "working" or self._handedOff then return end
   if not self.ready[version] then return end
   self._handedOff = true
   -- #835: remember the game being launched so the next launcher start opens on
@@ -2630,6 +2641,10 @@ function RomImporter:play(version)
     opts.lastVersion = version
     SaveData.saveOptions(opts)
   end)
+  local PlatformProfile = require("src.core.PlatformProfile")
+  self._questLaunch = require("src.import.QuestLaunchProgress").start(
+    version, PlatformProfile.isQuestStandalone())
+  if self._questLaunch then return end
   resetPointerCursor(self)
   -- The game draws with raw love.graphics from here on; drop the view's
   -- element tree and canvases before the handoff.
