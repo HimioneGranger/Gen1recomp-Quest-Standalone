@@ -2318,11 +2318,7 @@ end
 
 -- the HUD label drawn in place of the level for a statused mon
 function BattleState:statusLabel(mon)
-  local record = Status.recordFor(self.data.statuses, mon.status)
-  if record then
-    return record.hudLabel or record.label or mon.status
-  end
-  return mon.status
+  return Status.hudLabelFor(self.data.statuses, mon.status)
 end
 
 -- the one accuracy roll (MoveHitTest), hooked as battle.accuracy
