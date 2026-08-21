@@ -693,25 +693,31 @@ M.MT_MOON_B2F = {
 local function museumClerk(game, ow, done, onDecline)
   local TextBox = require("src.render.TextBox")
   local ChoiceBox = require("src.ui.ChoiceBox")
+  local t = game.data.text or {}
   if game.save.flags.EVENT_BOUGHT_MUSEUM_TICKET then
     game.stack:push(TextBox.new(game,
-      "Take your time,\nand enjoy it all!", done))
+      t._Museum1FScientist1TakePlentyOfTimeText
+        or "Take your time,\nand enjoy it all!", done))
     return
   end
   game.stack:push(TextBox.new(game,
-    "It's ¥50 for a\nchild's ticket.\fWould you like to\ncome in?", function()
+    t._Museum1FScientist1WouldYouLikeToComeInText
+      or "It's ¥50 for a\nchild's ticket.\fWould you like to\ncome in?", function()
     game.stack:push(ChoiceBox.new(game, function(yes)
       if yes and game.save.money >= 50 then
         game.save.money = game.save.money - 50
         game.save.flags.EVENT_BOUGHT_MUSEUM_TICKET = true
         game.stack:push(TextBox.new(game,
-          "Right, ¥50!\nThank you!", done))
+          t._Museum1FScientist1ThankYouText
+            or "Right, ¥50!\nThank you!", done))
       elseif yes then
         game.stack:push(TextBox.new(game,
-          "You don't have\nenough money.", onDecline or done))
+          t._Museum1FScientist1DontHaveEnoughMoneyText
+            or "You don't have\nenough money.", onDecline or done))
       else
         game.stack:push(TextBox.new(game,
-          "Come again!", onDecline or done))
+          t._Museum1FScientist1ComeAgainText
+            or "Come again!", onDecline or done))
       end
     end))
   end))
