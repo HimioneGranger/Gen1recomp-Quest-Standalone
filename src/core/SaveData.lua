@@ -1768,6 +1768,17 @@ function SaveData.emptyReport(report)
     and (not diff or (#diff.added == 0 and #diff.removed == 0 and #diff.changed == 0))
 end
 
+-- Quest is a headset-first product profile. A changed mod set is useful
+-- diagnostic metadata, but it must not stop a normal headset launch by itself.
+-- Recovery, quarantine, and remap results remain material on every platform.
+function SaveData.shouldShowLoadReport(report, questProfile)
+  if SaveData.emptyReport(report) then return false end
+  if not questProfile then return true end
+  return #report.lostMons > 0 or #report.lostItems > 0
+    or #report.remappedMaps > 0 or #report.restoredMons > 0
+    or #report.restoredItems > 0 or not not report.recovered
+end
+
 -- ------- new game
 
 -- boot is Data.field.boot, threaded in by Game: this module must not reach

@@ -13,6 +13,7 @@ local GamepadMap = require("src.core.GamepadMap")
 local ModLoader = require("src.mods.Loader")
 local ModRuntime = require("src.mods.Runtime")
 local Screens = require("src.ui.Screens")
+local PlatformProfile = require("src.core.PlatformProfile")
 
 local Game = {}
 
@@ -1170,7 +1171,7 @@ function Game:restoreSave(loaded, recovered, opts)
                   loaded.player.x, loaded.player.y, loaded.player.facing,
                   { via = "boot", freshBoot = opts and opts.freshBoot })
   self.saveReport = report
-  if not SaveData.emptyReport(report) then
+  if SaveData.shouldShowLoadReport(report, PlatformProfile.isQuestStandalone()) then
     -- the report screen is a Screens id so mods (or the ui milestone) own
     -- its looks; until one exists the log keeps a quarantine from being
     -- silent

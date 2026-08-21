@@ -51,6 +51,7 @@ launcher features. They are DRAMALESS Q42 features. They must stay in the mod.
 | Advanced color default | New user-approved Unplugged default | `redpp`, label `ADVANCED` | Exact source match | New approved |
 | Lower shared room panel | Accepted headset panel test | Shared offset `-0.19375 m` | Native source build | New approved |
 | Import and lifecycle recovery | Accepted Unplugged repairs | Present in baseline commits | Built in all variants | Found; device proof pending |
+| Do not stop spawn for a mod-set-only report | Launcher 8 headset flow; 2026-08-20 capture exposed the regression | Quest suppresses only the informational mod-diff page; recovery and quarantine reports remain | Focused policy test | Repaired |
 
 ### Supported launcher rows retained on Quest
 
@@ -97,6 +98,7 @@ Existing player settings are preserved. Missing values receive defaults.
 | Place Yellow Pikachu beside the player | `placeQuestSpawnPartner()` moves an overlapping follower to the player's right | Present in Q42; activation and headset proof pending |
 | Physical chest Pokédex | `Pokedex.lua` and `VR.lua` own the chest pose, either-hand grab, hand transfer, trigger open/close, menu input, throw, ground contact, and rear camera | Present in Q42; headset proof pending |
 | DRAMALESS Quest defaults | `QuestDefaults.lua` seeds absent values only | Present in Q42; fresh-profile proof pending |
+| Intro/game-surface black columns inside the white room panel | 2026-08-20 capture proves the outer Quest surround is white while the columns remain inside Q42's cropped quad | DRAMALESS `VR.lua` owns the game-surface crop and geometry | Missing; route to Q42 repair |
 
 Q42 defaults are: grid off, curve off, real-time day/night sync, full water,
 high shadows, anti-aliasing off, full render scale, Far render distance,
@@ -111,7 +113,14 @@ and 2D battle cards on. Its VR compatibility value remains internal.
   or phone Vibration rows on Quest.
 - Do not overwrite an existing player's saved choices to force defaults.
 - Do not treat the black-bar headset report as proof of a source regression.
-  The rebuilt payload already contains the fix.
+  The 2026-08-20 video proves the Quest profile is active because its outer
+  surround is white. The remaining black columns are inside DRAMALESS's
+  cropped game quad, not the launcher surround.
+- Do not make the app select Stationary or Roomscale. The Quest host creates
+  only OpenXR LOCAL and VIEW spaces and calls no Guardian boundary API. The
+  captured log records the Quest OS changing `Roomscale -> Stationary` after
+  an explicit `createNewActiveStationary` action; it records no app-triggered
+  `Stationary -> Roomscale` transition.
 
 ## Open acceptance gates
 
