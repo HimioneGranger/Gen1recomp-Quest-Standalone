@@ -178,7 +178,8 @@ M.PALLET_TOWN = {
       end
     end
 
-    local function enterLab()
+    local function enterLab(oak)
+      if oak then oak.stepFrames = nil end
       Commands.hide_object(ctx, "PALLET_TOWN", "PALLETTOWN_OAK")
       Commands.show_object(ctx, "OAKS_LAB", "OAKSLAB_OAK2")
       ow.doorWarp = true
@@ -187,12 +188,17 @@ M.PALLET_TOWN = {
     end
 
     local function walkToLab(oak)
+      -- lockstep half runs Oak on the player's own frames per cell
+      -- engine/overworld/movement.asm:737 (DoScriptedNPCMovement)
       local i = 0
+      if oak then
+        oak.stepFrames = ow.player.stepFramesCur or ow.player.stepFrames
+      end
       local function tick()
         i = i + 1
         local playerStep = escort.playerSteps[i]
         if not playerStep then
-          enterLab()
+          enterLab(oak)
           return
         end
         if oak and escort.oakSteps[i] then

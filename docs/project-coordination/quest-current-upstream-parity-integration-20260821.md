@@ -458,6 +458,36 @@ Focused verification:
 - Warp sprite visibility: 19/19 passed.
 - Staged diff and whitespace checks passed.
 
+### Batch 11: portable synchronized escort behavior
+
+Audit lane: portable C2 after its cadence prerequisite.
+
+Upstream source:
+`43957922260143126967aadb021cbb007e04ef34`.
+
+Exact imported path set:
+
+```text
+data/scripts/story2.lua
+data/scripts/story5.lua
+tests/drivers/escort_lockstep_test.lua
+tests/parity_escort_lockstep.lua
+```
+
+The full audited four-path unit is byte-equivalent to the upstream patch. Oak
+and the Pewter youngster temporarily use the player's step cadence and restore
+the normal NPC cadence when their escort ends.
+
+Focused verification:
+
+- Ordinary and synchronized NPC cadence: 8/8 passed.
+- Timing parity: 163/163 passed.
+- Pewter Pikachu world companion regression: 9/9 passed.
+- The upstream visual driver is preserved but was not launched.
+- The full-map parity scenario remains at the generated-ROM-data boundary;
+  this task did not create private data.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -470,5 +500,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 10 establishes the ordinary NPC cadence needed
-by portable escort item C2. Resume with the four-path `43957922` escort unit.
+Current recovery point: Batch 11 completes portable escort item C2 after its
+cadence prerequisite. Resume with the remaining audit lanes in source order.

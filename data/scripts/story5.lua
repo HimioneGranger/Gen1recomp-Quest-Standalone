@@ -445,7 +445,7 @@ local function pewterGymEscort(game, ow)
   end
 
   local function afterWalk()
-    if guy then guy.facing = "left" end
+    if guy then guy.stepFrames, guy.facing = nil, "left" end
     Music.playMap(game.data, "PEWTER_CITY")
     push(game, t._PewterCityYoungsterGoTakeOnBrockText
       or "Go take on BROCK\nat the GYM first!", walkHome)
@@ -468,6 +468,11 @@ local function pewterGymEscort(game, ow)
   end
 
   local function beginWalk()
+    -- the escort runs the youngster on the player's own frames per cell
+    -- engine/overworld/movement.asm:737 (DoScriptedNPCMovement)
+    if guy then
+      guy.stepFrames = ow.player.stepFramesCur or ow.player.stepFrames
+    end
     Music.play(game.data, "Music_MuseumGuy")
     if guy and head > 0 then
       local h = 0
