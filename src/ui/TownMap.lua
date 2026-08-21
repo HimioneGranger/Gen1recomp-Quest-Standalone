@@ -5,7 +5,7 @@
 -- Kanto map with a filled square per known location -- routes lighter,
 -- towns darker -- a blinking cursor the d-pad snaps between locations,
 -- the selected name in a banner up top, and the player's current
--- location blinking.  List mode (townMap data missing): up/down through
+-- location marked.  List mode (townMap data missing): up/down through
 -- an ordered list of fly towns instead.  B closes.
 --
 -- Fly mode (opts.fly + opts.onFly, LoadTownMap_Fly): the same Kanto map,
@@ -262,7 +262,7 @@ function TownMap:moveList(step)
 end
 
 function TownMap:update(dt)
-  self.blink = (self.blink + 1) % 32
+  self.blink = (self.blink + 1) % 50
   local input = self.game.input
   if input:wasPressed("b") then
     Sound.play(self.game.data, "Press_AB")
@@ -324,7 +324,7 @@ function TownMap:draw()
     end
     if self.nestSpecies then
       -- AREA mode: blinking nests, the species name up top
-      if self.blink % 16 < 10 then
+      if self.blink < 25 then
         for _, loc in ipairs(self.nests) do
           local x, y = markerXY(loc)
           if self.nestIcon then
@@ -345,14 +345,14 @@ function TownMap:draw()
       love.graphics.setColor(1, 1, 1, 1)
       return
     end
-    -- the player's current location blinks (slow phase).  Paint it with a
+    -- The player's current location is static.  Paint it with a
     -- palette-safe DARK shade (red 0), not red: this screen composites through
     -- the TOWNMAP SGB shade-remap shader (PaletteFX.shader), which keys ONLY on
     -- the red channel, and a red-0.75 dot lands in the c1 bucket = TOWNMAP
     -- {165,214,255}, the exact light-blue used for the water and the town-square
     -- fill, so the marker was drawn but recolored invisible (#152).  Red 0 -> c3
     -- {25,16,16} = a solid dark "you are here" dot, visible on land and water.
-    if self.playerLoc and self.blink < 20 then
+    if self.playerLoc then
       local x, y = markerXY(self.playerLoc)
       love.graphics.setColor(0, 0, 0, 1)
       love.graphics.rectangle("fill", x + 2, y + 2, 4, 4)
@@ -363,7 +363,7 @@ function TownMap:draw()
     -- (8,8), so draw it -4,-4 to enclose the cell (engine/menus/town_map.asm
     -- draws the box cursor CENTERED on the selected location).  Drawing it at
     -- the cell top-left put the square in the frame's top-left quadrant (#152).
-    if selected and self.blink % 16 < 10 then
+    if selected and self.blink < 25 then
       local x, y = markerXY(selected)
       if self.bg.cursor then
         love.graphics.draw(self.bg.cursor, x - 4, y - 4)
@@ -388,14 +388,14 @@ function TownMap:draw()
     for _, loc in ipairs(self.locs) do
       drawSquare(loc)
     end
-    if self.playerLoc and self.blink < 20 then
+    if self.playerLoc then
       -- palette-safe dark, same red-channel shade-remap reason as the primary
       -- grid path above (#152); stale-asset builds hit this fallback square
       love.graphics.setColor(0, 0, 0, 1)
       love.graphics.rectangle("fill", self.playerLoc.x * 8 + 2,
                               self.playerLoc.y * 8 + 2, 4, 4)
     end
-    if selected and self.blink % 16 < 10 then
+    if selected and self.blink < 25 then
       love.graphics.setColor(0, 0, 0, 1)
       love.graphics.rectangle("line", selected.x * 8 + 0.5,
                               selected.y * 8 + 0.5, 7, 7)
@@ -409,12 +409,13 @@ function TownMap:draw()
       local loc = self.locs[first + i]
       if loc then
         local y = 40 + i * 16
-        if first + i == self.sel and self.blink % 16 < 10 then
+        -- LoadTownMap_Fly keeps the list cursor visible in RBY.
+        if first + i == self.sel then
           Font.drawCode(0xED, 8, y)  -- the "▶" cursor glyph
         end
         Font.draw(loc.name, 24, y)
-        if loc == self.playerLoc and self.blink < 20 then
-          -- blinking marker on the player's current town; force the palette-safe
+        if loc == self.playerLoc then
+          -- Static marker on the player's current town; force the palette-safe
           -- dark shade explicitly so the red-channel shade-remap keeps it
           -- visible regardless of Font.draw's leftover color (#152)
           love.graphics.setColor(0, 0, 0, 1)

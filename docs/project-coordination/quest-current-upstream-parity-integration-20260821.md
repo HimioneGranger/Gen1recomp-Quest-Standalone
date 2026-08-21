@@ -1428,6 +1428,48 @@ Focused verification:
 - Staged secret, private-path, protected-artifact, binary, whitespace, and
   diff checks passed.
 
+### Batch 31: Gen 1 Town Map blink cadence
+
+Audit lane: portable C9 TownMap subset.
+
+Upstream source:
+
+- `f5b8b6c85fb20b91de53f5f8ab274a3c799fb287`
+
+Audited integrated path set:
+
+```text
+src/ui/TownMap.lua
+tests/engine/town_map_blink_test.lua
+```
+
+The Gen 1 Town Map now uses a 50-frame cycle. Grid cursors and Pokédex nest
+markers draw for frames 0 through 24 and hide for frames 25 through 49. Player
+markers remain static in both background and stale-asset grid paths. The list
+cursor and list player marker also remain static, matching the RBY fly list.
+
+The upstream `GameVersion` import and all generation-2 branches were excluded:
+this successor path is the Gen 1 owner, and adding the shared version switch
+would cross the compatibility split. The mixed `version_blink_test.lua` visual
+driver was also excluded because it switches to Gold, needs a live ROM/app
+session, and checks only counter wrap. The new ROM-free engine test instruments
+the actual draw calls at frames 0, 24, 25, and 49 and across the full cycle.
+The source commit's PaletteFX, Diploma, TradeAnim, and Diploma-test paths remain
+outside this narrow TownMap batch.
+
+Focused verification:
+
+- ROM-free draw and counter contract: 37/37 passed, including exact 25/25
+  cursor/nest duty, static player/list markers, and 49-to-0 wrap.
+- Direct TownMap LuaJIT bytecode compilation passed; strict source compilation:
+  373/373 passed.
+- Quest settings profile: 95/95 passed; the Quest load-report profile driver
+  passed.
+- No app or visual driver was launched and no network was used. The four
+  preserved root residues retained identical SHA-256 hashes and timestamps.
+- Staged scope/provenance, secret, private-path, protected-artifact, binary,
+  whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
