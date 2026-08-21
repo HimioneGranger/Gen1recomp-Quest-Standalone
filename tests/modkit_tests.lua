@@ -125,8 +125,11 @@ local hotFiles = {
   ["mods/hot_mod/main.lua"] = [[
 return function(mod)
   mod.content.pokemon:patch("FIXMON_A", { baseStats = { speed = 99 } })
+  -- counted on mod.exports, not _G: a mod's globals are its own
+  -- (src/mods/Sandbox.lua), and a reload gives it a fresh table
+  local out = mod.exports
   mod.events:on("game.ready", function()
-    _G.MODKIT_TEST_READY = (_G.MODKIT_TEST_READY or 0) + 1
+    out.ready = (out.ready or 0) + 1
   end)
 end
 ]],
@@ -148,7 +151,6 @@ local function freshHotData()
   return d
 end
 
-_G.MODKIT_TEST_READY = 0
 local hotData = freshHotData()
 local game = { data = hotData, save = { modData = {} } }
 local bootLoader = Loader.new({ fs = hotFs })
@@ -209,7 +211,8 @@ check(deepEqual(hotData.pokemon.FIXMON_B, fixture.load().pokemon.FIXMON_B),
   "untouched base record is byte-identical after reload")
 check(flushed >= 1, "reload flushed the registered caches")
 check(summary:find("reloaded 1 mods", 1, true) ~= nil, "reload summary counts")
-check(_G.MODKIT_TEST_READY >= 1, "game.ready re-reaches re-subscribed mods")
+check((game.mods.exports.hot_mod or {}).ready >= 1,
+  "game.ready re-reaches re-subscribed mods")
 ChipAudio.stopMusic = savedStopMusic
 check(musicStops >= 1, "reload stops chip music through the cache bus")
 Sound.play(beepData, "Fix_Beep")
@@ -228,7 +231,6 @@ local broken = HotReload.run(game, { fs = hotFs })
 check(#broken.errors > 0, "broken edit lands in the error feed")
 check(hotData.pokemon.FIXMON_A.baseStats.speed == 45,
   "broken mod rolls back to pristine base")
-_G.MODKIT_TEST_READY = nil
 
 -- ------- dev console: repl, verbs, tracer, input isolation
 

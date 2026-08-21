@@ -341,7 +341,8 @@ check(cycleStatus.innocent.state == "loaded" and cycleData.items.FINE ~= nil,
   "a mod beside the cycle loads normally")
 
 -- ------- inter-mod exports and find
-_G.MOD_FIND_RESULTS = {}
+-- probes report through mod.exports: a mod's globals are its own
+-- (src/mods/Sandbox.lua)
 local exportLoader = Loader.new({ fs = memfs({
   ["mods/colorlib/manifest.json"] = manifestJson("colorlib"),
   ["mods/colorlib/main.lua"] = [[
@@ -356,7 +357,7 @@ end
   }),
   ["mods/daynight/main.lua"] = [[
 return function(mod)
-  local results = _G.MOD_FIND_RESULTS
+  local results = mod.exports
   local color = mod.find("colorlib")
   results.depVersion = color.version
   results.tint = color.exports.tint("dusk")
@@ -371,7 +372,7 @@ end
   ["options.lua"] = "return { mods = { shelved = false } }",
 }) })
 check(exportLoader:load({}) == true, "the export fixture loads clean")
-local found = _G.MOD_FIND_RESULTS
+local found = exportLoader.exports.daynight
 check(found.tint == "tinted:dusk", "find returns the other mod's live export table")
 check(found.depVersion == "1.0.0", "the handle carries the other mod's version")
 check(found.optional == true, "an enabled optional dependency is findable")
@@ -380,10 +381,8 @@ check(found.disabled == nil, "find returns nil for a disabled mod")
 check(found.method == true, "mod:find is tolerated alongside mod.find")
 check(exportLoader.order[1] == "colorlib",
   "a hard dependency executes before its dependent")
-_G.MOD_FIND_RESULTS = nil
 
 -- ------- the rest of the v2 mod object
-_G.MOD_OBJECT_PROBE = {}
 local objectLoader = Loader.new({ fs = memfs({
   ["mods/probe/manifest.json"] = manifestJson("probe", {
     api = "2", description = '"probing"', priority = "3",
@@ -391,7 +390,7 @@ local objectLoader = Loader.new({ fs = memfs({
   ["mods/probe/data.txt"] = "hello from the mod dir",
   ["mods/probe/main.lua"] = [[
 return function(mod)
-  local probe = _G.MOD_OBJECT_PROBE
+  local probe = mod.exports
   probe.id, probe.version, probe.path = mod.id, mod.version, mod.path
   probe.manifestApi = mod.manifest.api
   mod.manifest.api = 99
@@ -423,7 +422,7 @@ end
   ["options.lua"] = "return { modOptions = { probe = { volume = 4 } } }",
 }) })
 check(objectLoader:load({ pokemon = {} }) == true, "the mod object fixture loads clean")
-local probe = _G.MOD_OBJECT_PROBE
+local probe = objectLoader.exports.probe
 check(probe.id == "probe" and probe.version == "1.0.0" and probe.path == "mods/probe",
   "identity fields are present")
 check(probe.manifestApi == 2 and objectLoader.mods.probe.manifest.api == 2,
@@ -449,7 +448,6 @@ check(probe.onceCount == 1 and probe.stillHeard == true,
   "events:once fires once and does not skip the listener behind it")
 check(tostring(probe.forgery):find("may only emit", 1, true) ~= nil,
   "a mod cannot emit outside its own event namespace")
-_G.MOD_OBJECT_PROBE = nil
 
 -- a failing entry chunk takes its exports, commands and migrations with it
 local residueLoader = Loader.new({ fs = memfs({

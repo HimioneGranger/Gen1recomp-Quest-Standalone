@@ -139,10 +139,11 @@ local files = {
   ["mods/probe/manifest.json"] =
     '{"id":"probe","name":"probe","version":"1.0.0",'
       .. '"entry":"main.lua","api":2,"profile":"content"}',
+  -- mod.exports, not _G: a mod's globals are its own (src/mods/Sandbox.lua)
   ["mods/probe/main.lua"] = [[
 return function(mod)
-  _G.MOD_CHECKPOINTS = mod.checkpoints
-  _G.MOD_HOOKS = mod.hooks
+  mod.exports.checkpoints = mod.checkpoints
+  mod.exports.hooks = mod.hooks
 end
 ]],
 }
@@ -150,12 +151,14 @@ local game, ow = makeGame()
 local loader = Loader.new({ fs = memfs(files) })
 loader.game = game
 T.check(loader:load({}) == true, "checkpoint fixture mod loads")
-local checkpoints = _G.MOD_CHECKPOINTS
+local checkpoints = (loader.exports.probe or {}).checkpoints
+local hooks = (loader.exports.probe or {}).hooks
 T.check(type(checkpoints) == "table",
   "Loader exposes mod.checkpoints through the public mod object")
+T.check(type(hooks) == "table",
+  "Loader exposes mod.hooks through the sandboxed public exports")
 if type(checkpoints) ~= "table" then
   Runtime.events, Runtime.hooks = savedEvents, savedHooks
-  _G.MOD_CHECKPOINTS = nil
   T.finish()
 end
 
@@ -440,7 +443,7 @@ end
 -- at the restored safe decision reaches its semantic auxiliary action without
 -- selecting a native command.
 local auxiliaryCalls = 0
-_G.MOD_HOOKS:wrap("battle.menu_auxiliary", function(nextFn, liveGame, context)
+hooks:wrap("battle.menu_auxiliary", function(nextFn, liveGame, context)
   auxiliaryCalls = auxiliaryCalls + 1
   T.check(liveGame == battleGame, "public battle auxiliary action receives the game")
   T.same(context, { kind = "wild" }, "public auxiliary context is data-only")
@@ -456,8 +459,6 @@ T.eq(boundary.menuIndex, originalMenuIndex, "public auxiliary hook preserves cur
 
 Runtime.events, Runtime.hooks = savedEvents, savedHooks
 Runtime.currentMod = nil
-_G.MOD_CHECKPOINTS = nil
-_G.MOD_HOOKS = nil
 love.math.getRandomState = oldGetRandomState
 love.math.setRandomState = oldSetRandomState
 

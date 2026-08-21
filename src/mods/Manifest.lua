@@ -3,13 +3,15 @@
 -- that need to stat a file, this owns shape, vocabulary and range grammar.
 local Logger = require("src.core.Logger")
 local ModTargets = require("src.mods.ModTargets")
+local SafePath = require("src.mods.SafePath")
 local Semver = require("src.mods.Semver")
 local Version = require("src.core.Version")
 
 local Manifest = {}
 
 Manifest.PROFILES = { content = true, overhaul = true, total_conversion = true }
-Manifest.PERMISSIONS = { network = true, filesystem = true, engine_internals = true }
+Manifest.PERMISSIONS = { network = true, filesystem = true,
+                         engine_internals = true, steps = true }
 
 -- link-relevant registries; a mod that writes into one of these while
 -- declaring affects_link = false gets an attributed warning from the loader
@@ -144,6 +146,9 @@ function Manifest.validate(raw, path)
   assert(type(raw.name) == "string" and raw.name ~= "", "manifest name is required")
   assert(type(raw.version) == "string" and raw.version ~= "", "manifest version is required")
   assert(type(raw.entry) == "string" and raw.entry ~= "", "manifest entry is required")
+  -- every manifest path is joined to the mod's own directory, so none of them
+  -- may climb out of it (src/mods/SafePath.lua)
+  local entry = SafePath.require(raw.entry, "manifest entry")
 
   -- absent means 1: full v1 compat, schema violations downgrade to warnings
   assert(raw.api == nil or tonumber(raw.api) ~= nil, "manifest api must be a number")
@@ -229,10 +234,15 @@ function Manifest.validate(raw, path)
   local affectsLink = profile ~= "content" and not language
   if type(raw.affects_link) == "boolean" then affectsLink = raw.affects_link end
 
-  local function optionalFile(value, field)
+  local function optionalString(value, field)
     if value == nil then return nil end
     assert(type(value) == "string" and value ~= "", field .. " must be a file path")
     return value
+  end
+
+  local function optionalFile(value, field)
+    local text = optionalString(value, field)
+    return text and SafePath.require(text, field)
   end
 
   local conflicts = mergeConflictLists(raw.conflicts, raw.incompatible)
@@ -241,7 +251,7 @@ function Manifest.validate(raw, path)
     id = raw.id,
     name = raw.name,
     version = raw.version,
-    entry = raw.entry,
+    entry = entry,
     api = api,
     priority = tonumber(raw.priority) or 0,
     dependencies = array(raw.dependencies),
@@ -265,7 +275,8 @@ function Manifest.validate(raw, path)
     permissionSet = permissionSet,
     options_schema = optionalFile(raw.options_schema, "options_schema"),
     assets_transforms = optionalFile(raw.assets_transforms, "assets_transforms"),
-    force_enable_env = optionalFile(raw.force_enable_env, "force_enable_env"),
+    -- an env var name, not a path, so it keeps the plain string check
+    force_enable_env = optionalString(raw.force_enable_env, "force_enable_env"),
     path = path,
     raw = raw,
   }

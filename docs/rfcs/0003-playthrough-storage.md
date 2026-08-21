@@ -26,8 +26,8 @@ wiki's Save Model. `mod.save` and `mod.options` keep their existing behavior.
 ## The exact API delta
 
 Backward-compatible, additive-only. `Loader:_api` binds a new `mod.storage`
-facade to the calling mod id. Mods receive logical keys and decoded values, never
-filesystem handles or physical paths.
+facade to the calling mod id. Mods receive logical keys and either decoded table
+values or exact opaque byte strings, never filesystem handles or physical paths.
 
 ### Lazy opaque playthrough identity
 
@@ -75,6 +75,25 @@ Returns a freshly decoded table, or `nil, code, message`. It tries main, staged,
 then backup data. A valid staged/backup value is returned and promoted
 best-effort; corrupt bytes are never executed.
 
+### `mod.storage:writeBytes(game, key, bytes)`
+
+Accepts a Lua string containing opaque bytes and returns `true`, or
+`false, code, message`. Empty strings are valid. Payloads are limited to 512
+MiB per key. The engine writes the supplied bytes exactly as received, without
+decoding, compression, checksums, or an engine-defined envelope. The consuming
+mod owns semantic validation of its format.
+
+Byte records use private `.bin`, `.bin.tmp`, and `.bin.bak` witnesses. A staged
+and replacement write is read back and compared byte-for-byte before it is
+committed. A failed write leaves the previous verified generation readable.
+Byte storage never passes its payload to the Lua serializer, loader, or module
+resolver.
+
+Table and byte records share one logical key namespace and a key has one type.
+Writing one type over the other returns `type_conflict`; callers must delete the
+key before changing its type. `mod.storage:selected(game)` exposes the same
+`readBytes` and `writeBytes` operations for the selected playthrough facade.
+
 ### `mod.storage:list(game[, prefix])`
 
 Returns sorted logical keys beneath a valid prefix, an exact key when the prefix
@@ -92,9 +111,9 @@ Physical records are scoped as:
 `persistence root / mod_storage / game version / playthrough id / mod id`
 
 Stable error codes are `not_in_playthrough`, `storage_unavailable`,
-`invalid_key`, `encode_failed`, `write_failed`, `verify_failed`, and
-`not_found`. Ordinary data and I/O failures are return values, not callback-
-terminating errors.
+`invalid_key`, `encode_failed`, `invalid_bytes`, `size_limit`, `type_conflict`,
+`type_mismatch`, `write_failed`, `verify_failed`, and `not_found`. Ordinary
+data and I/O failures are return values, not callback-terminating errors.
 
 The restricted serializer's recursive writer runs outside LuaJIT traces. A
 1,000-process GC stress regression found compiled recursion could intermittently
@@ -107,6 +126,8 @@ boundary.
 **Nothing.** No API is removed, no manifest field changes, and no storage path or
 playthrough id is created unless a mod invokes `mod.storage` or
 `mod.checkpoints`. Existing save bytes remain unchanged on the no-caller path.
+Existing files outside the scoped storage contract are not imported; a caller
+must rebuild them through `writeBytes`.
 
 ## Parity tests
 
@@ -115,8 +136,10 @@ playthrough id is created unless a mod invokes `mod.storage` or
 - **Engine identity:** lazy allocation, save/load preservation, stable legacy
   mapping, fresh-playthrough replacement, and version/slot isolation.
 - **Public Mod API:** two real API-2 entry chunks prove data-only roundtrip,
+  opaque byte roundtrip including NUL bytes, no execution, size/type rejection,
   deterministic listing, key rejection, mod/game/playthrough isolation,
-  corrupt-main recovery, failure retention, exact delete, and no-mod no-write.
+  corrupt-main recovery, failure retention, selected-playthrough access, exact
+  delete, and no-mod no-write.
 
 ## Deprecation etiquette
 

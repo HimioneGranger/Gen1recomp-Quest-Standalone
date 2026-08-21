@@ -57,13 +57,16 @@ local files = {
   ["mods/probe/manifest.json"] =
     '{"id":"probe","name":"probe","version":"1.0.0",'
       .. '"entry":"main.lua","api":2,"profile":"content"}',
+  -- mod.exports, not _G: a mod's globals are its own (src/mods/Sandbox.lua)
   ["mods/probe/main.lua"] = [[
 return function(mod)
-  _G.MOD_TITLE_STORAGE = mod.storage
-  _G.MOD_TITLE_CHECKPOINTS = mod.checkpoints
+  local out = mod.exports
+  out.storage = mod.storage
+  out.checkpoints = mod.checkpoints
+  out.restoreCount = 0
   mod.events:on("checkpoint.restored", function(ev)
-    _G.MOD_TITLE_RESTORE_COUNT = (_G.MOD_TITLE_RESTORE_COUNT or 0) + 1
-    _G.MOD_TITLE_RESTORE_KIND = ev.kind
+    out.restoreCount = out.restoreCount + 1
+    out.restoreKind = ev.kind
   end)
 end
 ]],
@@ -82,7 +85,8 @@ local loader = Loader.new({ fs = fs })
 loader.game = active
 T.check(loader:load({}) == true, "title-context fixture mod loads")
 
-local storage = _G.MOD_TITLE_STORAGE
+local probe = loader.exports.probe or {}
+local storage = probe.storage
 T.check(type(storage) == "table", "loader exposes the public storage facade")
 if type(storage) == "table" then
   local written, writeCode, writeMessage = storage:write(active, "history/index", {
@@ -131,6 +135,17 @@ if type(storage) == "table" then
         "title binding supports safe same-namespace durable operations")
       T.same(selected:read("history/title-operation"), { allowed = true },
         "title durable operation remains scoped to the selected playthrough")
+      T.check(type(selected.writeBytes) == "function"
+          and type(selected.readBytes) == "function",
+        "selected storage exposes opaque byte methods")
+      if type(selected.writeBytes) == "function"
+          and type(selected.readBytes) == "function" then
+        local titleBytes = "TITLE\0\255-cache"
+        T.check(selected:writeBytes("history/title-bytes", titleBytes) == true,
+          "title binding writes opaque bytes in the selected namespace")
+        T.eq(selected:readBytes("history/title-bytes"), titleBytes,
+          "title binding reads opaque bytes in the selected namespace")
+      end
     end
     T.check(title.save.meta.playthroughId == nil,
       "opening title history never allocates or adopts a playthrough identity")
@@ -178,7 +193,7 @@ if type(storage) == "table" then
   end
 
   local runtime = makeRuntime(active.save, false)
-  local checkpoints = _G.MOD_TITLE_CHECKPOINTS
+  local checkpoints = probe.checkpoints
   T.check(type(checkpoints) == "table", "loader exposes the public checkpoint facade")
   local checkpoint = checkpoints and checkpoints:capture(runtime)
   T.check(type(checkpoint) == "table",
@@ -238,9 +253,9 @@ if type(storage) == "table" then
     end
     T.same(recaptured, checkpoint,
       "bootstrapped overworld differentially recaptures the selected checkpoint")
-    T.eq(_G.MOD_TITLE_RESTORE_COUNT, 1,
+    T.eq(probe.restoreCount, 1,
       "a successfully verified title resume emits checkpoint.restored exactly once")
-    T.eq(_G.MOD_TITLE_RESTORE_KIND, "overworld",
+    T.eq(probe.restoreKind, "overworld",
       "title resume lifecycle reports the reconstructed checkpoint kind")
 
     -- Force a failure after restoreCheckpointSave has already installed the
@@ -267,7 +282,7 @@ if type(storage) == "table" then
       version = "red", meta = { playthroughId = originalId },
     }, fs).savedAt, anchoredAt,
       "failed title reconstruction never rewrites the normal Pokémon save")
-    T.eq(_G.MOD_TITLE_RESTORE_COUNT, 1,
+    T.eq(probe.restoreCount, 1,
       "failed title reconstruction emits no additional restored lifecycle event")
   end
 
@@ -302,10 +317,6 @@ end
 
 Runtime.events, Runtime.hooks = savedEvents, savedHooks
 Runtime.currentMod = nil
-_G.MOD_TITLE_STORAGE = nil
-_G.MOD_TITLE_CHECKPOINTS = nil
-_G.MOD_TITLE_RESTORE_COUNT = nil
-_G.MOD_TITLE_RESTORE_KIND = nil
 SaveData.resetSlotState()
 SaveData.loadOptions = originalLoadOptions
 love.filesystem = realFs

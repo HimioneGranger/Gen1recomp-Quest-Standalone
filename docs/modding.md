@@ -237,6 +237,25 @@ local keys, code, message = mod.storage:list(game, "history/quick")
 local deleted, code, message = mod.storage:delete(game, "history/quick/q0001")
 ```
 
+For independently generated binary data, use the opaque byte methods. They
+accept and return the exact Lua string of bytes, including NUL bytes and bytes
+that are not valid text:
+
+```lua
+local ok, code, message = mod.storage:writeBytes(
+  game, "cache/maps/pallet/terrain", encodedMesh)
+local encodedMesh, code, message = mod.storage:readBytes(
+  game, "cache/maps/pallet/terrain")
+```
+
+Opaque values are limited to 512 MiB per key. The engine stores them without
+decoding, compression, or an engine-defined file format, and never executes
+them. A consuming mod owns validation of its format, fingerprint, checksum,
+and compression metadata. Byte writes are staged and compared byte-for-byte
+before replacement, and reads can recover a valid backup after an interrupted
+write. Existing table values and opaque byte values use one shared logical key
+space; delete a key before changing its value from one type to the other.
+
 `context` returns `{ engineVersion, gameVersion, playthroughId }`. The engine
 version is compatibility metadata; physical launcher-slot and path identity stays
 private. A title-selected context may additionally contain `normalSavedAt`, the
@@ -245,19 +264,22 @@ progress or a slot/path handle.
 
 At the title screen only, `mod.storage:selected(game)` returns a bound storage
 facade for the launcher-selected existing playthrough, or `nil, code, message`.
-Resolving this facade is read-only: it never allocates an identity, adopts a
+Resolving this facade is non-allocating: it never allocates an identity, adopts a
 fresh New Game, or exposes a slot id/path. Its `context()`, `read(key)`,
-`write(key, value)`, `list(prefix)`, and `delete(key)` methods have the same
-data-only and transaction contract as `mod.storage`, but remain restricted to
-the calling mod's selected existing namespace. It is intended for title tools
-that need to browse or manage durable history before the first normal SAVE.
+`write(key, value)`, `readBytes(key)`, `writeBytes(key, bytes)`,
+`list(prefix)`, and `delete(key)` methods have the same scoped and
+transactional contract as `mod.storage`, but remain restricted to the calling
+mod's selected existing namespace. It is intended for title tools that need to
+browse or manage durable history before the first normal SAVE.
 
-Values must be tables containing serializable data only. Keys are conservative
-slash-separated segments (letters, digits, `_`, `-`); paths and filesystem
-handles are never exposed. Writes are staged and decode-verified, reads recover
-from a valid staged/backup generation, and methods return structured errors for
-normal data or I/O failures. The playthrough identity is allocated lazily on the
-first storage/checkpoint call, so an unused API changes no save bytes.
+Table values must contain serializable data only. Opaque values must be Lua
+strings. Keys are conservative slash-separated segments (letters, digits, `_`,
+`-`); paths and filesystem handles are never exposed. Table writes are staged
+and decode-verified; opaque writes are staged and byte-verified; reads recover
+from a valid staged/backup generation. Methods return structured errors for
+normal data, byte validation, and I/O failures. The playthrough identity is
+allocated lazily on the first storage/checkpoint call, so an unused API changes
+no save bytes.
 
 `mod.checkpoints` captures and reconstructs engine-owned semantic runtime state:
 
@@ -555,3 +577,41 @@ local both = mod.datetime:dateTime(game, createdAt)
 The live `game` supplies only the current option context. Formatting never
 mutates the save, options, or timestamp, and invalid timestamps return
 `"----"`.
+
+## Device power information
+
+Sandboxed mods can read the host's battery state without receiving the rest
+of `love.system`:
+
+```lua
+local state, percent = mod.device:powerInfo()
+```
+
+`state` follows LÖVE's values: `"unknown"`, `"battery"`, `"nobattery"`,
+`"charging"`, or `"charged"`. `percent` is `0` through `100`, or `nil` when
+the platform cannot report it. The facade is read-only and does not expose
+URL launching, clipboard access, or other system operations.
+
+## Real-world steps
+
+On iOS and Android the game counts the player's real-world steps natively
+(HealthKit / the hardware step counter). A mod reaches that bridge through
+the `steps` permission in `manifest.json`, which the player sees in the
+mod manager like every other permission:
+
+```lua
+if mod.steps:available() then
+  mod.steps:sync()                -- async; OS consent sheet on first use
+end
+-- later, at a quiet moment:
+local walk = mod.steps:poll()     -- { steps = n, from = ?, to = ? } or nil
+```
+
+`available()` is `false` on builds without the bridge (desktop) and for
+mods without the permission, so a probe is always safe. `sync()` asks the
+platform to refresh its count and returns whether there was a bridge to
+ask. `poll()` returns the next delivery for this mod — the engine consumes
+the native side's pending file itself, each permissioned mod receives its
+own copy of a delivery, and steps are anchored natively so the same walk
+is never delivered twice. Without the permission, `sync` and `poll` raise
+an error naming it.

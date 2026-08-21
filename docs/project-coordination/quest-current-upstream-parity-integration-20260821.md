@@ -12,9 +12,10 @@ Quest compatibility-split successor. It preserves the stronger Quest launcher,
 compatibility adapters, package identities, Quest UI, Android/OpenXR behavior,
 mod hooks, loading screen, and current repairs.
 
-- Canonical repository: `C:\Users\bolay\Documents\Gen1recomp-Quest-Standalone`.
-- Task worktree:
-  `C:\Users\bolay\Documents\Gen1recomp-Current-Upstream-Parity-Integration`.
+- Canonical repository: `Documents\Gen1recomp-Quest-Standalone`, outside
+  OneDrive.
+- Task worktree: `Documents\Gen1recomp-Current-Upstream-Parity-Integration`,
+  outside OneDrive.
 - Task branch: `codex/quest-current-upstream-parity-20260821`.
 - Branch start and Q47 app source:
   `b08e28b1e5ddee46767cae7dc168a4c09903692b`.
@@ -30,7 +31,7 @@ mod hooks, loading screen, and current repairs.
 - Audited upstream head:
   `d191aaa34d987866521d76e2e2b8f7bfb3067227` at `upstream/dev`.
 - Audit evidence: untracked, preserved file
-  `C:\Users\bolay\Documents\Gen1recomp-Upstream-Parity-Batch2\docs\project-coordination\quest-split-current-upstream-parity-audit-20260821.md`.
+  `Documents\Gen1recomp-Upstream-Parity-Batch2\docs\project-coordination\quest-split-current-upstream-parity-audit-20260821.md`.
 
 The audit enumerates 222 patch-unique upstream non-merge commits. It classifies
 4 as portable Gen 1, 75 as prerequisite-sensitive applicable Gen 1, and 1 as a
@@ -70,11 +71,12 @@ At branch start:
 
 The audit lane contract controls the semantic order. The working order is:
 
-1. Portable world and presentation items whose prerequisites already exist:
-   C7, C8, and the open C9 TownMap, TradeAnim, and PaletteFX subsets.
-2. Mod sandbox and API foundation M1.
-3. M8 foundation through cadence prerequisite `a94fecfe`, then portable escort
-   item C2 `43957922`.
+1. Mod sandbox and API foundation M1, including the interleaved M8 device-power
+   prerequisite `e44769a4` before the steps bridge.
+2. M8 foundation through the source context for C7 and cadence prerequisite
+   `a94fecfe`; then apply C7 and portable escort item C2 `43957922`.
+3. Portable C8 and the open C9 TownMap, TradeAnim, and PaletteFX subsets after
+   their focused presentation tests exist.
 4. Remaining M8 gameplay and shared mod behaviors, split into complete Gen 1
    source/test units.
 5. Save lifecycle M2, audio M3, extraction/catalog M4, renderer M5, link M6,
@@ -85,6 +87,68 @@ The audit lane contract controls the semantic order. The working order is:
 8. X1 mixed commit split by owner: keep only applicable portable
    accelerometer behavior and any already-authorized Gen 1/Quest-compatible
    audio or launcher correction. Exclude Gen 2 and non-Quest platform changes.
+
+## Completed batches
+
+### Batch 1: sandbox, device, steps, and opaque storage foundation
+
+Audit lanes: M1 and interleaved M8 prerequisite.
+
+Upstream sources, in dependency order:
+
+- `83682f011df5039c4ea7042141590d38ca7e21d5`
+- `e44769a48a4e885ff0522dd0ca6e694464237288`
+- `bde606f966ca5f58e351889a38d6427b50cc6f79`
+- `9fab992d425305f3d1dc41eb0eb48162c1fcb541`
+- `fb738fa1cee883ad15b0333235b5e4c6d1b9a1d9`
+
+Exact imported path set:
+
+```text
+CONTRIBUTING-mods.md
+docs/modding.md
+docs/new-features.md
+docs/rfcs/0003-playthrough-storage.md
+docs/rfcs/0008-device-power-info.md
+docs/rfcs/0009-step-bridge-permission.md
+src/mods/AssetTransform.lua
+src/mods/Loader.lua
+src/mods/ManagerState.lua
+src/mods/Manifest.lua
+src/mods/Runtime.lua
+src/mods/SafePath.lua
+src/mods/Sandbox.lua
+src/mods/Steps.lua
+src/mods/Storage.lua
+tests/integration/title_checkpoint_cold_start.lua
+tests/mod_loader_tests.lua
+tests/mod_manifest_tests.lua
+tests/mod_render_tests.lua
+tests/modkit/cases/checkpoints.lua
+tests/modkit/cases/device_power_info.lua
+tests/modkit/cases/platform_lifecycle_hooks.lua
+tests/modkit/cases/sandbox.lua
+tests/modkit/cases/steps_bridge.lua
+tests/modkit/cases/storage.lua
+tests/modkit/cases/title_playthrough_context.lua
+tests/modkit_tests.lua
+```
+
+The transient upstream `mod-sandbox-notice.txt` and private absolute-path
+symlink `mods/timekeepers_hut` are absent from `upstream/dev` and were not
+imported.
+
+Focused verification:
+
+- ROM-free Modkit: 18/18 suites passed, including new sandbox, device-power,
+  steps, storage, checkpoint, and Quest lifecycle-hook coverage.
+- `tests/mod_manifest_tests.lua`: 99/99 passed.
+- `tests/mod_render_tests.lua`: 58/58 passed.
+- Cold-start checkpoint integration: capture and resume passed.
+- Legacy `tests/mod_loader_tests.lua` and direct `tests/modkit_tests.lua` need
+  generated ROM data or prior aggregate initialization in this checkout. They
+  stopped at that existing boundary; no generated or private data was created.
+- Staged diff and whitespace checks passed.
 
 ## Final acceptance
 
@@ -98,6 +162,7 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: this ledger on top of
-`b08e28b1e5ddee46767cae7dc168a4c09903692b`. No upstream source item has been
-integrated yet.
+Current recovery point: Batch 1 is the first source batch on top of the
+Q47-based ledger commit `db524ed7`. Resume with the next applicable upstream
+row after `fb738fa1cee883ad15b0333235b5e4c6d1b9a1d9`, while respecting
+interleaved dependencies.

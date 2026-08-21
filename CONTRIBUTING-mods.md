@@ -242,7 +242,51 @@ with a `MK4xx` finding per site and an `unresolved:` note, with a file and a
 line, for every reach a static scan could not follow. Neither substitutes for a
 real Gold boot.
 
-### 5. `mod.card`
+### 5. What a mod's code can reach
+
+Your code runs in a sandbox (`src/mods/Sandbox.lua`), not against the
+engine's globals. Every chunk you author gets it: `main.lua`, your
+`options_schema`, and anything you `load()` yourself. What is absent:
+
+| Absent | Use instead |
+| --- | --- |
+| `io`, and `require("io")` | `mod:read` for your own files, `mod.storage` to persist |
+| `os.getenv`, `os.execute`, `os.remove`, `os.rename`, `os.exit` | nothing; `os.time`/`os.date`/`os.clock` still work |
+| `package`, `dofile`, `loadfile`, `debug`, `getfenv`, `setfenv` | `require` for the supported engine modules |
+| `require("ffi")`, `require("love.*")` | the `love` table you are given |
+| `love.filesystem` | `mod.storage` (per-mod, per-playthrough), `mod:read` for a known file, `mod:list` / `mod:info` to iterate your own directory |
+| `love.thread`, `love.event` | `mod.events`, `mod.hooks` |
+| `love.system` | `mod.device:powerInfo()` for battery information; `mod.steps` (with the `steps` permission) for the step bridge |
+
+The rest of `love` passes through unchanged, so graphics, audio, timers and
+input work as they always have.
+
+Three consequences worth knowing before you write against it:
+
+- **Your globals are yours.** `_G` inside a mod is that mod's own table. Two
+  mods no longer share a namespace, and neither can reach the engine's. To
+  publish something to another mod, put it on `mod.exports` and let them
+  `mod.find("your_id").exports` — the channel that was always the intended
+  one. The same goes for the standard library: `string`, `table` and `math`
+  are per-mod copies, so patching one is a local decision.
+- **Paths cannot climb.** `mod:read`, `mod:list`, `mod:info`, `mod.assets:path`
+  and `mod.assets:image` join to your own directory, and `..`, absolute paths
+  and drive letters are refused. So are `entry` and `options_schema` in your
+  manifest. `mod:list("assets")` is the sandboxed `getDirectoryItems` for a
+  folder you shipped; `mod:info` tells file from directory so a walk can
+  recurse.
+- **Ship source, not bytecode.** A precompiled entry file is refused.
+
+`permissions` in the manifest is still a disclosure the manager shows the
+player, and `network` now gates `require("socket")` and friends. There is no
+permission that grants raw filesystem access, because no mod needs one:
+everything a mod legitimately writes is already scoped by
+`mod.storage` or the asset-transform derived root.
+
+If your mod used one of the absent globals, the fix is almost always
+`mod.storage`. Open an issue if you have a case it does not cover.
+
+### 6. `mod.card`
 
 The manifest is the *engine's* contract: identity, load order, dependencies,
 permissions, profile. The card is the *human-facing* one: who made this,
@@ -263,7 +307,7 @@ Two fields deserve their own note:
   distributed mod never carries ROM-derived bytes, not even in its preview
   images.
 
-### 6. Tags
+### 7. Tags
 
 Lowercase kebab strings, open vocabulary. The showcase generator
 lowercases and de-dupes. A recommended starting set: `beginner`,
