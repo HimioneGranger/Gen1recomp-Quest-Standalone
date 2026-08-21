@@ -1009,6 +1009,33 @@ check(fallback.style == "doublecircle",
       "a hook naming an unregistered style falls back to the vanilla bits")
 Runtime.install(Events.new(), Hooks.new(), {})
 
+-- ------- gated final-output ownership
+
+local outputHooks = Hooks.new()
+Runtime.install(Events.new(), outputHooks, {})
+local outputCalls, outputContext = 0, nil
+outputHooks:wrap("render.output", function(nextLink, context)
+  outputCalls, outputContext = outputCalls + 1, context
+  return true
+end, 0, "test")
+outputHooks:wrap("render.output_enabled", function() return false end, 0, "test")
+Renderer:init()
+Renderer.presentCanvas = nil
+Renderer:beginFrame(false)
+Renderer:endFrame(nil, nil)
+check(outputCalls == 0 and Renderer.presentCanvas == nil,
+      "a disabled output hook leaves the direct render path untouched")
+
+outputHooks:wrap("render.output_enabled", function() return true end, 10, "test")
+Renderer:init()
+Renderer.presentCanvas = nil
+Renderer:beginFrame(false)
+Renderer:endFrame(nil, nil)
+check(outputCalls == 1 and outputContext and outputContext.canvas,
+      "an enabled output hook receives the finished frame")
+check(outputContext and outputContext.generation == 1,
+      "the output context identifies the active generation")
+
 -- ------- asset transforms
 
 local function seedTransform(id, source)

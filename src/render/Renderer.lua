@@ -828,11 +828,12 @@ function Renderer:endFrame(zones, worldZones)
     end
   end
 
-  -- A post-process pipeline needs the whole composite in a canvas for the
-  -- same reason GBC FX does, so either one alone is enough to take the
-  -- present path; with neither, the frame draws straight to the screen
-  -- exactly as it always did.
-  local needPresent = GBCFX.active() or Pipelines.wantsPresent()
+  -- Post-process pipelines, GBC FX and an enabled final-output owner need the
+  -- whole composite in a canvas. With none of them, the frame draws straight
+  -- to the screen exactly as it always did.
+  local hasOutputHook = Runtime.wantsHook("render.output")
+    and Runtime.call("render.output_enabled", function() return false end) == true
+  local needPresent = GBCFX.active() or Pipelines.wantsPresent() or hasOutputHook
   local present = nil
   if needPresent then
     if not self.presentCanvas or self.presentCanvas:getWidth() ~= ww
@@ -1156,14 +1157,25 @@ function Renderer:endFrame(zones, worldZones)
     -- this returns `present` unchanged and the frame is byte-identical.
     local composed = Pipelines.present(present,
       { width = ww, height = wh, scale = Sp, dpi = dpiY, dpiX = dpiX, dpiY = dpiY }) or present
-    if GBCFX.active() then
-      -- shader grid/shadow math is in framebuffer pixels
-      GBCFX.present(composed, Sp)
-    else
-      -- the present canvas only existed for the post-process, so put the
-      -- result on the screen at the same 1:1 unit mapping it was built at
-      love.graphics.setColor(1, 1, 1, 1)
-      love.graphics.draw(composed, 0, 0)
+    local outputHandled = hasOutputHook
+      and Runtime.call("render.output", function() return false end, {
+        canvas = composed,
+        width = ww, height = wh,
+        gameX = ox, gameY = oy,
+        gameWidth = vpw, gameHeight = vph,
+        scale = Sp, dpiX = dpiX, dpiY = dpiY,
+        generation = 1,
+      }) == true
+    if not outputHandled then
+      if GBCFX.active() then
+        -- shader grid/shadow math is in framebuffer pixels
+        GBCFX.present(composed, Sp)
+      else
+        -- the present canvas only existed for the post-process, so put the
+        -- result on the screen at the same 1:1 unit mapping it was built at
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.draw(composed, 0, 0)
+      end
     end
   end
   self.worldActive = false

@@ -1555,6 +1555,47 @@ Focused verification:
   preserved root residues retained identical SHA-256 hashes.
 - Staged scope/provenance, whitespace, and diff checks passed.
 
+### Batch 34: opt-in final-frame output hook
+
+Audit lane: M8 render-output API.
+
+Upstream source:
+
+- `09204daa2807a3d84c009c263de4d314a9e94b50`
+
+Exact imported/adapted path set:
+
+```text
+docs/modding.md
+src/render/Renderer.lua
+tests/mod_graphics_tests.lua
+```
+
+The Gen 1 output hook is integrated after Q47's present pipelines and before
+GBCFX. It allocates a full-window canvas only when `render.output` exists and
+`render.output_enabled` returns true. A handler receives the final composite
+and fitted viewport metrics and can take ownership by returning true. The
+earlier `render.compose` path still has precedence. The merge keeps Q47's
+GameViewport target, reserved-window capture, Quest compositor, HostDisplay,
+panel placement, true-color, battle-surround, and lifecycle behavior.
+
+Excluded upstream paths are `src/core/Game2.lua`,
+`tests/engine/gen2_render_output_seam.lua`, the Gen 2 gate change, and the Gen 2
+compatibility-document change. They are Gen 2-only. No platform or launcher
+path changed.
+
+Focused verification:
+
+- Full mod graphics, including the three new disabled/enabled output-hook
+  checks: 194/194 passed.
+- Q47 render viewport driver passed.
+- Quest compositor geometry, panel placement, and settings profile: 116/116
+  passed.
+- Direct Renderer LuaJIT compilation passed.
+- No app was launched and no network was used. The four protected runtime
+  residues remained untracked and unchanged.
+- Staged scope/provenance, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1567,7 +1608,8 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 33 completes all applicable C9 paths after the
-isolated TownMap and TradeAnim commits. Resume with the remaining audited M8
-items in dependency order. Apply the deferred C8 SAVE-panel field only after
-the `0f8f6d0e` and `dbecc345` menu foundation is integrated and tested.
+Current recovery point: Batch 34 integrates audited M8 source
+`09204daa2807a3d84c009c263de4d314a9e94b50` without its Gen 2-only paths.
+Resume with the next unreconciled M8 row, `35d44efb8b5c993f9ffa523637540c71df3c2496`.
+Keep the C8 SAVE-panel field deferred until the `0f8f6d0e` and `dbecc345`
+menu foundation is integrated and tested.
