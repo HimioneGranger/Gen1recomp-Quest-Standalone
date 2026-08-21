@@ -214,7 +214,9 @@ replay was needed.
   screen, host-adapter versioning, Android flavor/package identity, renderer,
   DRAMALESS, and protected package boundaries are unchanged. The only narrow
   boundary update is the approved portable `src/mods/Schemas.lua` map-object
-  Pokemon validation, covered by its 6/6 focused regression.
+  Pokemon validation, covered by its 6/6 focused regression. This protected
+  boundary statement applies to the portable replay through `1d9053f7`. The
+  later target-owned V8 launcher checkpoint is recorded separately below.
 
 ### Target verification before APK assembly
 
@@ -236,5 +238,56 @@ replay was needed.
 - Diagnostic package-only passed through Git Bash and skipped Gradle/signing.
 - `git diff --check 3cfc9d6c..3935c0b4` passed. The tracked replay boundary is
   portable source/tests only. Protected-path scans found no prohibited edit.
-- No network, install, ADB, headset, ROM, save, private-data, push, merge,
-  publish, release-signing, or device action occurred.
+- Through portable integration commit `1d9053f7`, no network, install, ADB,
+  headset, ROM, save, private-data, push, merge, publish, release-signing, or
+  device action occurred. The later packaging network exception is recorded
+  below.
+
+### Final launcher checkpoint and package records
+
+- While package verification was in progress, the target branch received
+  target-owned commit `430b731553c4089e65e23a9505c78bf5ee811259`,
+  `feat(quest): approve V8 loading screen`. It is patch-identical to local
+  launcher-audit commit `e19fa704b9545ae9963477a12f839a881a840441`;
+  both have stable patch ID
+  `714e7ba4aa96fd780b2d3dab6a08d08d34a89957`. It is not an upstream parity
+  replay and does not change any portable mapping above.
+- V8 verification: loading screen 4158/4158 checks; deterministic Python
+  preview contract passed; launch progress 23/23; load-report profile passed;
+  settings profile 80/80; panel placement 5/5; flavor isolation passed.
+- Exact APK build HEAD: `430b731553c4089e65e23a9505c78bf5ee811259`.
+  JDK 17.0.20 and direct local Gradle 8.5 ran the final app tasks in offline
+  mode. Both `questVrNoRecordDebug` and the discovered recording flavor
+  `questVrRecordDebug` assembled successfully. Their app unit-test sources are
+  absent, so both unit-test tasks reported `NO-SOURCE`.
+- Candidate directory:
+  `dist/android/candidates/portable-parity-430b7315-20260821-001`.
+- No-record APK SHA-256:
+  `1aeb54cde1ea99b906e25da9659a90dba5a1694bac90746736f4369811d0de3c`.
+- Record APK SHA-256:
+  `10b5c611010a32a7ab70c9ae97bdac2052756c926e3f6c6332c61dd0af4023e3`.
+- Both APKs embed source payload SHA-256
+  `f7ffd764d4a50afb8feeec4ee68fb8e71e8f133f1a94105a9e569438af977412`.
+  All 469 payload entries match the exact build-HEAD worktree. The two APKs
+  have identical portable payloads and native libraries. Only `classes5.dex`
+  differs for compiled `questVrNoRecord` versus `questVrRecord` identity.
+- Both are Diagnostic `com.theboisclub.pokemonred.diagnostic` version
+  `0.1.81` / code `181`, labeled `Gen 1 Recomp Unplugged Diagnostic`, with
+  `QuestGameActivity`, Quest profile metadata value `1`, and ARM64-only six
+  ELF64/AArch64 libraries.
+- Both archives have 439 safe, unique entries and standard 4-byte ZIP
+  alignment. The optional strict 16 KiB page-alignment check did not pass, so
+  no 16 KiB alignment claim is made.
+- APK Signature Scheme v2 verified with one debug signer. Certificate SHA-256
+  `b1aa77b295eaaba52867af6dc7f9a2813590031208e93218d1c62b66c6c97291`
+  matches both checked prior corrected-split artifacts.
+- Final full engine: 190/193 suites. The same three exact baseline failures
+  remain and V8 loading passes 4158/4158.
+- A failed wrapper attempt downloaded the Gradle 8.5 distribution from
+  `services.gradle.org` before project configuration despite `--offline`, then
+  stopped because its task-local cache lacked Android Gradle Plugin 8.1.1.
+  No accepted build input came from that attempt and it made no remote write.
+  The accepted builds used direct local Gradle and local dependencies in
+  offline mode. No other network action occurred.
+- No install, ADB, headset, ROM, save, private-data, push, merge, publish,
+  release-signing, or device action occurred.
