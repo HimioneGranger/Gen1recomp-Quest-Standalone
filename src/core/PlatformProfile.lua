@@ -20,9 +20,12 @@ end
 function PlatformProfile.optionRowSupported(row)
   if not PlatformProfile.isQuestStandalone() then return true end
   row = type(row) == "table" and row or {}
-  local value = tostring(row.id or row.key or row.label or ""):lower()
-  value = value:gsub("[^%w]", "")
-  return value ~= "tshift" and value ~= "vcurved"
+  local inactive = { tshift = true, vcurve = true, vcurved = true }
+  for _, field in ipairs({ "id", "key", "label" }) do
+    local value = tostring(row[field] or ""):lower():gsub("[^%w]", "")
+    if inactive[value] then return false end
+  end
+  return true
 end
 
 return PlatformProfile
