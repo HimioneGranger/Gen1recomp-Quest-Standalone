@@ -293,6 +293,8 @@ static void *questxr_native_bootstrap(void *unused) {
     PFN_xrEnumerateViewConfigurationViews xrEnumerateViewConfigurationViews = NULL;
     PFN_xrGetOpenGLESGraphicsRequirementsKHR xrGetOpenGLESGraphicsRequirementsKHR = NULL;
     PFN_xrCreateSession xrCreateSession = NULL;
+    PFN_xrEnumerateReferenceSpaces xrEnumerateReferenceSpaces = NULL;
+    PFN_xrGetReferenceSpaceBoundsRect xrGetReferenceSpaceBoundsRect = NULL;
     PFN_xrCreateReferenceSpace xrCreateReferenceSpace = NULL;
     PFN_xrLocateSpace xrLocateSpace = NULL;
     PFN_xrLocateViews xrLocateViews = NULL;
@@ -428,6 +430,8 @@ static void *questxr_native_bootstrap(void *unused) {
     XR_PROC(instance, xrEnumerateViewConfigurationViews);
     XR_PROC(instance, xrGetOpenGLESGraphicsRequirementsKHR);
     XR_PROC(instance, xrCreateSession);
+    XR_PROC(instance, xrEnumerateReferenceSpaces);
+    XR_PROC(instance, xrGetReferenceSpaceBoundsRect);
     XR_PROC(instance, xrCreateReferenceSpace);
     XR_PROC(instance, xrLocateSpace);
     XR_PROC(instance, xrLocateViews);
@@ -600,6 +604,31 @@ static void *questxr_native_bootstrap(void *unused) {
     attach_info.actionSets = &action_set;
     if (XR_FAILED(xrAttachSessionActionSets(session, &attach_info)))
         XR_FAIL("xrAttachSessionActionSets");
+
+    // Boundary mode belongs to Quest Guardian. This app does not request a
+    // Stationary or Roomscale transition. Record what the runtime exposes and
+    // its current STAGE bounds so a device log can distinguish an OS Guardian
+    // transition from an app-owned reference-space choice.
+    uint32_t reference_space_count = 0;
+    if (XR_SUCCEEDED(xrEnumerateReferenceSpaces(
+            session, 0, &reference_space_count, NULL)) &&
+            reference_space_count > 0) {
+        XrReferenceSpaceType *reference_spaces = (XrReferenceSpaceType *)
+            calloc(reference_space_count, sizeof(XrReferenceSpaceType));
+        if (reference_spaces && XR_SUCCEEDED(xrEnumerateReferenceSpaces(
+                session, reference_space_count, &reference_space_count,
+                reference_spaces))) {
+            for (uint32_t i = 0; i < reference_space_count; i++)
+                XR_LOG("boundary diagnostic supported reference-space type=%d",
+                    (int) reference_spaces[i]);
+        }
+        free(reference_spaces);
+    }
+    XrExtent2Df stage_bounds = {0};
+    XrResult stage_bounds_result = xrGetReferenceSpaceBoundsRect(
+        session, XR_REFERENCE_SPACE_TYPE_STAGE, &stage_bounds);
+    XR_LOG("boundary diagnostic app-space=LOCAL stage-result=%d stage-width=%.3f stage-height=%.3f",
+        (int) stage_bounds_result, stage_bounds.width, stage_bounds.height);
     XrActionSpaceCreateInfo pointer_space_info = {
         XR_TYPE_ACTION_SPACE_CREATE_INFO
     };
@@ -804,14 +833,19 @@ static void *questxr_native_bootstrap(void *unused) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(panel_vertices), panel_vertices, GL_STATIC_DRAW);
     XR_LOG("native bootstrap session created");
 
-    // The panel height is 1.1625 m. Moving its center down by one sixth of
-    // that height puts a forward gaze in its upper third, rather than its
-    // center. Apply this to the shared room panel pose, so launcher, loading,
-    // and game content stay aligned.
-    const float launcher_panel_gaze_top_third_offset_m = -0.19375f;
+    // The panel height is 1.1625 m. The accepted lower position used a
+    // -0.19375 m offset. Move the complete shared panel up by 15 percent of
+    // its height for this candidate. Launcher, loading, and game content keep
+    // one pose, so the change cannot create presentation drift between them.
+    const float launcher_panel_height_m = 1.1625f;
+    const float launcher_panel_previous_offset_m = -0.19375f;
+    const float launcher_panel_upward_adjustment_ratio = 0.15f;
+    const float launcher_panel_shared_offset_m =
+        launcher_panel_previous_offset_m +
+        launcher_panel_height_m * launcher_panel_upward_adjustment_ratio;
     XrPosef panel_pose = {0};
     panel_pose.orientation.w = 1.0f;
-    panel_pose.position.y = launcher_panel_gaze_top_third_offset_m;
+    panel_pose.position.y = launcher_panel_shared_offset_m;
     panel_pose.position.z = -1.35f;
     int panel_anchored = 0;
     const int room_anchor_enabled = 1;
@@ -898,11 +932,24 @@ static void *questxr_native_bootstrap(void *unused) {
                 }
             } else if (event.type ==
                        XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING) {
+                XrEventDataReferenceSpaceChangePending *space_change =
+                    (XrEventDataReferenceSpaceChangePending *) &event;
                 // Quest emits this after a Meta-button recenter. Reacquire the
                 // settled pose in the new LOCAL space rather than preserving
                 // the old room anchor.
                 panel_anchored = 0;
                 anchor_after_frame = submitted_frames + 30;
+                XrExtent2Df changed_stage_bounds = {0};
+                XrResult changed_stage_result = xrGetReferenceSpaceBoundsRect(
+                    session, XR_REFERENCE_SPACE_TYPE_STAGE,
+                    &changed_stage_bounds);
+                XR_LOG("boundary diagnostic reference-space change type=%d change-time=%lld pose-valid=%d stage-result=%d stage-width=%.3f stage-height=%.3f",
+                    (int) space_change->referenceSpaceType,
+                    (long long) space_change->changeTime,
+                    space_change->poseValid,
+                    (int) changed_stage_result,
+                    changed_stage_bounds.width,
+                    changed_stage_bounds.height);
                 XR_LOG("launcher recenter requested by reference-space change");
             }
             event.type = XR_TYPE_EVENT_DATA_BUFFER;
@@ -1020,8 +1067,7 @@ static void *questxr_native_bootstrap(void *unused) {
                 panel_pose.position.x += offset.x;
                 panel_pose.position.y += offset.y;
                 panel_pose.position.z += offset.z;
-                panel_pose.position.y +=
-                    launcher_panel_gaze_top_third_offset_m;
+                panel_pose.position.y += launcher_panel_shared_offset_m;
                 panel_anchored = 1;
                 XR_LOG("launcher panel anchored in local space");
             }
