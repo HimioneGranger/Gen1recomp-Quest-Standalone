@@ -257,7 +257,8 @@ function LinkBattle.new(game, net, opts)
   self.enemyParty = theirParty
   self.playerParty = myParty -- intro ball row uses the clamped copies
   self.opponentName = theirName
-  self.introText = Strings("%s wants\nto battle!", theirName)
+  self.introText = self:romText("_TrainerWantsToFightText",
+    "%s wants\nto battle!", theirName)
   self.remoteHashes = {}
   self.localHashes = {}
   self.remoteParts = {}
