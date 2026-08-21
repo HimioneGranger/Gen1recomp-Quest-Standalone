@@ -108,6 +108,7 @@ end
 
 local function newBackend(native, axisX, axisY, pointerX, pointerY, pointerActive)
   local backend = {
+    apiVersion = 1,
     native = native, elapsed = 0,
     axisX = axisX, axisY = axisY,
     pointerX = pointerX, pointerY = pointerY, pointerActive = pointerActive,
