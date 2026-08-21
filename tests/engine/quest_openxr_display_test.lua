@@ -62,6 +62,7 @@ launcher = {
   keypressed = function(_, key) launcherKeys[#launcherKeys + 1] = key end,
 }
 check(type(backend) == "table", "test factory returns a backend")
+eq(backend.apiVersion, 1, "Quest display backend uses HostDisplay API v1")
 eq(backend.beginFrame, nil, "adapter does not invent a beginFrame policy")
 -- HostDisplay learns the active draw subject from a completed frame. Seed the
 -- launcher once before its next update, matching LÖVE's update/draw cadence.
