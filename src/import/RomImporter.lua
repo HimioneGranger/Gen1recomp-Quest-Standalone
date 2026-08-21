@@ -1176,6 +1176,7 @@ function RomImporter.new(onComplete, opts)
     forceImport = opts.forceImport or false,
     onEditSave = opts.onEditSave,
     onEditTouchControls = opts.onEditTouchControls,
+    onOpenSkinStudio = opts.onOpenSkinStudio,
     isNX = isNX,
     romImportMode = romImportMode,
     mobileFileBridge = mobileFileBridge,
@@ -1627,7 +1628,12 @@ function RomImporter:filedropped(file)
   -- readDroppedFile does here.
   local name = file:getFilename() or ""
   if name:lower():match("%.zip$") then
-    self:_installMod(file)
+    -- On the SKINS tab a zip is a skin; everywhere else it is a mod archive.
+    if self.tab == "skins" then
+      self:_installSkinZip(file)
+    else
+      self:_installMod(file)
+    end
     return
   end
   -- A dropped .sav is a battery save: import it to a new slot for the active
@@ -2493,6 +2499,9 @@ end
 
 function RomImporter:_cycleTab(delta)
   local order = { "red", "blue", "yellow", "gold", "mods", "find" }
+  if not require("src.core.PlatformProfile").isQuestStandalone() then
+    order[#order + 1] = "skins"
+  end
   local idx = 1
   for i, id in ipairs(order) do
     if id == self.tab then idx = i; break end
@@ -2839,12 +2848,81 @@ end
 -- the soft keyboard drop with the panel they belonged to; each tab's scroll
 -- offset persists inside the view's per-tab scroll container.
 function RomImporter:_switchTab(id)
+  if id == "skins"
+      and require("src.core.PlatformProfile").isQuestStandalone() then return end
   self.tab = id
   self._findSearchFocus = false
   self:_disarmTextInput()
+  -- the skins list is cheap and can change behind the launcher's back
+  -- (an export, a hand-dropped folder), so re-read it on every visit
+  if id == "skins" then self:_ensureSkins(true) end
   if GameVersion.VERSIONS[id] then
     self:_setModScope(id)
   end
+end
+
+-- ------- skins tab (touch skins + the desktop Skin Studio)
+
+function RomImporter:_ensureSkins(force)
+  if self._skins and not force then return self._skins end
+  local TouchSkin = require("src.core.TouchSkin")
+  local out = {}
+  for _, entry in ipairs(TouchSkin.list()) do
+    local skin = TouchSkin.load(entry.root, entry.id)
+    local page = skin and skin.pages[1]
+    local controls = 0
+    for _, ctl in ipairs(page and page.controls or {}) do
+      if not ctl.decorative then controls = controls + 1 end
+    end
+    out[#out + 1] = {
+      id = entry.id,
+      source = entry.source,
+      pages = skin and #skin.pages or 0,
+      controls = controls,
+      screen = page ~= nil and page.viewport ~= nil,
+      ok = skin ~= nil,
+    }
+  end
+  self._skins = out
+  return out
+end
+
+function RomImporter:_activeSkin()
+  local opts = require("src.core.SaveData").loadOptions()
+  local tc = type(opts.touchControls) == "table" and opts.touchControls or {}
+  return tc.skin
+end
+
+function RomImporter:_useSkin(id)
+  local SaveData = require("src.core.SaveData")
+  local opts = SaveData.loadOptions()
+  local tc = type(opts.touchControls) == "table" and opts.touchControls or {}
+  tc.enabled = true
+  tc.skin = id
+  opts.touchControls = tc
+  SaveData.saveOptions(opts)
+  self._skinNotice = {
+    ok = true,
+    text = id and ("Now using " .. id) or "Now using the built-in pad",
+  }
+end
+
+function RomImporter:_installSkinZip(file)
+  local TouchSkin = require("src.core.TouchSkin")
+  local name = file:getFilename() or ""
+  local data, readError = readDroppedFile(file)
+  if not data then
+    self._skinNotice = { ok = false,
+      text = "Could not read the dropped file: " .. tostring(readError) }
+    return
+  end
+  local id, err = TouchSkin.installArchive(name, data)
+  self:_ensureSkins(true)
+  if not id then
+    self._skinNotice = { ok = false, text = "Import failed: " .. tostring(err) }
+    return
+  end
+  self._skinNotice = { ok = true, text = "Imported " .. id }
 end
 
 function RomImporter:_toggleFindSearchFocus()
@@ -2871,6 +2949,13 @@ function RomImporter:_openSettings()
     hooks.editTouchControls = function()
       self:_closeSettings()
       self.onEditTouchControls(version)
+    end
+  end
+  if self.onOpenSkinStudio then
+    local version = self.tab
+    hooks.openSkinStudio = function(skinId)
+      self:_closeSettings()
+      self.onOpenSkinStudio(version, skinId)
     end
   end
   -- The tab the gear was opened on decides the row set: Gold reads a

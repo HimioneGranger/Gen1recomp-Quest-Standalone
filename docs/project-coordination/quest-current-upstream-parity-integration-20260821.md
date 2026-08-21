@@ -1186,6 +1186,106 @@ Focused verification:
 - Staged secret, private-path, protected-artifact, binary, whitespace, and
   diff checks passed.
 
+### Batch 27: touch skins and Skin Studio
+
+Audit lane: M7, ordered skin foundation.
+
+Upstream source:
+
+- `3cca70608f2093198ebd88f4d71074a7f0dd351d`
+
+Audited integrated path set:
+
+```text
+assets/skins/gb_anim/README.md
+assets/skins/gb_anim/img/gb_a_b.png
+assets/skins/gb_anim/img/gb_back.png
+assets/skins/gb_anim/img/gb_down.png
+assets/skins/gb_anim/img/gb_left.png
+assets/skins/gb_anim/img/gb_right.png
+assets/skins/gb_anim/img/gb_start_select.png
+assets/skins/gb_anim/img/gb_up.png
+assets/skins/gb_anim/img/gbc_a.png
+assets/skins/gb_anim/img/gbc_b.png
+assets/skins/gb_anim/img/gbc_back.png
+assets/skins/gb_anim/img/gbc_down.png
+assets/skins/gb_anim/img/gbc_left.png
+assets/skins/gb_anim/img/gbc_right.png
+assets/skins/gb_anim/img/gbc_start_select.png
+assets/skins/gb_anim/img/gbc_up.png
+assets/skins/gb_anim/img/menu.png
+assets/skins/gb_anim/img/rotate.png
+assets/skins/gb_anim/overlay.cfg
+assets/skins/tv_crt/README.md
+assets/skins/tv_crt/img/tv-integer.png
+assets/skins/tv_crt/overlay.cfg
+docs/new-features.md
+docs/skin-studio.md
+main.lua
+src/core/Game.lua
+src/core/SkinZip.lua
+src/core/TouchControls.lua
+src/core/TouchSkin.lua
+src/import/LauncherSettings.lua
+src/import/LauncherView.lua
+src/import/RomImporter.lua
+src/render/Renderer.lua
+src/ui/SkinStudio.lua
+src/ui/TouchControlsEditor.lua
+tests/drivers/launcher_skins_tab_shot.lua
+tests/drivers/skin_studio_author_tv.lua
+tests/drivers/skin_studio_play_test.lua
+tests/drivers/skin_studio_shot.lua
+tests/drivers/touch_skin_editor_shot.lua
+tests/drivers/touch_skin_shot.lua
+tests/drivers/tv_skin_shot.lua
+tests/engine/launcher_skins_tab.lua
+tests/engine/skin_studio_test.lua
+tests/engine/touch_skin_test.lua
+```
+
+Quest integration paths:
+
+```text
+.gitattributes
+tests/engine/quest_settings_profile_test.lua
+```
+
+Thirty-three audited result blobs remain exact, including all 18 CC-BY-4.0
+PNG assets, the complete SkinZip, TouchSkin, and SkinStudio modules, both core
+skin/studio tests, and all seven visual drivers. The `gb_anim` descriptor's
+CRLF bytes were normalized to LF through a scoped Git attribute; its text is
+unchanged. The two attribution files now state that line-ending normalization
+explicitly.
+
+The semantic merge preserves Q47's immediate-mode launcher header, Quest
+focus and touch dispatch, async/SAF importer, HostDisplay routes, renderer
+repairs, viewport ownership, link containment, speed categories, and current
+feature documentation. It adds the audited game dropdown and skins route
+without importing the source parent's unrelated cached-header implementation.
+The flat-display skin feature is gated out of the Quest launcher and tab
+cycler. A skin saved by another build is ignored on Quest, so it cannot crop
+or decorate the OpenXR compositor. Desktop and flat-mobile builds retain the
+full bezel, viewport, hotkey, archive, editor, export, and studio behavior.
+
+Focused verification:
+
+- RetroArch/native parsing, bounds, hotkeys, input, viewport, export, and
+  archive safety: 118/118 passed.
+- Skin Studio model and authoring: 93/93 passed.
+- Launcher skin import, route, and Quest gating: 22/22 passed.
+- Quest settings and saved-skin isolation: 95/95 passed.
+- Renderer, faithful-ratio, touch, safe-area, Quest host, compositor, panel,
+  and OpenXR contracts: 193 checks plus the render-viewport driver passed.
+- Quest/current launcher focus, touch, modal, text, row, reflow, scrolling,
+  SAF, launch, and lifecycle checks: 444 checks plus 3 contract drivers passed.
+- LuaJIT source compilation: 373/373 passed.
+- Full Modkit: 21/21 suites passed.
+- The seven LÖVE visual drivers were preserved as exact source blobs but were
+  not launched, as required by the no-launch boundary.
+- Staged secret, private-path, protected-artifact, authorized-binary,
+  whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1198,5 +1298,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 26 completes the version-aware conflict fix.
-Resume with the ordered skin and Skin Studio unit.
+Current recovery point: Batch 27 completes the base skin and Skin Studio unit
+with Quest compositor isolation. Resume with its audited follow-up fix.

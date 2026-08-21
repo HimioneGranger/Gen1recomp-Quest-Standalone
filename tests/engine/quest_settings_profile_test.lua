@@ -102,6 +102,7 @@ check(not launcher["VIDEO MODE"], "Quest launcher hides VIDEO MODE")
 check(not launcher["ORIENTATION"], "Quest launcher hides ORIENTATION")
 check(not launcher["TOUCH PAD"], "Quest launcher hides TOUCH PAD")
 check(not launcher["VIBRATION"], "Quest launcher hides VIBRATION")
+check(not launcher["SKIN STUDIO"], "Quest launcher hides flat-display Skin Studio")
 check(launcher["COLORS"], "Quest launcher keeps COLORS")
 check(launcher["PERFORMANCE"], "Quest launcher keeps PERFORMANCE")
 for _, label in ipairs({
@@ -151,6 +152,10 @@ local TouchControls = require("src.core.TouchControls")
 TouchControls:init()
 check(not TouchControls.active,
   "Quest flavor disables touch overlay without the panel FFI backend")
+TouchControls:applyOptions({ touchControls = { skin = "tv_crt" } })
+check(TouchControls.skinId == nil
+    and require("src.core.TouchSkin").active == nil,
+  "Quest ignores a saved flat-display skin and preserves its OpenXR viewport")
 
 local yellowSource
 do
@@ -166,6 +171,9 @@ local function read(path)
   file:close()
   return text
 end
+check(read("src/import/LauncherView.lua"):find(
+  "not PlatformProfile.isQuestStandalone()", 1, true),
+  "Quest launcher keeps the flat-display skins tab out of its header")
 check(read("src/ui/TitleState.lua"):find(
   "self.questLetterboxWhite = self.letterboxWhite", 1, true),
   "Quest Red Blue Yellow titles opt into the paper side fill")

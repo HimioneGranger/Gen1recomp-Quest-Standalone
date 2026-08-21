@@ -60,6 +60,9 @@ function Game:load()
 
   self.touchControls = TouchControls
   TouchControls:init()
+  TouchControls:setHotkeyHandler(function(action, pressed)
+    self:touchSkinHotkey(action, pressed)
+  end)
 
   self.renderer = Renderer
   Renderer:init()
@@ -204,6 +207,40 @@ function Game:breakLink(err)
     local TextBox = require("src.render.TextBox")
     stack:push(TextBox.new(self, Strings("The link was\nbroken.")))
   end)
+end
+
+Game.SKIN_FAST_FORWARD = 4
+
+function Game:touchSkinHotkey(action, pressed)
+  if action == "fast_forward_hold" then
+    if pressed then
+      self.skinSpeedSaved = self.speedOverride
+      self.speedOverride = Game.SKIN_FAST_FORWARD
+    else
+      self.speedOverride = self.skinSpeedSaved
+      self.skinSpeedSaved = nil
+    end
+  elseif action == "fast_forward_toggle" then
+    if pressed then self:_cycleSpeed(1) end
+  elseif action == "soft_reset" then
+    if pressed then
+      Input:reset()
+      TouchControls:reset()
+      self:returnToTitle()
+    end
+  elseif action == "menu" then
+    if pressed then
+      local Screens = require("src.ui.Screens")
+      local top = self.stack and self.stack:top()
+      if top and not top.isTouchSkinMenu then
+        local state = Screens.build(self, "OptionsMenu")
+        if state then
+          state.isTouchSkinMenu = true
+          self.stack:push(state)
+        end
+      end
+    end
+  end
 end
 
 function Game:step(dt)

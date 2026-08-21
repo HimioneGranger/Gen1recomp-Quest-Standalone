@@ -15,6 +15,7 @@ local Runtime = require("src.mods.Runtime")
 local GameViewport = require("src.render.GameViewport")
 -- leaf module (no renderer dependency), so requiring it here cannot cycle
 local FaithfulRes = require("src.core.FaithfulRes")
+local TouchSkin = require("src.core.TouchSkin")
 
 local Renderer = {}
 
@@ -84,7 +85,13 @@ local function displayMetrics()
   end
   if dpiX < 1e-6 then dpiX = 1 end
   if dpiY < 1e-6 then dpiY = 1 end
-  return ww, wh, pw, ph, dpiX, dpiY
+  local vx, vy = 0, 0
+  local sx, sy, sw, sh = TouchSkin.viewport(pw, ph)
+  if sw and sw >= 1 and sh >= 1 then
+    vx, vy = math.floor(sx), math.floor(sy)
+    pw, ph = math.floor(sw), math.floor(sh)
+  end
+  return ww, wh, pw, ph, dpiX, dpiY, vx, vy
 end
 
 function Renderer:init()
@@ -274,6 +281,10 @@ function Renderer:worldViewSize()
   -- this is the same sum with the viewport standing in for the window, so
   -- both platforms show the same map area at the same zoom.
   local cap = FaithfulRes.scaleCap()
+  if not cap and TouchSkin.hasViewport() then
+    local page = TouchSkin.page()
+    if not page.viewportExpand then cap = self:fitScale() end
+  end
   if cap then
     local uiw, uih = self:uiSize()
     pw, ph = uiw * cap, uih * cap
@@ -746,7 +757,9 @@ end
 -- presented through the GBC FX shader as a final pass.
 function Renderer:endFrame(zones, worldZones)
   GameViewport.setTarget()
-  local ww, wh, pw, ph, dpiX, dpiY = displayMetrics()
+  local ww, wh, pw, ph, dpiX, dpiY, vx, vy = displayMetrics()
+  local vux, vuy = vx / dpiX, vy / dpiY
+  local vuw, vuh = pw / dpiX, ph / dpiY
   -- Sp = integer framebuffer pixels per GB pixel;
   -- Sx/Sy = LOVE-unit draw scales (may differ when dpiX ≠ dpiY).
   local Sp = self:fitScale()
@@ -754,8 +767,8 @@ function Renderer:endFrame(zones, worldZones)
   local uiw, uih = self:uiSize()
   local vpw, vph = uiw * Sx, uih * Sy
   -- Snap the letterbox origin to a framebuffer pixel, then convert to units.
-  local ox = math.floor((pw - uiw * Sp) / 2) / dpiX
-  local oy = math.floor((ph - uih * Sp) / 2) / dpiY
+  local ox = (vx + math.floor((pw - uiw * Sp) / 2)) / dpiX
+  local oy = (vy + math.floor((ph - uih * Sp) / 2)) / dpiY
   -- The UI has its own scale: it steps down as the survey zoom goes out (see
   -- uiScale), so it can be smaller than the world letterbox.  Un-zoomed these
   -- are identical to Sp/ox/oy and every rect below is what it always was.
@@ -771,8 +784,8 @@ function Renderer:endFrame(zones, worldZones)
   end
   local Ux, Uy = Up / dpiX, Up / dpiY
   local uvpw, uvph = uiw * Ux, uih * Uy
-  local uox = math.floor((pw - uiw * Up) / 2) / dpiX
-  local uoy = math.floor((ph - uih * Up) / 2) / dpiY
+  local uox = (vx + math.floor((pw - uiw * Up) / 2)) / dpiX
+  local uoy = (vy + math.floor((ph - uih * Up) / 2)) / dpiY
   local GBCFX = require("src.render.GBCFX")
   -- Forced mono/Classic modes still need a whole-screen zone when a state
   -- exposes no SGB packets (raw DMG canvas), so sendColors can remap.
@@ -921,7 +934,7 @@ function Renderer:endFrame(zones, worldZones)
     -- skipped entirely (nothing drew into it).  The UI blit below still
     -- runs, so dialogs, menus and the HUD sit on top as usual.
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.setScissor(0, 0, ww, wh)
+    love.graphics.setScissor(vux, vuy, vuw, vuh)
     local loveMajor = love.getVersion()
     if love.system and love.system.getOS and love.system.getOS() == "iOS" and loveMajor >= 12 then
       love.graphics.draw(self.worldOverride, 0, wh, 0, 1 / dpiX, -1 / dpiY)
@@ -933,7 +946,7 @@ function Renderer:endFrame(zones, worldZones)
     local fade = self.worldFadeAlpha
     if fade and fade > 0 then
       love.graphics.setColor(0, 0, 0, fade)
-      love.graphics.rectangle("fill", 0, 0, ww, wh)
+      love.graphics.rectangle("fill", vux, vuy, vuw, vuh)
       love.graphics.setColor(1, 1, 1, 1)
     end
   elseif self.worldActive then
@@ -941,8 +954,8 @@ function Renderer:endFrame(zones, worldZones)
     local sx, sy = sp / dpiX, sp / dpiY
     local wvw = self.worldCanvas:getWidth()
     local wvh = self.worldCanvas:getHeight()
-    local wox = math.floor((pw - wvw * sp) / 2) / dpiX
-    local woy = math.floor((ph - wvh * sp) / 2) / dpiY
+    local wox = (vx + math.floor((pw - wvw * sp) / 2)) / dpiX
+    local woy = (vy + math.floor((ph - wvh * sp) / 2)) / dpiY
     -- Tilt mode projects the ground world pass through the perspective mesh
     -- (SGB zones baked in beforehand -- see drawTiltedWorld -- so no zone
     -- scissoring here).  drawTiltedWorld returns false when tilt is off or
@@ -953,9 +966,9 @@ function Renderer:endFrame(zones, worldZones)
       Tilt.active() and self:drawTiltedWorld(worldZones or zones, sx, sy, wox, woy, present)
     if not projected then
       if worldZones then
-        blit(self.worldCanvas, sx, sy, worldZones, sx, sy, wox, woy, 0, 0, ww, wh)
+        blit(self.worldCanvas, sx, sy, worldZones, sx, sy, wox, woy, vux, vuy, vuw, vuh)
       else
-        blit(self.worldCanvas, sx, sy, zones, Sx, Sy, wox, woy, 0, 0, ww, wh)
+        blit(self.worldCanvas, sx, sy, zones, Sx, Sy, wox, woy, vux, vuy, vuw, vuh)
       end
       -- OBP-baked overworld sprites replay on top of the zone pass (GBC
       -- mode per-object coloring; see PaletteFX.markSpriteRedraw).  Grass
@@ -964,7 +977,7 @@ function Renderer:endFrame(zones, worldZones)
       local redraws = PaletteFX.spriteRedraws()
       if redraws[1] then
         love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.setScissor(0, 0, ww, wh)
+        love.graphics.setScissor(vux, vuy, vuw, vuh)
         local activeShader = nil
         for _, r in ipairs(redraws) do
           local wanted = r.colors
@@ -996,7 +1009,7 @@ function Renderer:endFrame(zones, worldZones)
     if self.uprightActive then
       local M = self.UPRIGHT_MARGIN
       love.graphics.setColor(1, 1, 1, 1)
-      love.graphics.setScissor(0, 0, ww, wh)
+      love.graphics.setScissor(vux, vuy, vuw, vuh)
       love.graphics.draw(self.uprightCanvas, wox - M * sx, woy - M * sy, 0, sx, sy)
       love.graphics.setScissor()
     end
@@ -1007,7 +1020,7 @@ function Renderer:endFrame(zones, worldZones)
     local fade = self.worldFadeAlpha
     if fade and fade > 0 then
       love.graphics.setColor(0, 0, 0, fade)
-      love.graphics.rectangle("fill", 0, 0, ww, wh)
+      love.graphics.rectangle("fill", vux, vuy, vuw, vuh)
       love.graphics.setColor(1, 1, 1, 1)
     end
   end
@@ -1029,7 +1042,7 @@ function Renderer:endFrame(zones, worldZones)
   -- (and its duplicate #772).
   if self.battleDim and self.battleDim > 0 then
     love.graphics.setColor(0, 0, 0, self.battleDim)
-    for _, r in ipairs(subtractRect({ { 0, 0, ww, wh } }, uox, uoy, uvpw, uvph)) do
+    for _, r in ipairs(subtractRect({ { vux, vuy, vuw, vuh } }, uox, uoy, uvpw, uvph)) do
       love.graphics.rectangle("fill", r[1], r[2], r[3], r[4])
     end
     love.graphics.setColor(1, 1, 1, 1)

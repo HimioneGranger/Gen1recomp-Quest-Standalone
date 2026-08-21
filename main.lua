@@ -32,7 +32,7 @@ do
   end
 end
 
-local Game, EditorApp, Importer, TouchEditor
+local Game, EditorApp, Importer, TouchEditor, Studio
 
 -- #887: quit-to-launcher state, shared by love.load and love.quit (both need
 -- it, so it is declared here rather than next to love.quit).
@@ -237,7 +237,43 @@ function closeTouchControlsEditor()
   end
 end
 
-local function bootGame(version)
+-- ------------------------------------------------------------ skin studio
+local studioHost
+local closeSkinStudio
+local bootGame
+
+local function openSkinStudio(version, skinId)
+  local SkinStudio = require("src.ui.SkinStudio")
+  if not SkinStudio.available_desktop() then return end
+  studioHost = Importer
+  if Importer and Importer.prepareOverlayHandoff then
+    Importer:prepareOverlayHandoff()
+  end
+  Importer = nil
+  Studio = SkinStudio
+  Studio.load({
+    version = version,
+    skinId = skinId,
+    onClose = function() closeSkinStudio() end,
+    onPlay = function(v)
+      closeSkinStudio()
+      Importer = nil
+      bootGame(v or version)
+    end,
+  })
+end
+
+function closeSkinStudio()
+  if Studio and Studio.unload then Studio.unload() end
+  Studio = nil
+  Importer = studioHost
+  studioHost = nil
+  if Importer and Importer.resumeAfterOverlay then
+    Importer:resumeAfterOverlay()
+  end
+end
+
+function bootGame(version)
   -- The launcher hands us the chosen game (Red / Blue / Yellow / Gold);
   -- scripted and headless runs fall back to POKEPORT_VERSION, then Red.
   -- Set the active version and overlay its extracted cache BEFORE anything
@@ -449,6 +485,8 @@ function love.load(args)
     forceImport = forceImport,
     onEditSave = openEditor,
     onEditTouchControls = openTouchControlsEditor,
+    onOpenSkinStudio = require("src.ui.SkinStudio").available_desktop()
+      and openSkinStudio or nil,
   })
 end
 
@@ -459,6 +497,7 @@ function love.update(dt)
   NxDisplay.sync()
   if editorMode then return EditorApp.update(dt) end
   if TouchEditor then return TouchEditor.update(dt) end
+  if Studio then return Studio.update(dt) end
   if Importer then return Importer:update(dt) end
 
   -- Scripted runs (autopilot / POKEPORT_DRIVER) observe and act exactly
@@ -517,6 +556,12 @@ function love.draw()
       return result
     end)
   end
+  if Studio then
+    HostDisplay.beginFrame("skin_studio", Studio)
+    local result = Studio.draw()
+    HostDisplay.endFrame("skin_studio", Studio)
+    return result
+  end
   if Importer then
     GameViewport.reset()
     return HostDisplay.render("launcher", Importer, function()
@@ -552,12 +597,13 @@ end
 function love.keypressed(key, scancode, isrepeat)
   if editorMode then return EditorApp.keypressed(key) end
   if TouchEditor then return TouchEditor.keypressed(key) end
+  if Studio then return Studio.keypressed(key) end
   if Importer then return Importer:keypressed(key) end
   Game:keypressed(key)
 end
 
 function love.keyreleased(key)
-  if editorMode or TouchEditor then return end
+  if editorMode or TouchEditor or Studio then return end
   if Importer then return end
   Game:keyreleased(key)
 end
@@ -788,6 +834,7 @@ function love.wheelmoved(x, y)
     return
   end
   if TouchEditor then return end
+  if Studio then return Studio.wheelmoved(x, y) end
   if Importer then return end
   Game:wheelmoved(x, y)
 end
@@ -825,6 +872,7 @@ function love.mousepressed(x, y, button, istouch)
     if love.system.getOS() == "Android" then return end
     return TouchEditor.mousepressed(x, y, button)
   end
+  if Studio then return Studio.mousepressed(x, y, button) end
   if Importer then
     -- love.touchpressed already forwards the primary touch into FlexLove for
     -- scroll. LÖVE ALSO synthesizes a mouse press for that same touch; if both
@@ -859,6 +907,7 @@ function love.mousereleased(x, y, button, istouch)
     if love.system.getOS() == "Android" then return end
     return TouchEditor.mousereleased(x, y, button)
   end
+  if Studio then return Studio.mousereleased(x, y, button) end
   if Importer then return end
   if editorMode and EditorApp.mousereleased then
     return EditorApp.mousereleased(x, y, button)
@@ -876,6 +925,7 @@ function love.mousemoved(x, y, dx, dy, istouch)
     if love.system.getOS() == "Android" then return end
     return TouchEditor.mousemoved(x, y)
   end
+  if Studio then return Studio.mousemoved(x, y) end
   if editorMode or Importer then return end
   if mouseTouch then
     if Game and love.mouse.isDown(1) then Game:touchmoved("mouse", x, y) end
@@ -886,6 +936,7 @@ end
 
 function love.textinput(text)
   if TouchEditor then return end
+  if Studio then return Studio.textinput(text) end
   if Importer then return Importer:textinput(text) end
   if editorMode and EditorApp.textinput then
     return EditorApp.textinput(text)
@@ -967,6 +1018,7 @@ function love.filedropped(file)
   if editorMode and EditorApp and EditorApp.filedropped then
     return EditorApp.filedropped(file)
   end
+  if Studio then return Studio.filedropped(file) end
   if Importer then Importer:filedropped(file) end
 end
 

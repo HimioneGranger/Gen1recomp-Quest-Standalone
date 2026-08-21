@@ -11,6 +11,7 @@ Features intentionally added beyond the original Pokémon Red, Blue, and Yellow 
 * **Persistent custom options** stored separately from game saves
 * **Optional widescreen battle layout**
 * **Mobile touch controls** with editable layouts, vibration, and orientation settings
+* **Touch skins** in RetroArch overlay format, with bezel art, per-button press states, and Super Game Boy borders
 * **Translation and custom font support**
 * **Built-in save editor** for parties, boxes, items, events, maps, and Pokédex data
 * **Tiled map editing tools** for mod authors

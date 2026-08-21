@@ -35,6 +35,7 @@ local Loader = require("src.ui.kit.Loader")
 local GameVersion = require("src.core.GameVersion")
 local Version = require("src.core.Version")
 local Strings = require("src.core.Strings")
+local PlatformProfile = require("src.core.PlatformProfile")
 
 local PAL = Theme.PAL
 local LauncherView = {}
@@ -434,6 +435,25 @@ end
 
 -- A hand-drawn X, for the same reason drawCheck exists below: the UI font has
 -- no guaranteed glyph, and the launcher ships no icon asset for it.
+-- Skins tab glyph: a bezel with a screen cutout and two face buttons, drawn
+-- rather than shipped as art so the tab needs no new asset.
+local function drawSkinGlyph(x, y, w, h, hot)
+  local box = math.min(w, h)
+  local bx = x + (w - box) / 2
+  local by = y + (h - box) / 2
+  local pad = math.floor(box * 0.22)
+  local ow, oh = box - 2 * pad, box - 2 * pad
+  local ink = hot and PAL.inverse or PAL.ink
+  local a = 1
+  Theme.strokeRounded(bx + pad, by + pad, ow, oh, ink, a,
+    math.max(1, math.floor(Kit.scale)), math.floor(oh * 0.22))
+  local sw, sh = ow * 0.58, oh * 0.40
+  Theme.fillRounded(bx + pad + ow * 0.10, by + pad + oh * 0.14, sw, sh, ink, a,
+    math.max(1, math.floor(sh * 0.2)))
+  local r = math.max(1, oh * 0.09)
+  Theme.fillRounded(bx + pad + ow * 0.60, by + pad + oh * 0.64, r * 2, r * 2, ink, a, r)
+  Theme.fillRounded(bx + pad + ow * 0.80, by + pad + oh * 0.50, r * 2, r * 2, ink, a, r)
+end
 local function drawCross(x, y, size, color)
   love.graphics.push("all")
   love.graphics.setColor(color)
@@ -449,6 +469,35 @@ end
 -- Returns the y at which content may start.  Its vertical arithmetic is
 -- mirrored by headerHeight() at the bottom of this file (the short-window
 -- scroll decision needs the height before anything draws) -- keep in sync.
+-- The four cartridges used to be four tabs of their own.  They are one
+-- dropdown now: the tab row was seven controls wide and wrapped to two rows on
+-- anything narrow, and only ever one game is being looked at.
+local GAME_TABS = {
+  { id = "red",    key = "tab-red",    letter = "R", color = PAL.railRed,
+    label = "Red" },
+  { id = "blue",   key = "tab-blue",   letter = "B", color = PAL.railBlue,
+    label = "Blue" },
+  { id = "yellow", key = "tab-yellow", letter = "Y", color = PAL.railGold,
+    label = "Yellow" },
+  { id = "gold",   key = "tab-gold",   letter = "G", color = PAL.railAmber,
+    label = "Gold" },
+}
+
+-- Which cartridge the dropdown is showing: the open game tab, else the last
+-- one visited, else Red.  Kept as a function so the mods/find/skins panels
+-- still answer "for which game" without a game tab being open.
+local function currentGame(imp)
+  for _, g in ipairs(GAME_TABS) do
+    if imp.tab == g.id then return g end
+  end
+  for _, g in ipairs(GAME_TABS) do
+    if imp.modScope == g.id then return g end
+  end
+  return GAME_TABS[1]
+end
+
+LauncherView.GAME_TABS = GAME_TABS
+LauncherView.currentGame = currentGame
 local function buildHeader(imp, m)
   local y = m.top
   Theme.versionRail(m.x, y, m.w, m.railH)
@@ -530,20 +579,16 @@ local function buildHeader(imp, m)
     or love.graphics.newImage("assets/launcher/mods.png")
   imp._findIcon = imp._findIcon
     or love.graphics.newImage("assets/launcher/find.png")
-  -- Game tabs keep their cartridge colours -- that is the one piece of brand
-  -- identity in the launcher, and "the red one" is how people actually refer
-  -- to these.  The colour rides the outline and the glyph at rest and becomes
-  -- the fill when active, the same rule the buttons follow.  Yellow stays the
-  -- bright cart gold; Gold (Gen 2) uses the deeper amber so the two do not
-  -- collide.
+  -- The game dropdown keeps the cartridge colour. The remaining tabs retain
+  -- the current Quest icon-and-label behavior, including expansion when active.
   local tabs = {
-    { id = "red",    letter = "R", label = Strings("RED"),    color = PAL.railRed },
-    { id = "blue",   letter = "B", label = Strings("BLUE"),   color = PAL.railBlue },
-    { id = "yellow", letter = "Y", label = Strings("YELLOW"), color = PAL.railGold },
-    { id = "gold",   letter = "G", label = Strings("GOLD"),   color = PAL.railAmber },
     { id = "mods",   icon = imp._modsIcon, label = Strings("MODS") },
     { id = "find",   icon = imp._findIcon, label = Strings("FIND MODS") },
   }
+  if not PlatformProfile.isQuestStandalone() then
+    tabs[#tabs + 1] =
+      { id = "skins", drawFn = drawSkinGlyph, label = Strings("SKINS") }
+  end
   local tabH = m.chip
   local tx = m.x + m.pad
   local ty = y + math.floor(6 * m.s)
@@ -557,12 +602,48 @@ local function buildHeader(imp, m)
   local tabRight = m.x + m.w - m.pad
   local tabGap = math.floor(6 * m.s)
   local tabRowGap = math.floor(4 * m.s)
+
+  -- the cartridge dropdown, sized to its longest label so switching games
+  -- never reflows the row
+  local game = currentGame(imp)
+  local labelW = 0
+  for _, g in ipairs(GAME_TABS) do
+    labelW = math.max(labelW, Kit.textWidth("tab", Strings(g.label)))
+  end
+  local dropW = math.min(tabRight - tabLeft,
+    tabH + labelW + math.floor(34 * m.s))
+  local gameHot = Kit.hover(tx, ty, dropW, tabH)
+  local gameDown = gameHot and Kit.mouseDown
+  -- face "tab" inverts on hover as well as when active, so the caret has to
+  -- flip with it or it vanishes into the cartridge colour
+  local gameActive = imp.tab == game.id
+  local gameInvert = gameActive or gameHot
+  btn(imp, tx, ty, dropW, tabH, "tab-game", Strings(game.label), {
+    face = "tab", font = "tab", color = game.color, letter = game.letter,
+    active = gameActive, ring = gameHot and not gameActive or nil,
+    action = function()
+      if imp.tab == game.id then imp._gamePopup = true
+      else imp:_switchTab(game.id) end
+    end,
+  })
+  do
+    local cw = math.floor(7 * m.s)
+    local ccx = tx + dropW - math.floor(14 * m.s)
+    local ccy = ty + tabH / 2 + (gameDown and math.floor(1 * m.s) or 0)
+    if love.graphics.polygon then
+      Theme.col(gameInvert and PAL.inverse or PAL.ink, gameDown and 1 or 0.9)
+      love.graphics.polygon("fill",
+        ccx - cw, ccy - cw * 0.5, ccx + cw, ccy - cw * 0.5, ccx, ccy + cw * 0.8)
+      love.graphics.setColor(1, 1, 1, 1)
+    end
+  end
+  tx = tx + dropW + tabGap
+
   for _, t in ipairs(tabs) do
     local active = imp.tab == t.id
     local key = "tab-" .. t.id
-    -- Cartridge tabs stay square (letter only).  Icon tabs still expand to
-    -- show MODS / FIND MODS when selected.
-    local expand = active and t.icon ~= nil
+    -- Icon and drawn-glyph tabs expand to show their label when selected.
+    local expand = active and (t.icon ~= nil or t.drawFn ~= nil)
     local labelW = expand and Kit.textWidth("tab", t.label) or 0
     local w = expand and (tabH + math.floor(8 * m.s) + labelW + math.floor(12 * m.s))
       or tabH
@@ -594,6 +675,8 @@ local function buildHeader(imp, m)
       love.graphics.draw(t.icon, Theme.snap(tx + (tabH - iw * s) / 2),
         Theme.snap(ty + (tabH - ih * s) / 2), 0, s, s)
       love.graphics.setColor(1, 1, 1, 1)
+    elseif t.drawFn then
+      t.drawFn(tx, ty, tabH, tabH, invert)
     else
       Kit.textCenter("tab", t.letter, tx,
         ty + (tabH - Kit.textHeight("tab")) / 2, tabH, ink)
@@ -1482,6 +1565,117 @@ end
 
 -- ---------------------------------------------------------- find mods panel
 
+-- SKINS tab: pick the on-screen skin, import one, or open the desktop studio.
+local function buildSkinsPanel(imp, x, y, w, availH, m)
+  local skins = imp:_ensureSkins()
+  local active = imp:_activeSkin()
+  local gap = m.gap
+  local cy = y
+
+  if imp._skinNotice then
+    cy = cy + Kit.textWrapped("small", imp._skinNotice.text, x, cy, w,
+      imp._skinNotice.ok and PAL.green or PAL.red, 2) + math.floor(8 * m.s)
+  end
+
+  -- Studio button.  Desktop only: the host supplies the hook nowhere else.
+  if imp.onOpenSkinStudio then
+    local label = Strings("Open Skin Studio")
+    local bw = math.min(w, Kit.textWidth("small", label) + math.floor(40 * m.s))
+    btn(imp, x, cy, bw, m.btnH, "skins-studio", label, {
+      kind = "accent", font = "small",
+      action = function()
+        -- the studio boots the game on Play, so hand it a real cartridge
+        imp.onOpenSkinStudio(imp.modScope or "red")
+      end })
+    local hint = Strings("Design bezels and button layouts, then test them.")
+    Kit.text("small", Kit.ellipsize("small", hint,
+      w - bw - math.floor(12 * m.s)), x + bw + math.floor(12 * m.s),
+      cy + math.floor((m.btnH - Kit.textHeight("small")) / 2), PAL.muted)
+    cy = cy + m.btnH + gap
+  end
+
+  Kit.caption(x, cy, Strings("INSTALLED"))
+  cy = cy + Kit.textHeight("small") + math.floor(6 * m.s)
+
+  local rowH = math.max(Kit.tapMin(), math.floor(44 * m.s))
+  imp._skinGear = imp._skinGear
+    or love.graphics.newImage("assets/launcher/gear.png")
+
+  -- The row itself is "use this skin"; the gear beside it configures that
+  -- entry -- the built-in pad opens the drag-a-button layout editor, a skin
+  -- opens the studio, so neither lands on a screen that cannot edit it.
+  local function skinRow(key, id, title, detail, selected, configure)
+    local gearW = configure and rowH or 0
+    local rowW = w - (gearW > 0 and (gearW + math.floor(6 * m.s)) or 0)
+    local ink = rowHit(imp, x, cy, rowW, rowH, selected, key,
+      function() imp:_useSkin(id) end)
+    local tagW = selected
+      and (Kit.textWidth("small", Strings("IN USE")) + math.floor(20 * m.s))
+      or math.floor(12 * m.s)
+    local textW = rowW - math.floor(24 * m.s) - tagW
+    local tx = x + math.floor(12 * m.s)
+    local ty = cy + math.floor(7 * m.s)
+    Kit.text("mono", Kit.ellipsize("mono", title, textW), tx, ty,
+      ink or PAL.heading)
+    Kit.text("small", Kit.ellipsize("small", detail, textW),
+      tx, ty + Kit.textHeight("mono"), ink or PAL.muted)
+    if selected then
+      Kit.textRight("small", Strings("IN USE"), x + rowW - math.floor(12 * m.s),
+        cy + math.floor((rowH - Kit.textHeight("small")) / 2), ink or PAL.green)
+    end
+    if configure then
+      btn(imp, x + w - gearW, cy, gearW, gearW, key .. "-cfg", "", {
+        face = "invert", image = imp._skinGear, action = configure })
+    end
+    cy = cy + rowH + math.floor(4 * m.s)
+  end
+
+  skinRow("skin-none", nil, Strings("Built-in pad"),
+    Strings("The default on-screen buttons."), active == nil,
+    imp.onEditTouchControls and function()
+      imp.onEditTouchControls(imp.modScope or "red")
+    end or nil)
+
+  for _, entry in ipairs(skins) do
+    local bits = {}
+    bits[#bits + 1] = entry.source == "user" and Strings("installed")
+      or Strings("bundled")
+    if entry.controls > 0 then
+      bits[#bits + 1] = entry.controls .. " " .. Strings("buttons")
+    else
+      bits[#bits + 1] = Strings("bezel only")
+    end
+    if entry.pages > 1 then
+      bits[#bits + 1] = entry.pages .. " " .. Strings("pages")
+    end
+    if entry.screen then bits[#bits + 1] = Strings("screen cutout") end
+    local configure = imp.onOpenSkinStudio and function()
+      imp.onOpenSkinStudio(imp.modScope or "red", entry.id)
+    end or nil
+    skinRow("skin-" .. entry.id, entry.id, entry.id,
+      table.concat(bits, "  \194\183  "), active == entry.id, configure)
+  end
+
+  if #skins == 0 then
+    Kit.emptyBox(x, cy, w, math.floor(72 * m.s),
+      Strings("No skins installed yet."))
+    cy = cy + math.floor(72 * m.s) + gap
+  end
+
+  cy = cy + math.floor(6 * m.s)
+  local TouchSkin = require("src.core.TouchSkin")
+  Kit.caption(x, cy, Strings("IMPORT"))
+  cy = cy + Kit.textHeight("small") + math.floor(6 * m.s)
+  local boxH = math.floor(76 * m.s)
+  Kit.card(x, cy, w, boxH, "muted")
+  Kit.textWrapped("small", Strings(
+    "Drop a skin .zip on this window to install it, or put a folder in the skins folder of your save directory. RetroArch overlay .cfg files work as-is."),
+    x + math.floor(14 * m.s), cy + math.floor(12 * m.s),
+    w - math.floor(28 * m.s), PAL.muted, 3)
+  Kit.text("small", TouchSkin.USER_ROOT .. "/", x + math.floor(14 * m.s),
+    cy + boxH - Kit.textHeight("small") - math.floor(10 * m.s), PAL.faint)
+end
+
 local function buildFindPanel(imp, x, y, w, availH, m)
   imp:_ensureFind()
   imp:_ensureMods()
@@ -2255,6 +2449,34 @@ local function buildSortModal(imp, m)
       action = function() imp._sortPopup = nil end })
 end
 
+-- The cartridge dropdown's list.  Replaces the four R/B/Y/G tabs, so it is
+-- also what a controller reaches after the tab row.
+local function buildGameModal(imp, m)
+  local pad = math.floor(18 * m.s)
+  local gap = math.floor(8 * m.s)
+  local w = math.floor(360 * m.s)
+  local h = pad + Kit.textHeight("button") + math.floor(12 * m.s)
+    + #GAME_TABS * (m.btnH + gap) + m.btnH + pad
+  local px, py, pw = modalPanel(m, w, h)
+  local cy = py + pad
+  Kit.text("button", Strings("Choose game"), px + pad, cy, PAL.heading)
+  cy = cy + Kit.textHeight("button") + math.floor(12 * m.s)
+  for _, g in ipairs(GAME_TABS) do
+    local id = g.id
+    btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "gamepop-" .. g.id,
+      Strings(g.label), {
+        face = "tab", font = "small", letter = g.letter, color = g.color,
+        active = imp.tab == g.id,
+        action = function()
+          imp._gamePopup = nil
+          imp:_switchTab(id)
+        end })
+    cy = cy + m.btnH + gap
+  end
+  btn(imp, px + pad, cy, pw - 2 * pad, m.btnH, "gamepop-close",
+    Strings("Close"), { font = "small",
+      action = function() imp._gamePopup = nil end })
+end
 -- Category filter for FIND MODS.  Two columns, because an index can list
 -- enough categories to overflow a single stacked column on a short window.
 local function buildFilterModal(imp, m)
@@ -3094,6 +3316,7 @@ local function buildModals(imp, m)
   if imp._profilesPopup then buildProfilesModal(imp, m) return true end
   if imp._modHeaderActionsPopup then buildModHeaderActionsModal(imp, m) return true end
   if imp._sortPopup then buildSortModal(imp, m) return true end
+  if imp._gamePopup then buildGameModal(imp, m) return true end
   if imp._filterPopup then buildFilterModal(imp, m) return true end
   if imp._indexManage then buildIndexesModal(imp, m) return true end
   if imp._modActions then buildModActionsModal(imp, m) return true end
@@ -3260,8 +3483,12 @@ function LauncherView.draw(imp)
     buildModsPanel(imp, x, contentY, w, availH, m)
   elseif imp.tab == "find" then
     buildFindPanel(imp, x, contentY, w, availH, m)
+  elseif imp.tab == "skins" and not PlatformProfile.isQuestStandalone() then
+    buildSkinsPanel(imp, x, contentY, w, availH, m)
   else
-    buildGamePanel(imp, x, contentY, w, availH, m, imp.tab)
+    local game = currentGame(imp)
+    buildGamePanel(imp, x, contentY, w, availH, m,
+      GameVersion.VERSIONS[imp.tab] and imp.tab or game.id)
   end
 
   buildFooter(imp, m, footY)
