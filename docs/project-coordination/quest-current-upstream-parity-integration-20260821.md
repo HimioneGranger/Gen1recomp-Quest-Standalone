@@ -150,6 +150,39 @@ Focused verification:
   stopped at that existing boundary; no generated or private data was created.
 - Staged diff and whitespace checks passed.
 
+### Batch 2: shared Gen 1 test and scripted-step stability
+
+Audit lane: M8.
+
+Upstream source:
+`52e36ad7e4a22b9fce2abbad8eeb754339085cf6`.
+
+Exact imported path set:
+
+```text
+src/ui/OakSpeech.lua
+src/world/OverworldController.lua
+tests/integration/title_checkpoint_cold_start.lua
+tests/mod_link_tests.lua
+tests/parity_yellow_pallet_pikachu.lua
+tests/run_tests.lua
+```
+
+The Gen 2 source and all Gen 2 tests in the mixed upstream commit were not
+imported. The Gen 1 unit adds nil-safe Oak intro sprite lookup and prevents a
+script-driven step from rolling a wild encounter. Shared fixtures now use the
+current link-session and sandbox-export contracts.
+
+Focused verification:
+
+- Minimal Oak intro construction with no sprite table: passed.
+- Cold-start checkpoint capture and resume: passed.
+- Timing parity: 163/163 passed.
+- Title fill, cycle, and zone seams: 8/8, 104/104, and 82/82 passed.
+- ROM-backed link and Yellow Pallet aggregate cases remain unavailable because
+  this worktree has no generated private ROM data.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -162,7 +195,6 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 1 is the first source batch on top of the
-Q47-based ledger commit `db524ed7`. Resume with the next applicable upstream
-row after `fb738fa1cee883ad15b0333235b5e4c6d1b9a1d9`, while respecting
-interleaved dependencies.
+Current recovery point: Batch 2 follows committed Batch 1 `2711f45a`. Resume
+with the Gen 1 source/test units inside upstream row
+`37051a26b5b5732cc845441dbd66d1916a6925fb`; do not replay its Gen 2 bundle.
