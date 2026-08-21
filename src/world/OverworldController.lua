@@ -1973,7 +1973,8 @@ function OverworldState:tryHiddenObject(fx, fy)
         -- leaves the spot unfound; _CantCarryMoreText is the Toss line (#872)
         local name = Game.data.items[h.item] and Game.data.items[h.item].name or h.item
         Game.stack:push(TextBox.new(Game,
-          Strings("%s found\n%s!", save.player.name, name) .. "\f"
+          romText(Game.data, "_FoundHiddenItemText", "%s found\n%s!",
+            save.player.name, name) .. "\f"
           .. romText(Game.data, "_HiddenItemBagFullText",
                      "But, {PLAYER} has\nno more room for\vother items!")))
         return true
@@ -1983,7 +1984,8 @@ function OverworldState:tryHiddenObject(fx, fy)
       -- hidden items always play SFX_GET_ITEM_2 (hidden_items.asm)
       require("src.core.Sound").play(Game.data, "Get_Item2")
       Game.stack:push(TextBox.new(Game,
-        Strings("%s found\n%s!", save.player.name, name)))
+        romText(Game.data, "_FoundHiddenItemText", "%s found\n%s!",
+          save.player.name, name)))
       return true
     end
   end
@@ -2628,8 +2630,8 @@ function OverworldState:talkTo(npc)
         "No more room for\nitems!")
       if GameVersion.isYellow() then
         local name = Game.data.items[d.item] and Game.data.items[d.item].name or d.item
-        noRoom = Strings("%s found\n%s!", Game.save.player.name, name)
-                 .. "\f" .. noRoom
+        noRoom = romText(Game.data, "_FoundItemText", "%s found\n%s!",
+                   Game.save.player.name, name) .. "\f" .. noRoom
       end
       Game.stack:push(TextBox.new(Game, noRoom))
       return
@@ -2647,7 +2649,8 @@ function OverworldState:talkTo(npc)
     require("src.core.Sound").play(Game.data,
       (ddef and ddef.keyItem) and "Get_Key_Item" or "Get_Item1")
     Game.stack:push(TextBox.new(Game,
-      Strings("%s found\n%s!", Game.save.player.name, name)))
+      romText(Game.data, "_FoundItemText", "%s found\n%s!",
+        Game.save.player.name, name)))
     return
   end
 
@@ -3459,7 +3462,8 @@ function OverworldState:applyFieldPoison()
   local queue = {}
   for _, mon in ipairs(fainted) do
     local name = mon.nickname or Game.data.pokemon[mon.species].name
-    table.insert(queue, Strings("%s\nfainted!", name))
+    table.insert(queue,
+      romText(Game.data, "_PokemonFaintedText", "%s\nfainted!", name))
   end
   local alive = false
   for _, mon in ipairs(save.party) do
