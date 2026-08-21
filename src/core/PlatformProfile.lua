@@ -1,6 +1,9 @@
 -- Product-profile gates for settings that are meaningful only on a flat
--- phone or desktop display. The Quest Standalone package identifies itself
--- through its verified OpenXR bridge. Generic Android remains unchanged.
+-- phone or desktop display. The Quest Android flavor sets
+-- POKEPORT_QUEST_PROFILE through SDL_ENV manifest metadata before Lua starts.
+-- The verified OpenXR bridge signal remains a compatibility fallback, but a
+-- missing or delayed panel FFI backend must not turn a Quest build into a
+-- generic Android profile. Generic Android remains unchanged.
 
 local PlatformProfile = {}
 

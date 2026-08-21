@@ -27,6 +27,10 @@ local questDisplay = read("src/host/android/QuestOpenXRDisplay.lua")
 local questManifest = read(
   "mobile/android/app/src/questVr/AndroidManifest.xml")
 
+check(questManifest:find('android:name="SDL_ENV.POKEPORT_QUEST_PROFILE"', 1, true) and
+      questManifest:find('android:value="1"', 1, true),
+  "Quest flavor selects its Lua product profile without panel FFI")
+
 check(app:find("questVrImplementation", 1, true),
   "OpenXR loader dependency is scoped to questVr")
 check(app:find("abiFilters 'arm64-v8a'", 1, true),

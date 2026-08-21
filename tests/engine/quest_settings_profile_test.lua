@@ -9,8 +9,13 @@ love = love or require("tests.love_stub")
 
 local realGetOS = love.system.getOS
 love.system.getOS = function() return "Android" end
+local realGetenv = os.getenv
+os.getenv = function(name)
+  if name == "POKEPORT_QUEST_PROFILE" then return "1" end
+  return realGetenv(name)
+end
 local realQuestPanel = rawget(_G, "QUEST_PANEL_ACTIVE")
-_G.QUEST_PANEL_ACTIVE = true
+_G.QUEST_PANEL_ACTIVE = nil
 
 local function labels(model)
   local out = {}
@@ -19,6 +24,10 @@ local function labels(model)
   end
   return out
 end
+
+local PlatformProfile = require("src.core.PlatformProfile")
+check(PlatformProfile.isQuestStandalone(),
+  "Quest flavor selects its profile without the panel FFI backend")
 
 local LauncherSettings = require("src.import.LauncherSettings")
 local SaveData = require("src.core.SaveData")
@@ -80,7 +89,7 @@ check(inGameColors and inGameColors.value(inGame.game) == "ADVANCED",
 local TouchControls = require("src.core.TouchControls")
 TouchControls:init()
 check(not TouchControls.active,
-  "Quest runtime disables the flat Android touch overlay")
+  "Quest flavor disables touch overlay without the panel FFI backend")
 
 local yellowSource
 do
@@ -118,5 +127,16 @@ for _, path in ipairs({
 end
 
 love.system.getOS = realGetOS
+os.getenv = function(name)
+  if name == "POKEPORT_QUEST_PROFILE" then return nil end
+  return realGetenv(name)
+end
+_G.QUEST_PANEL_ACTIVE = nil
+check(not PlatformProfile.isQuestStandalone(),
+  "generic Android remains outside the Quest profile")
+_G.QUEST_PANEL_ACTIVE = true
+check(PlatformProfile.isQuestStandalone(),
+  "legacy panel signal remains a compatibility fallback")
+os.getenv = realGetenv
 _G.QUEST_PANEL_ACTIVE = realQuestPanel
 T.finish("quest settings profile")

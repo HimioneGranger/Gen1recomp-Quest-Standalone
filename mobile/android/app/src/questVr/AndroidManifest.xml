@@ -8,6 +8,14 @@
 
   <application>
     <!--
+      SDL copies SDL_ENV.* application metadata into the native process
+      environment before Lua starts. This flavor identity must not depend on
+      the optional OpenXR panel FFI backend loading successfully.
+    -->
+    <meta-data
+        android:name="SDL_ENV.POKEPORT_QUEST_PROFILE"
+        android:value="1" />
+    <!--
       Horizon OS issues a second launch intent while it places an immersive
       activity. singleInstance turns that into a second task and destroys the
       first activity before OpenXR receives focus. Keep one reusable task for

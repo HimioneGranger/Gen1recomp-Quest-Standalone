@@ -4,9 +4,11 @@
 
 The clean Unplugged baseline at `c4f06e96` contains the launcher-owned Quest
 presentation and settings behavior. The rebuilt Diagnostic APK contains the
-same source files byte for byte. The current headset report conflicts with
-that payload. This is a deployment or runtime-selection issue until a device
-test proves otherwise.
+same source files byte for byte. Live evidence later proved that the installed
+APK also matches that artifact. The remaining defect was product-profile
+activation: it depended on the optional OpenXR panel FFI backend succeeding.
+The Quest Android flavor now selects the profile directly through SDL manifest
+environment metadata. Generic Android remains unchanged.
 
 The world spawn correction, companion placement, and physical Pokédex are not
 launcher features. They are DRAMALESS Q42 features. They must stay in the mod.
@@ -38,7 +40,8 @@ launcher features. They are DRAMALESS Q42 features. They must stay in the mod.
 | Behavior | Historical or accepted source | Clean source | Rebuilt APK | State |
 |---|---|---|---|---|
 | Normal, Test, and Diagnostic identities | Accepted Unplugged build flow | Present | Present | Found |
-| White or palette-paper surround for all opening states | Accepted Quest presentation rule | Present in Gen 1 and Gen 2 opening states and `Renderer.lua` | Exact source match | Found |
+| Quest product-profile activation | Quest flavor identity | `SDL_ENV.POKEPORT_QUEST_PROFILE=1`; independent of panel FFI | Flavor manifest | Fixed in this branch |
+| White or palette-paper surround for all opening states | Accepted Quest presentation rule | Present in Gen 1 and Gen 2 opening states and `Renderer.lua` | Exact source match | Found; activation fixed |
 | No Android phone touch overlay in Quest | Accepted Quest rule | `TouchControls` returns inactive for Quest | Exact source match | Found |
 | Hide Video Mode | Quest has no desktop window mode | Hidden in launcher and game menus | Exact source match | Found |
 | Hide Orientation | Quest owns immersive orientation | Hidden in launcher and game menus | Exact source match | Found |
@@ -112,7 +115,7 @@ and 2D battle cards on. Its VR compatibility value remains internal.
 
 ## Open acceptance gates
 
-1. Prove the installed Diagnostic package is the rebuilt clean artifact.
+1. Build the three variants with the Quest profile metadata.
 2. Run a fresh ROM opening and confirm a white or palette-paper surround with
    no phone touch controls.
 3. Import and activate Q42. Confirm its manifest version in the mod list.
