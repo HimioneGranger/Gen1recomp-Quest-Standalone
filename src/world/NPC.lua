@@ -8,7 +8,7 @@ local SpriteRenderer = require("src.render.SpriteRenderer")
 local NPC = {}
 NPC.__index = NPC
 
-local STEP_FRAMES = 16
+local STEP_FRAMES = 32
 
 local FACING_FROM_RANGE = {
   DOWN = "down", UP = "up", LEFT = "left", RIGHT = "right",
@@ -52,7 +52,16 @@ function NPC:facePlayer(player)
 end
 
 function NPC:update(map, entities)
-  -- self.stepFrames overrides the shared 16-frame walk for an object whose
+  -- An NPC tile is 32 frames, half the player's rate: TryWalking loads
+  -- WALKANIMATIONCOUNTER with $10 and UpdateSpriteInWalkingAnimation adds
+  -- the 1px step vector once per call (engine/overworld/movement.asm), but
+  -- UpdateSprites runs once per OverworldLoop pass and every pass opens
+  -- with two DelayFrame calls (home/overworld.asm) -- so those 16 ticks
+  -- cost 32 frames for one 16px cell, against AdvancePlayerSprite's 8
+  -- ticks of 2px.  That halving is why pokeyellow's NormalPikachuFollow
+  -- needs TryDoubleAddPikachuStepVectorToScreenPixelCoords to keep up.
+  --
+  -- self.stepFrames overrides the shared walk for an object whose
   -- step has to stay in phase with something else: Yellow's follower
   -- Pikachu takes the player's own step length, halved while it is more
   -- than a cell behind (FastPikachuFollow, engine/pikachu/
@@ -78,7 +87,7 @@ function NPC:update(map, entities)
       return
     end
     local d = Collision.DELTA[self.facing]
-    -- 1px per frame at the default length; a shortened step scales instead,
+    -- 1px per 2 frames at the default length; a shortened step scales instead,
     -- so the cell still lands on a 16px boundary (Player:update does the
     -- same for the bicycle)
     local moved = math.floor(self.progress * 16 * span / stepLen)
@@ -113,8 +122,9 @@ end
 
 function NPC:walkPhase()
   if not self.moving then return 0 end
-  local p = self.progress % 16
-  return (p >= 4 and p < 12) and 1 or 0
+  local stepLen = self.stepFrames or STEP_FRAMES
+  local p = self.progress % stepLen
+  return (p >= stepLen / 4 and p < stepLen * 3 / 4) and 1 or 0
 end
 
 -- Same contract as Player:pose -- the sheet, position, facing and step

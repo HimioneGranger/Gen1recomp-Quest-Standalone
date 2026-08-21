@@ -431,6 +431,33 @@ are exactly `src/core/Game2.lua`, `src/core/gen2/ItemEffects.lua`,
 `src/ui/gen2/EvolutionAnim.lua`, and
 `tests/engine/gen2_sun_stone_bug1219.lua`; they are Gen 2-only.
 
+### Batch 10: ordinary NPC cadence prerequisite
+
+Audit lane: M8 prerequisite for portable C2.
+
+Upstream source:
+`a94fecfec8c8a853cb20cca0d97446d933387e8d`.
+
+Exact imported path set:
+
+```text
+src/world/NPC.lua
+tests/engine/npc_walk_cadence.lua
+```
+
+Only the audited cadence prerequisite was extracted from the multi-issue
+upstream bundle. The NPC source patch is byte-equivalent to its upstream path;
+all unrelated battle, link, launcher, renderer, UI-kit, story, and Gen 2 work
+from that commit remains deferred to its owning lane.
+
+Focused verification:
+
+- Ordinary and synchronized NPC cadence: 8/8 passed.
+- Timing parity: 163/163 passed.
+- Turn-in-place timing: 28/28 passed.
+- Warp sprite visibility: 19/19 passed.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -443,6 +470,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 9 completes the applicable Gen 1 split of
-`37051a26b5b5732cc845441dbd66d1916a6925fb`. Resume with the next audited
-commit after that bundle; do not import its four Gen 2-only paths.
+Current recovery point: Batch 10 establishes the ordinary NPC cadence needed
+by portable escort item C2. Resume with the four-path `43957922` escort unit.
