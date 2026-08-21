@@ -19,7 +19,7 @@ Features intentionally added beyond the original Pokémon Red, Blue, and Yellow 
 * **Soft reset button combination**
 * **Keyboard and controller rebinding**
 * **Mod profiles** with separate mod settings and save slots
-* **Sandboxed mods**: an installed mod can read only its own folder and write only its own storage, so it cannot reach the rest of your device
+* **Sandboxed mods**: an installed mod can read only its own folder and write only its own storage, so it cannot reach the rest of your device, and mods that need the internet or heavy background work do it through permissions the mod manager shows you, without freezing the game
 * **Improved launcher and save editor UI**, including background downloads and update checks
 * **Direct-launch options** for shortcuts, Steam entries, and handheld frontends
 * **Custom boot branding**

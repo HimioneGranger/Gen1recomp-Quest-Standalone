@@ -11,7 +11,8 @@ local Manifest = {}
 
 Manifest.PROFILES = { content = true, overhaul = true, total_conversion = true }
 Manifest.PERMISSIONS = { network = true, filesystem = true,
-                         engine_internals = true, steps = true }
+                         engine_internals = true, steps = true,
+                         background = true }
 
 -- link-relevant registries; a mod that writes into one of these while
 -- declaring affects_link = false gets an attributed warning from the loader

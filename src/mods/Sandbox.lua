@@ -68,7 +68,11 @@ end
 -- without an edit here.
 -- value is the replacement to name in the error, or true when there is none
 local BLOCKED_LOVE = {
-  filesystem = "mod.storage, mod:read and mod:list", thread = true,
+  filesystem = "mod.storage, mod:read and mod:list",
+  -- newThread's state has a full standard library and none of this file's
+  -- rules, so it stays blocked -- but the reason mods reached for it was
+  -- background work, and mod.fetch is that without the escape.
+  thread = 'mod.fetch for background HTTP (needs the "network" permission)',
   system = "mod.device:powerInfo() for battery information, mod.steps for "
     .. "the step bridge", event = true,
 }

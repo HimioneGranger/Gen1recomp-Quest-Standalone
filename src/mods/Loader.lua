@@ -22,6 +22,8 @@ local Hooks = require("src.mods.Hooks")
 local LegacyCompat = require("src.mods.LegacyCompat")
 local Runtime = require("src.mods.Runtime")
 local Steps = require("src.mods.Steps")
+local Net = require("src.mods.Net")
+local Job = require("src.mods.Job")
 
 local Loader = {}
 Loader.__index = Loader
@@ -1035,6 +1037,51 @@ function Loader:_api(mod)
       return { available = function() return false end,
                sync = refuse, poll = refuse }
     end)(),
+    -- Background HTTP, behind the "network" permission the player already
+    -- sees.  This is what love.thread is NOT: the worker runs engine code in
+    -- an engine-owned pool, so a mod gets asynchrony without getting a Lua
+    -- state the sandbox cannot reach.  get() hands back an opaque handle;
+    -- poll() is non-blocking, so nothing here can hang a frame.
+    fetch = (function()
+      if mod.manifest.permissionSet.network then
+        return {
+          available = function() return Net.available() end,
+          get = function(_, url, opts) return Net.get(loader, modId, url, opts) end,
+          poll = function(_, handle) return Net.poll(loader, modId, handle) end,
+          release = function(_, handle) return Net.release(loader, modId, handle) end,
+          cancel = function(_, handle) return Net.cancel(loader, modId, handle) end,
+        }
+      end
+      local function refuse()
+        error(('[%s] mod.fetch needs the "network" permission in '
+          .. "manifest.json"):format(modId), 2)
+      end
+      return { available = function() return false end,
+               get = refuse, poll = refuse, release = refuse, cancel = refuse }
+    end)(),
+    -- Background compute, behind the "background" permission.  The worker
+    -- rebuilds this mod's sandbox before loading the script, so a job is the
+    -- one thing love.thread is not: off the main thread without a Lua state
+    -- that escapes the sandbox.  Plain data in, plain data out.
+    job = (function()
+      if mod.manifest.permissionSet.background then
+        return {
+          available = function() return Job.available() end,
+          run = function(_, script, arg, opts)
+            return Job.run(loader, modId, mod.path, script, arg, opts)
+          end,
+          poll = function(_, handle) return Job.poll(loader, modId, handle) end,
+          release = function(_, handle) return Job.release(loader, modId, handle) end,
+          cancel = function(_, handle) return Job.cancel(loader, modId, handle) end,
+        }
+      end
+      local function refuse()
+        error(('[%s] mod.job needs the "background" permission in '
+          .. "manifest.json"):format(modId), 2)
+      end
+      return { available = function() return false end,
+               run = refuse, poll = refuse, release = refuse, cancel = refuse }
+    end)(),
     -- namespaced per mod; M11 backs these with save.modData /
     -- options.modOptions, the shape mods compile against is already final
     save = {
@@ -1307,6 +1354,8 @@ function Loader:_rollback(modId)
   self.migrations[modId] = nil
   self.modSave[modId] = nil
   self.stepsQueues[modId] = nil
+  Net.releaseAll(self, modId)
+  Job.releaseAll(self, modId)
 end
 
 -- a mod that explicitly swears it stays link-compatible while writing into a

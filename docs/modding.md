@@ -616,6 +616,125 @@ own copy of a delivery, and steps are anchored natively so the same walk
 is never delivered twice. Without the permission, `sync` and `poll` raise
 an error naming it.
 
+## Background HTTP
+
+`mod.fetch` is how a mod does work off the main thread. It is behind the
+`network` permission in `manifest.json`, the same one that gates
+`require("socket")`, and the player sees it in the mod manager.
+
+```lua
+-- somewhere once
+local job = mod.fetch:get("https://example.com/data.json")
+
+-- in a hook or update, every frame -- poll never blocks
+if job then
+  local r = mod.fetch:poll(job)
+  if r.status ~= "pending" then
+    if r.status == "ok" then use(r.body) else warn(r.err) end
+    mod.fetch:release(job)
+    job = nil
+  end
+end
+```
+
+`get(url, opts)` returns an opaque handle, or `nil` plus a reason. `opts`
+takes `accept` (a request Accept header) and `maxSeconds` (clamped to 30).
+`poll(handle)` returns `{ status, body, err, progress }` where `status` is
+`"pending"`, `"ok"`, `"error"` or `"cancelled"`; it is a copy, and it never
+blocks, so calling it every frame is the intended use. `release(handle)`
+frees a finished job — do it, or you will hit the ceiling. `cancel(handle)`
+drops a result you no longer want. `available()` is `false` when the build
+has no transport and for mods without the permission, so a probe is safe.
+
+The rules worth knowing before you design around it:
+
+- **http and https only.** The underlying transport also speaks `file://`,
+  `ftp://` and `scp://`; those are refused, on the initial URL and on any
+  redirect. `mod.fetch` is not a way to read a local file.
+- **Four requests in flight per mod.** The worker pool is shared with the
+  launcher's own downloads, so one mod cannot fill it. Over the ceiling,
+  `get` returns `nil` and a reason until you release something.
+- **Handles are yours alone.** A handle from another mod, a fabricated
+  table, or a guessed number all poll as `"error"`.
+- **Your mod id is in the User-Agent**, so a server operator can see who is
+  calling and a mod cannot pose as the launcher.
+- Jobs are released when your mod unloads.
+
+This is deliberately not `love.thread`. A LÖVE thread is a fresh Lua state
+with a full standard library that the sandbox cannot reach, so handing one
+to a mod would undo every other rule; `mod.fetch`'s workers run engine
+code, so a mod gets asynchrony without gaining any new reach.
+
+## Background jobs
+
+`mod.fetch` covers work waiting on a server. `mod.job` covers work waiting on
+the CPU — generating a map, crunching a table, anything that would otherwise
+stall a frame. It is behind the `background` permission in `manifest.json`.
+
+Ship the job as its own file inside your mod:
+
+```lua
+-- mods/your_mod/jobs/crunch.lua
+local arg = ...
+local total = 0
+for i = 1, arg.n do total = total + i end
+return { total = total }
+```
+
+```lua
+-- in your entry file
+local job = mod.job:run("jobs/crunch.lua", { n = 1e6 })
+
+-- later, in a hook -- poll never blocks
+local r = mod.job:poll(job)
+if r.status == "ok" then
+  use(r.result.total)
+  mod.job:release(job)
+end
+```
+
+`run(script, arg, opts)` returns an opaque handle, or `nil` plus a reason.
+`opts.maxSeconds` sets the job's time budget (default 5, clamped to 30).
+`poll(handle)` returns `{ status, result, err }` with `status` one of
+`"pending"`, `"ok"`, `"error"` or `"cancelled"`. `release(handle)` frees it.
+`available()` is `false` on a host without threads and for mods without the
+permission, so a probe is always safe.
+
+**A job is pure compute.** This is the part to design around, not a detail:
+
+- **Plain data in, plain data out.** Numbers, strings, booleans and tables of
+  them. A function, userdata, a cycle or a table key that is not a string or
+  number is refused at your `run` call with a reason. Nothing is shared —
+  your argument is snapshotted, and mutating the original afterwards does not
+  reach the job.
+- **No engine API, no game state, no storage.** `require` is refused inside a
+  job, and there is no `mod` object. A job cannot read the party, write
+  `mod.storage`, or touch a registry. Get what it needs into the argument and
+  act on the result back on the main thread.
+- **Your script is a file in your mod folder.** The path goes through the same
+  rules as `mod:read`; `..`, absolute paths and drive letters are refused.
+- **Two jobs per mod, four on the machine.** Over the limit, `run` returns
+  `nil` and a reason until you release one.
+- **The budget bounds how long YOU wait, not how long the work runs.** Past
+  `maxSeconds`, `poll` reports an error and the result is dropped if it ever
+  arrives — but the thread runs to its own end. There is no way to stop a
+  LÖVE thread from outside, and every attempt to stop one from inside was
+  worse than the disease (a debug hook does not reliably interrupt LuaJIT,
+  and raising from one wedged the whole process). `cancel(handle)` is the
+  same deal: it drops the result, it does not stop the work.
+
+  So **write jobs that terminate.** A job with an infinite loop will keep one
+  core busy until the game closes. It will not freeze the game — the main
+  thread stays responsive and quitting still works — but nothing will reclaim
+  that core in the meantime.
+
+Your job script runs in the same sandbox your entry file does, so `io`, `os`,
+`debug`, `ffi`, `package` and `love.filesystem` are absent there too. That is
+the whole reason this exists rather than `love.thread`: a raw LÖVE thread is a
+fresh Lua state with a full standard library that the sandbox cannot reach, so
+handing one to a mod would undo every other rule. Here the worker builds your
+sandbox first and loads your chunk into it.
+
 ## Pre-sandbox globals (compat)
 
 A mod written before the sandbox landed does not have to be updated to
@@ -648,4 +767,5 @@ with the full standard library, which the sandbox in this state cannot
 reach, so a stand-in would be a hole rather than a reroute. The same goes
 for `ffi`, `debug`, `setfenv`, `os.execute`, `io.popen`, `love.run` and
 `love.errorhandler`. A mod that needs real background work needs an
-engine-owned facility, not a compat shim.
+engine-owned facility, not a compat shim -- for HTTP that facility is
+[`mod.fetch`](#modfetch), which runs on the engine's own worker pool.

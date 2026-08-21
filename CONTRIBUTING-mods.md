@@ -271,7 +271,7 @@ What has no stand-in, because there is nothing honest to reroute it to:
 
 | Still refused | Why |
 | --- | --- |
-| `love.thread` | a LÖVE thread is a fresh Lua state with the full standard library, which no environment-based sandbox in this state can reach |
+| `love.thread` | a LÖVE thread is a fresh Lua state with the full standard library, which no environment-based sandbox in this state can reach. Use `mod.fetch` for background HTTP (`network`) or `mod.job` for background compute (`background`) — both run your code inside the sandbox instead of outside it |
 | `require("ffi")` | arbitrary C |
 | `debug`, `getfenv`, `setfenv` | each one undoes the sandbox from inside |
 | `io.popen`, `os.execute` | spawning a process |
@@ -298,7 +298,10 @@ Three consequences worth knowing before you write against it:
 - **Ship source, not bytecode.** A precompiled entry file is refused.
 
 `permissions` in the manifest is still a disclosure the manager shows the
-player, and `network` now gates `require("socket")` and friends. There is no
+player. `network` gates `require("socket")` and friends plus `mod.fetch`
+(non-blocking HTTP), and `background` gates `mod.job` (compute on a worker
+thread). Those two are the sanctioned ways to work off the main thread now
+that `love.thread` is refused. There is no
 permission that grants raw filesystem access, because no mod needs one:
 everything a mod legitimately writes is already scoped by
 `mod.storage` or the asset-transform derived root.

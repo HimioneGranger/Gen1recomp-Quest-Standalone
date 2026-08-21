@@ -519,6 +519,45 @@ Focused verification:
 - Quest platform lifecycle hooks inside Modkit: 14/14 passed.
 - Staged diff and whitespace checks passed.
 
+### Batch 13: permission-gated mod fetch and compute jobs
+
+Audit lane: M8 network/job core, split from launcher-owned paths.
+
+Upstream source:
+`5198b35945be11a9713a512dbb6924564850773e`.
+
+Exact imported path set:
+
+```text
+CONTRIBUTING-mods.md
+docs/modding.md
+docs/new-features.md
+src/core/HostShell.lua
+src/mods/Job.lua
+src/mods/Loader.lua
+src/mods/Manifest.lua
+src/mods/Net.lua
+src/mods/Sandbox.lua
+src/mods/job_worker.lua
+tests/modkit/cases/mod_fetch.lua
+tests/modkit/cases/mod_job.lua
+```
+
+This is the byte-equivalent mod-core subset. It restricts curl protocols,
+keeps raw threads blocked, gives mods opaque per-owner handles, and gates
+network and background compute by declared permissions. LauncherView,
+RomImporter, ExtractThread, RomManifest, and UI-kit paths remain deferred to
+their launcher/import owners; no Quest launcher code changed in this batch.
+
+Focused verification:
+
+- Permission-gated mod fetch: 36/36 passed without a network request.
+- Permission-gated mod jobs: 23/23 passed.
+- Full Modkit: 20/20 suites passed.
+- Sandbox compatibility: 97/97 passed.
+- Quest platform lifecycle hooks: 14/14 passed.
+- Staged diff and whitespace checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -531,5 +570,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 12 establishes LegacyCompat. Resume with the
-filtered network/job core of `5198b359`, excluding launcher-owned paths.
+Current recovery point: Batch 13 establishes the filtered mod fetch/job core.
+Resume with the TLS compatibility follow-up, then M1 postLog dependents.

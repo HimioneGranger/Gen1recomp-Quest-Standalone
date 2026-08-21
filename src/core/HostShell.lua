@@ -325,7 +325,8 @@ function HostShell.httpDownload(url, absPath, userAgent, accept, maxTime)
   if type(absPath) ~= "string" or absPath == "" then return nil, "missing path" end
   userAgent = userAgent or "gen1recomp"
   if HostShell.haveCurl() then
-    local cmd = ("curl -fsSL --connect-timeout 15 --max-time %d ")
+    local cmd = ("curl -fsSL --proto =http,https --proto-redir =http,https "
+      .. "--connect-timeout 15 --max-time %d ")
       :format(tonumber(maxTime) or 300)
       .. "-H " .. HostShell.quote("User-Agent: " .. userAgent) .. " "
     if accept then
@@ -370,7 +371,8 @@ function HostShell.httpGet(url, userAgent, accept, maxTime)
     -- BODY, and on the two services this talks to that body is the whole
     -- diagnosis: GitHub's 403 says "API rate limit exceeded for <ip>", which
     -- tells a user to wait rather than to go hunting for a broken index.
-    local cmd = ("curl -sSL --connect-timeout 10 --max-time %d ")
+    local cmd = ("curl -sSL --proto =http,https --proto-redir =http,https "
+      .. "--connect-timeout 10 --max-time %d ")
       :format(tonumber(maxTime) or 40)
       .. "-H " .. HostShell.quote("User-Agent: " .. userAgent) .. " "
     if accept then
