@@ -30,6 +30,34 @@ launcher frame; live native ray tracking may update coordinates only while
 that visibility flag is enabled. This prevents the launcher selector from
 appearing over a game frame or a mod-owned preparation card.
 
+## Accepted-baseline sync gate
+
+Do not classify a Quest/core integration branch as merge-ready until it passes
+the non-device accepted-baseline gate:
+
+```sh
+scripts/verify_accepted_baseline.sh <accepted-baseline-ref>
+```
+
+The caller must explicitly supply the latest accepted Unplugged baseline as a
+local branch, tag, or commit. The script resolves that value and `HEAD` to
+commits, then uses Git ancestry to verify that the baseline is contained in
+the candidate. It exits `1` when the candidate is stale or has diverged. It
+exits `2` when the ref is missing, invalid, or cannot be resolved.
+
+The verifier does not fetch or select a baseline. Fetch the trusted baseline
+first when its local ref may be stale. CI must use a full-history checkout or
+fetch the explicitly selected commit before it runs the command. For example:
+
+```sh
+git fetch origin <accepted-baseline-ref>
+scripts/verify_accepted_baseline.sh FETCH_HEAD
+```
+
+`scripts/test.sh` runs the verifier's ROM-free functional suite, but that suite
+does not select the accepted product baseline. The explicit command above is
+the required merge-readiness gate.
+
 ## Physical validation — 2026-08-12
 
 A Quest 3 test with Dramaless Shape `1.6.4-quest.14` passed the complete path:
