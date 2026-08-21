@@ -1470,6 +1470,47 @@ Focused verification:
 - Staged scope/provenance, secret, private-path, protected-artifact, binary,
   whitespace, and diff checks passed.
 
+### Batch 32: Gen 1 trade-cable geometry and fallback rendering
+
+Audit lane: portable C9 TradeAnim subset.
+
+Upstream source:
+
+- `f5b8b6c85fb20b91de53f5f8ab274a3c799fb287`
+
+Audited integrated path set:
+
+```text
+src/ui/TradeAnim.lua
+tests/engine/trade_cable_geometry.lua
+```
+
+The `TradeAnim.lua` patch is byte-equivalent to the upstream path delta, with
+stable patch ID `e96f2051a1d50a82cfaebcaf35e8d1d8d7c34b42`. Horizontal cable
+art is cropped to the requested span instead of shifting outside it. The
+8-pixel cable-segment asset is the first fallback, the solid rectangle remains
+the final ROM-free fallback, and the right vertical cable now meets its corner
+at `x=112`.
+
+The new ROM-free engine test drives the real left and right Game Boy draw
+methods with synthetic art. It proves both cropped widths, all 22 segment
+fallback positions, the four vertical-segment positions, and the rectangle
+fallback width. The TownMap subset is already complete in Batch 31. PaletteFX
+remains the next isolated C9 unit. Diploma is not part of this batch. The mixed
+visual driver remains excluded because it switches to Gold and needs a live
+ROM/app session.
+
+Focused verification:
+
+- Trade cable geometry and fallbacks: 18/18 passed.
+- Existing trade sequence, ROM-art import, and presentation mirror contracts:
+  64/64 passed.
+- Direct TradeAnim LuaJIT compilation passed.
+- Quest settings profile: 95/95 passed.
+- No app or visual driver was launched and no network was used. The four
+  preserved root residues retained identical SHA-256 hashes.
+- Staged scope/provenance, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1482,6 +1523,7 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 30 completes the dependency-safe C8 title subset
-and records the SAVE-panel tail against its real M8 prerequisites. Resume with
-the open C9 subsets of `f5b8b6c85fb20b91de53f5f8ab274a3c799fb287`.
+Current recovery point: Batch 32 completes the isolated C9 TradeAnim subset
+after the committed C9 TownMap subset. Resume with the PaletteFX portion of
+`f5b8b6c85fb20b91de53f5f8ab274a3c799fb287`; keep the C8 SAVE-panel field
+deferred until its audited M8 menu foundation lands.
