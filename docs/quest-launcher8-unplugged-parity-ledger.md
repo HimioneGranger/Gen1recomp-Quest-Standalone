@@ -144,3 +144,97 @@ and 2D battle cards on. Its VR compatibility value remains internal.
    identity from that run before another source change.
 
 No device action was done during this audit.
+
+## Portable upstream parity propagation — 2026-08-21
+
+### Recovery point and source provenance
+
+- Target workspace:
+  `C:\Users\bolay\Documents\Gen1recomp-Unplugged-Corrected-Split-Candidate-20260821`.
+- Target branch: `codex/unplugged-corrected-split-candidate-20260821`.
+- Verified clean target start: `3cfc9d6c65954ec22308f6cb1ee5af2734dba3ed`.
+- Latest launcher checkpoint at that start: `3cfc9d6c`,
+  `feat(quest): propagate source-matched launcher screen`, on top of the
+  corrected split and the recorded launcher/app repair chain.
+- Canonical approved local-object snapshot:
+  `codex/upstream-parity-batch2-20260820` at
+  `3197ac955af9ba41591bd74d8e098295f125a535`.
+- Canonical inventory:
+  `docs/project-coordination/upstream-parity-ledger.md` at that snapshot.
+  The inventory file itself was not replayed.
+- The versioned host boundary series was already patch-equivalent:
+  canonical `2d85eabc`, `b17f6c91`, and `8800521b` map to target
+  `4261702e`, `9a9f0c85`, and `cf4443e1`.
+
+### Applied portable source and test map
+
+All source commits below are local equivalents already approved by the
+canonical ledger. Target commits preserve the same small logical order.
+
+| Approved upstream item or chain | Canonical local equivalent | Corrected-split target commit or commits |
+|---|---|---|
+| `2da2168d` | `5bdddf22` | `e7898df2` |
+| `142d1358` | `341256e5`, `6e265d89` | `dd606600`, `c521ed69` |
+| `abe176b2` | `3a58c773` | `2bace9db` |
+| `881670db` | `ddefe423`, `964fa4b7` | `2956f5d3`, `758ae966` |
+| `f62b1268` | `89285465` | `eb4117a2` |
+| `455ff21a` | `2d506f8e` | `e161cc7f` |
+| `17fbf6ce` | `3f9ac63f`, `14207f5d` | `f0b7edcc`, `1d66f71b` |
+| `34c4481f` | `1c48f5db` | `54d614cd` |
+| `2279617b` | `362843c3` | `e84d467c` |
+| `8f88d01c` | `58927a28` | `9c5768d3` |
+| `bff40a5d` portable field-message subset | `71e24327` | `2aae05b9` |
+| `72c244b4`, `fbdfc1c0` | `b98227d6` | `2d9b9307` |
+| `99849581`, `08518099` | `ce6adc91` | `57bf20b4` |
+| `24d0c652` → `9423337b` → `d6ddf23f` | `b7ab6b6d` | `300ee6a6` |
+| `abf95ce1` | `0cba40b4` | `c0ece427` |
+| `b20b1370` | `8bc1e2d3` | `6f5101b6` |
+| `667267d9` | `da50be1d` | `a41dc652` |
+| `f1388279` | `8d037237` | `3fb4fc83` |
+| `f5b8b6c8` approved Diploma subset only | `3197ac95` source/test subset | `3935c0b4` |
+
+The exact approved Diploma source blob is
+`ddcd6c738d83a3d9434feca01128c7347e775bb6`. The target blob matches it.
+The seven inventory items recorded as exact already-equivalent deletions or
+snapshots (`d38faab0`, `0aab11b6`, `a68c47e7`, `dfc216f9`, `a3bbd78e`,
+`871087a1`, and `99806ead`) remain inherited from the accepted baseline; no
+replay was needed.
+
+### Exclusions preserved
+
+- C2 `43957922`, C7 `f6a03594`, and C8 `90163a3f` remain blocked and were
+  not replayed.
+- For C9, only the independently approved Diploma source/test subset was
+  replayed. `TownMap.lua`, `TradeAnim.lua`, `PaletteFX.lua`, and
+  `version_blink_test.lua` remain deferred and unchanged.
+- The deferred Softboiled field-action hunk and all other inventory items
+  marked deferred, blocked, Gen 2-only, platform-only, prerequisite-sensitive,
+  superseded, or build/release/docs-only remain out.
+- Quest-only/OpenXR/native presentation, SAF/lifecycle, launcher and loading
+  screen, host-adapter versioning, Android flavor/package identity, renderer,
+  DRAMALESS, and protected package boundaries are unchanged. The only narrow
+  boundary update is the approved portable `src/mods/Schemas.lua` map-object
+  Pokemon validation, covered by its 6/6 focused regression.
+
+### Target verification before APK assembly
+
+- Focused portable: 18 Lua files passed 145/145 checks; the synthetic
+  grayscale cutoff Python module passed 2/2 tests.
+- Exact neutral host: eight suites passed 140/140 counted checks;
+  `android_host_extension_test.lua` also passed.
+- Modkit: 15/15 suites passed. Launcher mod-bundle import passed 42/42.
+- Quest/launcher contracts passed: flavor isolation, boundary diagnostics
+  6/6, environment capability, host adapter 7/7, launch progress 23/23,
+  load-report profile, loading screen 1471/1471, OpenXR display 39/39,
+  panel placement 5/5, SAF/focus 15/15, settings profile 80/80, Android variant
+  output 3/3, Gold launcher rows 22/22, modal focus 24/24, Android pick 9/9,
+  Android mod/save pick 14/14, and focus reset 3/3.
+- Full engine: target 190/193 suites; exact clean start `3cfc9d6c` 175/178.
+  Both have the same three Windows/source-shape failures:
+  `build_zip_pipe_guard_bug774`, `quit_thread_shutdown`, and
+  `title_zone_seams`. All 15 added suites pass.
+- Diagnostic package-only passed through Git Bash and skipped Gradle/signing.
+- `git diff --check 3cfc9d6c..3935c0b4` passed. The tracked replay boundary is
+  portable source/tests only. Protected-path scans found no prohibited edit.
+- No network, install, ADB, headset, ROM, save, private-data, push, merge,
+  publish, release-signing, or device action occurred.
