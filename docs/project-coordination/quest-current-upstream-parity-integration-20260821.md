@@ -733,6 +733,57 @@ Focused verification:
 - Mod audio, including silent failure isolation: 116/116 passed.
 - Staged secret, private-path, whitespace, and diff checks passed.
 
+### Batch 18: Gen 1 grass equivalence and Surfing Pikachu source
+
+Audit lane: M4, with the Gen 1 subset separated from mixed Gen 2 paths.
+
+Upstream sources, in dependency order:
+
+- `286988a1e378a7f28d7a5676e84f44c50a4f495a`
+- `f0d3c014a794dbae23d7376eca93449be42cc716`
+
+Exact integrated path set:
+
+```text
+src/core/Game.lua
+src/core/Music.lua
+src/ui/SurfingMinigame.lua
+tests/engine/surfing_m4_contract.lua
+tests/test_surfing_minigame.lua
+tools/build_rom_data.py
+```
+
+The final SurfingMinigame source and its upstream unit test are byte-identical
+to `f0d3c014`. The fixed-speed Game hunk, safe headless Music guard, Music
+pitch control, and guarded Yellow asset-extraction hunk match their audited
+upstream sources. The extractor source reads authorized user ROM bytes only
+during a later import and writes no generated or protected content in this
+integration.
+
+The Gen 1 entity-bound grass overdraw from `286988a1` was already present in
+the Q47 successor. `TileRenderer.lua` differs from that upstream state only by
+blank lines, and the flat and tilted Overworld grass blocks are semantically
+identical. They were proved and left unchanged. Gen 2 encounter, schema,
+extractor, world, fishing, Game Corner, Gold manifest, and Gen 2 test paths
+remain excluded. `SpriteRenderer`'s Gen 2 object-palette/quad extension also
+remains excluded. No manifest or generated asset changed.
+
+Focused verification:
+
+- Surfing Pikachu state machine, physics, landing, scoring, recovery,
+  frame-rate consistency, and fixed speed: passed all 13 scenarios.
+- ROM-free extraction, fixed-speed, Music, and flat/tilted grass contracts:
+  11/11 passed.
+- Builder CLI routing under the repository's WSL/POSIX test shell: 4/4 passed.
+- Python syntax compilation: passed.
+- Gen 1 Red, Blue, and Yellow manifest blobs remained unchanged at
+  `b8233558`, `753db374`, and `9fa9e696`.
+- Native Windows ran the same CLI test as 2/4 because its path separator is
+  `\\` while the existing test pins `/`; WSL passed the unchanged test.
+- No ROM, save, generated asset, manifest payload, or protected content was
+  created or staged.
+- Staged secret, private-path, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -745,5 +796,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 17 completes the audited M3 audio and movie
-orientation chain. Resume with the ordered M4 extractor/catalog batch.
+Current recovery point: Batch 18 completes the audited Gen 1-applicable M4
+extractor/minigame batch. Resume with the ordered M5 renderer stack.

@@ -211,7 +211,7 @@ end
 
 function Music.play(data, song, loop, ctx)
   if not song then return end
-  if not love.audio then return end -- headless test stub
+  if not (love and love.audio) then return end -- headless test stub
   ctx = ctx or {}
   song = selectSong(song, ctx)
 
@@ -468,6 +468,12 @@ function Music.setFilterLevel(level)
   filterLevel = math.max(0, math.min(3, level or 0))
   applyFilter(state.source)
   applyFilter(state.loopSource)
+end
+
+function Music.setPitch(pitch)
+  pitch = pitch or 1.0
+  if state.source then pcall(state.source.setPitch, state.source, pitch) end
+  if state.loopSource then pcall(state.loopSource.setPitch, state.loopSource, pitch) end
 end
 
 -- re-apply persisted audio options (Game calls this on boot and after
