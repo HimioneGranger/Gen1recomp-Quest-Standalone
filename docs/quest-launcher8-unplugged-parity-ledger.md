@@ -55,7 +55,7 @@ launcher features. They are DRAMALESS Q42 features. They must stay in the mod.
 | Hide Vibration | This row controls phone overlay haptics | Hidden in launcher and game menus | Exact source match | Found |
 | Keep supported graphics and game controls | Launcher 8 feature set | Present; exact list below | Exact source match | Found |
 | Advanced color default | New user-approved Unplugged default | `redpp`, label `ADVANCED` | Exact source match | New approved |
-| Lower shared room panel | Accepted headset panel test | Shared offset `-0.19375 m` | Native source build | New approved |
+| Center shared room panel at gaze height | User-approved panel raise; headset retest pending | Shared offset `0.0 m` | Native source build | New candidate |
 | Import and lifecycle recovery | Accepted Unplugged repairs | Present in baseline commits | Built in all variants | Found; device proof pending |
 | Do not stop spawn for a mod-set-only report | Launcher 8 headset flow; 2026-08-20 capture exposed the regression | Quest suppresses only the informational mod-diff page; recovery and quarantine reports remain | Focused policy test | Repaired |
 | Visible animated Quest launch progress | Capture part 1 has no app progress frame between Play and opening | Quest-only 0.75-second launcher-compositor handoff; six bolt states at 12 Hz | Four or more distinct sampled states; packaged source exact | Repaired; headset proof pending |

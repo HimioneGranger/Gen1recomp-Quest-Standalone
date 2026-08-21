@@ -836,19 +836,12 @@ static void *questxr_native_bootstrap(void *unused) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(panel_vertices), panel_vertices, GL_STATIC_DRAW);
     XR_LOG("native bootstrap session created");
 
-    // The panel height is 1.1625 m. The accepted lower position used a
-    // -0.19375 m offset. Move the complete shared panel up by 15 percent of
-    // its height for this candidate. Launcher, loading, and game content keep
-    // one pose, so the change cannot create presentation drift between them.
-    const float launcher_panel_height_m = 1.1625f;
-    const float launcher_panel_previous_offset_m = -0.19375f;
-    const float launcher_panel_upward_adjustment_ratio = 0.15f;
-    const float launcher_panel_shared_offset_m =
-        launcher_panel_previous_offset_m +
-        launcher_panel_height_m * launcher_panel_upward_adjustment_ratio;
+    // Keep the shared launcher, loading, and game panel centered at gaze
+    // height in both startup view space and the settled room anchor.
+    const float launcher_panel_gaze_center_offset_m = 0.0f;
     XrPosef panel_pose = {0};
     panel_pose.orientation.w = 1.0f;
-    panel_pose.position.y = launcher_panel_shared_offset_m;
+    panel_pose.position.y = launcher_panel_gaze_center_offset_m;
     panel_pose.position.z = -1.35f;
     int panel_anchored = 0;
     const int room_anchor_enabled = 1;
@@ -1074,7 +1067,7 @@ static void *questxr_native_bootstrap(void *unused) {
                 panel_pose.position.x += offset.x;
                 panel_pose.position.y += offset.y;
                 panel_pose.position.z += offset.z;
-                panel_pose.position.y += launcher_panel_shared_offset_m;
+                panel_pose.position.y += launcher_panel_gaze_center_offset_m;
                 panel_anchored = 1;
                 XR_LOG("launcher panel anchored in local space");
             }

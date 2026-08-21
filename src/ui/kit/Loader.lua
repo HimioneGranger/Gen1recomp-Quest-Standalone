@@ -27,36 +27,6 @@ local PAL = Theme.PAL
 
 local Loader = {}
 
--- Six intentionally different bolt silhouettes.  The state is supplied by
--- the Quest handoff clock, not wall time inside draw, so tests can prove that
--- successive compositor samples do not repeat a dead frame.
-local BOLT_OFFSETS = { -18, -10, -3, 5, 13, 2 }
-
-function Loader.lightningState(time, frame)
-  local index = tonumber(frame)
-    or (math.floor(math.max(0, tonumber(time) or 0) * 12) % #BOLT_OFFSETS + 1)
-  index = (math.floor(index) - 1) % #BOLT_OFFSETS + 1
-  return index, BOLT_OFFSETS[index]
-end
-
-local function drawLightning(cx, y, size, spec)
-  local G = love.graphics
-  local _, dx = Loader.lightningState(spec.animationTime, spec.animationFrame)
-  local s = size / 100
-  local x = cx + dx * s
-  G.push("all")
-  G.setColor(1, 0.86, 0.18, 1)
-  G.polygon("fill",
-    x - 12 * s, y, x + 12 * s, y, x + 2 * s, y + 28 * s,
-    x + 18 * s, y + 28 * s, x - 10 * s, y + 70 * s,
-    x - 2 * s, y + 38 * s, x - 18 * s, y + 38 * s)
-  G.setColor(1, 1, 0.78, 1)
-  G.setLineWidth(math.max(1, 2 * s))
-  G.line(x - 7 * s, y + 4 * s, x + 5 * s, y + 4 * s,
-    x - 5 * s, y + 32 * s)
-  G.pop()
-end
-
 -- Scrim alpha.  Not opaque: the user keeps the context of what they were
 -- doing, which is most of why a modal beats a blank screen.
 local SCRIM_A = 0.82
@@ -74,6 +44,11 @@ local SCRIM_A = 0.82
 -- Returns true when the cancel button was activated this frame.
 function Loader.overlay(m, spec)
   if not spec then return false end
+  if spec.questLoading then
+    Kit.blockClicks = true
+    require("src.ui.kit.QuestLoadingScreen").draw(m, spec)
+    return false
+  end
   local G = love and love.graphics
   local W, H = m.W, m.H
 
@@ -87,7 +62,7 @@ function Loader.overlay(m, spec)
   Kit.blockClicks = true
 
   local pw = math.floor(math.min(m.w - 2 * m.pad, 460 * m.s))
-  local baseH = spec.lightning and 225 or (spec.subProgress and 215 or 160)
+  local baseH = spec.subProgress and 215 or 160
   local ph = math.floor((spec.onCancel and baseH + 50 or baseH) * m.s)
   local px = math.floor((W - pw) / 2)
   local py = math.floor((H - ph) / 2)
@@ -99,13 +74,7 @@ function Loader.overlay(m, spec)
 
   -- Spinner (indeterminate) or a progress bar (determinate).  Never both.
   local y = py + pad
-  if spec.lightning then
-    local size = math.floor(74 * m.s)
-    drawLightning(cx, y, size, spec)
-    y = y + size + math.floor(10 * m.s)
-    Kit.textCenter("button", spec.title, px + pad, y, pw - 2 * pad, PAL.heading)
-    y = y + Kit.textHeight("button") + math.floor(6 * m.s)
-  elseif spec.progress then
+  if spec.progress then
     Kit.textCenter("button", spec.title, px + pad, y, pw - 2 * pad, PAL.heading)
     y = y + Kit.textHeight("button") + math.floor(14 * m.s)
     Kit.progress(px + pad, y, pw - 2 * pad, math.floor(10 * m.s), spec.progress)
