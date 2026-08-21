@@ -1596,6 +1596,44 @@ Focused verification:
   residues remained untracked and unchanged.
 - Staged scope/provenance, whitespace, and diff checks passed.
 
+### Batch 35: portable cache and cold-start test guards
+
+Audit lane: M8 test/runtime portability.
+
+Upstream source:
+
+- `35d44efb8b5c993f9ffa523637540c71df3c2496`
+
+Exact imported/adapted path set:
+
+```text
+src/import/CacheFs.lua
+src/import/RomImporter.lua
+tests/integration/title_checkpoint_cold_start.lua
+```
+
+CacheFs now avoids native PhysFS FFI discovery on UWP and under the table-backed
+headless filesystem. The cold-start fixture accepts both Lua 5.1/LuaJIT's
+numeric `os.execute` success and newer Lua's boolean success. The upstream
+optional dependency-check guard is applied to both the synchronous and
+asynchronous Q47 mod-import paths, preserving SAF and bounded progress work.
+
+The upstream `.gitignore` addition for `/options.lua*` is intentionally
+excluded. This worktree's four protected runtime residues must remain visible
+as untracked recovery evidence; hiding them would weaken the recorded
+preservation boundary. Q47's stronger signing-secret ignore rules remain.
+
+Focused verification:
+
+- WSL cold-start capture and independent resume both passed.
+- Headless, Blue mount, and Red migration CacheFs contracts: 25/25 passed.
+- Launcher profile/dependency, launcher mods, and Quest SAF recovery: 148/148
+  passed.
+- Direct CacheFs and RomImporter LuaJIT compilation passed.
+- No app was launched and no network was used. The four protected residues
+  remained visible, untracked, and unchanged.
+- Staged scope/provenance, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1608,8 +1646,9 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 34 integrates audited M8 source
-`09204daa2807a3d84c009c263de4d314a9e94b50` without its Gen 2-only paths.
-Resume with the next unreconciled M8 row, `35d44efb8b5c993f9ffa523637540c71df3c2496`.
-Keep the C8 SAVE-panel field deferred until the `0f8f6d0e` and `dbecc345`
-menu foundation is integrated and tested.
+Current recovery point: Batch 35 integrates audited M8 source
+`35d44efb8b5c993f9ffa523637540c71df3c2496` while preserving visible runtime
+residues. Resume with the next unreconciled M8 row,
+`dfeacc36b06892d116864e9b72f609ce3e54d4f0`. Keep the C8 SAVE-panel field
+deferred until the `0f8f6d0e` and `dbecc345` menu foundation is integrated and
+tested.

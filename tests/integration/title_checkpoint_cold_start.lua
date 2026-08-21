@@ -8,11 +8,16 @@ local function quote(value)
   return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
+local function execOk(cmd)
+  local status = os.execute(cmd)
+  return status == 0 or status == true
+end
+
 local function full(path) return root .. "/" .. path end
 
 local fs = {}
 function fs.createDirectory(path)
-  return os.execute("mkdir -p " .. quote(full(path))) == 0
+  return execOk("mkdir -p " .. quote(full(path)))
 end
 function fs.write(path, body)
   local parent = path:match("^(.*)/[^/]+$")
@@ -34,7 +39,7 @@ function fs.remove(path)
   return true
 end
 function fs.getInfo(path)
-  if os.execute("test -d " .. quote(full(path))) == 0 then
+  if execOk("test -d " .. quote(full(path))) then
     return { type = "directory" }
   end
   local handle = io.open(full(path), "rb")

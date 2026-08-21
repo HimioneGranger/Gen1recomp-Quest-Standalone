@@ -1721,7 +1721,7 @@ function RomImporter:_installModNow(source)
     if not checkTarget and type(res) == "string" then
       checkTarget = { id = res }
     end
-    if checkTarget then
+    if checkTarget and LauncherMods.checkDependencies then
       local depCheck = LauncherMods.checkDependencies(checkTarget)
       if depCheck and depCheck.hasIssues then
         self._modDepResolver = depCheck
@@ -1804,7 +1804,7 @@ function RomImporter:_installMod(source, done)
     local installed, res, manifest = LauncherMods._installZipInner(source, { progress = progress })
     if installed then
       local checkTarget = manifest or (type(res) == "string" and { id = res })
-      if checkTarget then
+      if checkTarget and LauncherMods.checkDependencies then
         local depCheck = LauncherMods.checkDependencies(checkTarget)
         if depCheck and depCheck.hasIssues then
           self._modDepResolver = depCheck
