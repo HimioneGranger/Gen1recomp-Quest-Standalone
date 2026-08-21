@@ -50,6 +50,7 @@ function Source:setVolume(value) self.volume = value end
 function Source:setPitch(value) self.pitch = value end
 function Source:setFilter() end
 function Source:getDuration() return 1 end
+function Source:tell() return self.position or 0.5 end
 
 love.audio = {
   newSource = function(what, mode)
@@ -101,6 +102,10 @@ local defs = {
   Unranked_Sfx = ChipAsm.sfx{ channels = { { hw = 1, program = {
     { squareNote = { len = 8, volume = 15, fade = 1, frequency = 0x600 } },
   } } } },                                   -- a mod def: no header address
+  Peck = sfxDef(0x4000 + 10 * 3, { 1 }),
+  Trainer_Appeared = sfxDef(0x4000 + 50 * 3, { 1 }),
+  Seed_Sfx = sfxDef(0x4000 + 20 * 3, { 4 }),
+  Modified_Sfx = sfxDef(0x4000 + 40 * 3, { 1, 2 }),
 }
 
 local data = { audio = { sfx = defs, cries = {}, songs = {} } }
@@ -213,6 +218,34 @@ playMove("Blizzard_Sfx")
 Sound.invalidate()
 playMove("HydroPump_Sfx")
 eq(#played, 2, "invalidate clears the tracked row sound")
+
+-- ------- 8. a disjoint modified sound keeps its plain opening
+-- CHAN8's remaining sound combines with the new CHAN5+6 id outside the
+-- hardware modifier range. The new sound starts unmodified for that source's
+-- remaining 30 frames, then applies its pitch and tempo modifiers.
+reset()
+local ChipAudio = require("src.core.ChipAudio")
+local originalNewSfx = ChipAudio.newSfx
+local rendered = {}
+ChipAudio.newSfx = function(dataArg, name, pitch, tempo, header, plain)
+  rendered[#rendered + 1] = {
+    name = name, pitch = pitch, tempo = tempo, plain = plain,
+  }
+  return originalNewSfx(dataArg, name, pitch, tempo, header, plain)
+end
+playMove("Seed_Sfx")
+Sound.playMove(data, { sound = "Modified_Sfx", pitch = 0xff, tempo = 0x40 })
+ChipAudio.newSfx = originalNewSfx
+
+local modified
+for _, render in ipairs(rendered) do
+  if render.name == "Modified_Sfx" then modified = render break end
+end
+check(modified ~= nil, "the modified disjoint sound renders")
+eq(modified and modified.plain, 30,
+  "the modified sound keeps the incumbent's 30-frame plain opening")
+check(sources[#sources] and sources[#sources].playing,
+  "the modified sound is playing after its plain opening is scheduled")
 
 Runtime.install(savedEvents, savedHooks)
 

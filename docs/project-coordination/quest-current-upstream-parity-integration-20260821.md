@@ -686,6 +686,53 @@ Focused verification:
   boundary and was not enabled.
 - Staged secret, private-path, whitespace, and diff checks passed.
 
+### Batch 17: ordered move audio and movie orientation
+
+Audit lane: M3, foundation then replay correction.
+
+Upstream sources, in dependency order:
+
+- `cfa8406306d8c3e06339a4f7a6ed9ac1269a5214`
+- `25ec896545ff282e009f2c06fe24c72bf8ea217c`
+
+Exact integrated path set:
+
+```text
+src/core/ChipAudio.lua
+src/core/ChipSynth.lua
+src/core/Sound.lua
+src/ui/EvolutionState.lua
+src/ui/TradeAnim.lua
+tests/drivers/evolution_flip_bug1412_test.lua
+tests/drivers/leer_sound_bug1414_test.lua
+tests/engine/move_sfx_channel_gate_bug844.lua
+tests/engine/presentation_sprite_mirror_bug1412.lua
+```
+
+`ChipAudio.lua`, `ChipSynth.lua`, `Sound.lua`, and `TradeAnim.lua` are
+byte-identical to the corrected upstream state at `25ec8965`. Both upstream
+driver blobs are byte-identical to `cfa84063`. The EvolutionState mirror hunk
+is exact; this branch keeps its stronger, already-tested evolution timing
+model instead of replacing it with upstream's older timing loop.
+
+Move SFX now track each software channel. A disjoint modified sound keeps its
+plain opening until an occupied channel releases, lower-priority takeovers
+stop only superseded sources, and an equal-id cached replay remains playing.
+Evolution and trade front sprites use the movie-specific mirrored orientation.
+No Quest audio host, OpenXR, lifecycle, surround, package, or launcher path
+changed. The two interactive driver files were preserved but not launched.
+
+Focused verification:
+
+- Move channel arbitration, plain opening, and equal-id replay: 25/25 passed.
+- Chip analog audio: 8/8 passed.
+- ROM-free evolution and trade sprite orientation: 9/9 passed.
+- Trade sequence and evolution cancel behavior: 9/9 and 15/15 passed.
+- Fanfare hold and stereo effect routing: 18/18 and 7/7 passed.
+- Host lifecycle and Quest host adapter: 19/19 and 7/7 passed.
+- Mod audio, including silent failure isolation: 116/116 passed.
+- Staged secret, private-path, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -698,5 +745,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 16 completes the audited Gen 1-applicable M2
-save/editor chain. Resume with the ordered M3 audio foundation.
+Current recovery point: Batch 17 completes the audited M3 audio and movie
+orientation chain. Resume with the ordered M4 extractor/catalog batch.
