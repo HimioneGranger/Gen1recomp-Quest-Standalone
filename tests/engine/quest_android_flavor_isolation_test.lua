@@ -24,6 +24,7 @@ local questMake = read("mobile/android/love/src/jni/questxr_bridge/Android.mk")
 local questNative = read(
   "mobile/android/love/src/jni/questxr_bridge/questxr_bridge.c")
 local questDisplay = read("src/host/android/QuestOpenXRDisplay.lua")
+local questAdapter = read("src/quest/compat/HostAdapterV1.lua")
 local questManifest = read(
   "mobile/android/app/src/questVr/AndroidManifest.xml")
 
@@ -48,8 +49,19 @@ check(love:find("arguments 'QUEST_XR=1'", 1, true),
   "only the questVr library flavor enables native XR compilation")
 check(not activity:find("Quest", 1, true) and not activity:find("OpenXR", 1, true),
   "shared GameActivity has no Quest/OpenXR references")
+check(activity:find("protected String getHostModule()", 1, true) and
+      activity:find('return "";', 1, true),
+  "standard Android returns no host adapter")
 check(questActivity:find('return new String[] { "questxr" };', 1, true),
   "Quest activity opts into its separate native library")
+check(questActivity:find("protected String getHostModule()", 1, true) and
+      questActivity:find('return "src.quest.compat.HostAdapterV1";', 1, true),
+  "Quest activity selects the exact API v1 host adapter")
+check(questAdapter:find("apiVersion = 1", 1, true) and
+      questAdapter:find("QuestOpenXRDisplay", 1, true) and
+      not questAdapter:find("ImportHost", 1, true) and
+      not questAdapter:find("HostLifecycle", 1, true),
+  "first Quest adapter installs only the existing display backend")
 check(questActivity:find("protected void onHostDestroy()", 1, true) and
       questActivity:find("nativeQuestXrDestroy();", 1, true),
   "Quest activity releases the native host from the generic destroy hook")
