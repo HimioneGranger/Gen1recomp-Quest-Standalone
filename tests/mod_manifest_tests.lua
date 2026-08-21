@@ -555,6 +555,51 @@ check(depConflictCheck.hasIssues == true, "conflict with colorlib triggers hasIs
 check(#depConflictCheck.deps == 1 and depConflictCheck.deps[1].status == "conflict",
   "incompatible mod is flagged as status conflict")
 check(depConflictCheck.deps[1].kind == "conflict", "conflict item carries kind conflict")
+local unconditionalConflict = LauncherMods.checkDependencies(testTargetManifest,
+  nil, nil, { testTargetManifest, installedColorlib })
+check(unconditionalConflict.hasIssues == true,
+  "dependency resolver reports an unversioned conflict")
+
+local function rangeTarget(version, conflicts)
+  return Manifest.validate({
+    id = "range_target",
+    name = "Range Target",
+    version = version,
+    entry = "main.lua",
+    conflicts = conflicts or {},
+  }, "mods/range_target")
+end
+local function rangeSource(conflicts)
+  return Manifest.validate({
+    id = "range_source",
+    name = "Range Source",
+    version = "1.0.0",
+    entry = "main.lua",
+    conflicts = conflicts or {},
+  }, "mods/range_source")
+end
+
+local forwardSource = rangeSource({ "range_target@<2.0.0" })
+local matchingTarget = rangeTarget("1.4.0")
+local nonmatchingTarget = rangeTarget("2.0.0")
+local forwardMatching = LauncherMods.checkDependencies(forwardSource,
+  nil, nil, { forwardSource, matchingTarget })
+check(forwardMatching.hasIssues == true and #forwardMatching.deps == 1,
+  "dependency resolver applies a matching forward conflict range")
+local forwardNonmatching = LauncherMods.checkDependencies(forwardSource,
+  nil, nil, { forwardSource, nonmatchingTarget })
+check(forwardNonmatching.hasIssues == false and #forwardNonmatching.deps == 0,
+  "dependency resolver ignores a nonmatching forward conflict range")
+
+local reverseSource = rangeSource({ "range_target@<2.0.0" })
+local reverseMatching = LauncherMods.checkDependencies(matchingTarget,
+  nil, nil, { reverseSource, matchingTarget })
+check(reverseMatching.hasIssues == true and #reverseMatching.deps == 1,
+  "dependency resolver applies a matching reverse conflict range")
+local reverseNonmatching = LauncherMods.checkDependencies(nonmatchingTarget,
+  nil, nil, { reverseSource, nonmatchingTarget })
+check(reverseNonmatching.hasIssues == false and #reverseNonmatching.deps == 0,
+  "dependency resolver ignores a nonmatching reverse conflict range")
 
 Runtime.install(savedEvents, savedHooks)
 

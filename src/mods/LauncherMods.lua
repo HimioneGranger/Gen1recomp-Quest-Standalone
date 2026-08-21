@@ -210,12 +210,19 @@ function LauncherMods.checkDependencies(manifest, options, version, installedMan
     return m and not m.experimental
   end
 
+  local function conflictApplies(spec, other)
+    return not spec.range or (other and other.version
+      and Semver.satisfies(other.version, spec.range))
+  end
+
   -- (a) Conflicts declared by target manifest
   if type(manifest.conflictSpecs) == "table" then
     for _, spec in ipairs(manifest.conflictSpecs) do
       local conflictId = spec.id
       local installedOther = installedMap[conflictId]
-      if installedOther and isEnabled(conflictId) and not conflictIdsSeen[conflictId] then
+      if installedOther and isEnabled(conflictId)
+          and conflictApplies(spec, installedOther)
+          and not conflictIdsSeen[conflictId] then
         conflictIdsSeen[conflictId] = true
         hasIssues = true
         depsResult[#depsResult + 1] = {
@@ -233,11 +240,12 @@ function LauncherMods.checkDependencies(manifest, options, version, installedMan
 
   -- (b) Reverse conflicts declared by installed mods against target manifest
   if manifest.id then
+    local installedTarget = installedMap[manifest.id] or manifest
     for _, other in ipairs(manifests) do
       if other.id ~= manifest.id and isEnabled(other.id) and not conflictIdsSeen[other.id] then
         local conflicts = other.conflictSpecs or {}
         for _, spec in ipairs(conflicts) do
-          if spec.id == manifest.id then
+          if spec.id == manifest.id and conflictApplies(spec, installedTarget) then
             conflictIdsSeen[other.id] = true
             hasIssues = true
             depsResult[#depsResult + 1] = {

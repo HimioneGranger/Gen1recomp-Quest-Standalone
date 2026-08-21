@@ -1153,6 +1153,39 @@ Focused verification:
 - Staged secret, private-path, protected-artifact, binary, whitespace, and
   diff checks passed.
 
+### Batch 26: version-aware launcher conflicts
+
+Audit lane: M7.
+
+Upstream source:
+
+- `b8ec4fe6b5fe4df48926e316ed4e89efd97bf0a5`
+
+Exact integrated path set:
+
+```text
+src/mods/LauncherMods.lua
+tests/mod_manifest_tests.lua
+```
+
+The staged patch has the same 57 ordered changed lines and the same 55-line
+stat as the audited source. The three-way test context also contained an
+unchanged, intervening Gen 2 scoped-dependency block from the source parent;
+that block was not part of this commit's patch and was not imported. The
+existing Gen 1 dependency and conflict tests remain in place.
+
+Direct and reverse conflict reports now apply a declared semantic-version
+range to the installed target. Unversioned conflicts keep their prior meaning.
+
+Focused verification:
+
+- Manifest, dependency, forward-range, and reverse-range contract: 112/112
+  passed.
+- Profile and dependency launcher seam: 15/15 passed.
+- LuaJIT source compilation: 370/370 passed.
+- Staged secret, private-path, protected-artifact, binary, whitespace, and
+  diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1165,6 +1198,5 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 25 completes the M7 profile and dependency
-foundation while preserving the Q47 async/SAF importer. Resume with versioned
-conflict resolution.
+Current recovery point: Batch 26 completes the version-aware conflict fix.
+Resume with the ordered skin and Skin Studio unit.
