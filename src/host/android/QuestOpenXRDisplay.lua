@@ -235,10 +235,17 @@ local function newBackend(native, axisX, axisY, pointerX, pointerY, pointerActiv
   end
 
   function backend:endFrame(kind, subject)
+    local previousKind = self.kind
     self.kind, self.subject = kind, subject
     local px, py, visible = pointerState(kind, subject)
     pcall(self.native.questxr_set_panel_pointer, px, py, visible)
-    if self.elapsed < (1 / 15) then return end
+    -- A rate-limited launcher frame can leave the branded loading texture in
+    -- the native panel after gameplay has drawn its first completed frame.
+    -- Retire that texture at every real presentation-owner change. Ordinary
+    -- frames stay at 15 Hz, but the first frame from a new owner is captured
+    -- immediately so an old loading or game image cannot reappear later.
+    local ownerChanged = previousKind ~= nil and previousKind ~= kind
+    if not ownerChanged and self.elapsed < (1 / 15) then return end
     self.elapsed = 0
     local fx, fy, fw, fh = focusRect(kind, subject)
     -- Queue only the panel metadata here. The optional Android presentation

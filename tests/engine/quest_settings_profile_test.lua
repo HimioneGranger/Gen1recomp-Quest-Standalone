@@ -34,6 +34,44 @@ check(not PlatformProfile.optionRowSupported({ key = "v_curved", label = "V CURV
   "Quest hides the inactive V Curved row")
 check(PlatformProfile.optionRowSupported({ key = "render_distance", label = "DISTANCE" }),
   "Quest retains a supported mod option")
+local preserved = { id = "legacy", key = "v_curve", label = "V-CURVE", value = true }
+check(not PlatformProfile.optionRowSupported(preserved) and preserved.value == true,
+  "Quest filtering preserves the saved V-Curve value")
+for _, row in ipairs({
+  { key = "tshift", label = "T SHIFT" },
+  { key = "t_shift", label = "T-SHIFT" },
+  { key = "vcurve", label = "V CURVE" },
+  { key = "v_curve", label = "V-CURVE" },
+  { key = "v_curved", label = "V CURVED" },
+}) do
+  check(not PlatformProfile.optionRowSupported(row),
+    "Quest hides inactive schema variant: " .. row.key)
+end
+
+local ManagerState = require("src.mods.ManagerState")
+local managerOptions = {
+  modOptions = { DRAMALESS_SHAPE = {
+    tshift = true, v_curve = false, active_quest_control = 7,
+  } },
+}
+local manager = ManagerState.new({
+  save = { options = managerOptions },
+  mods = { modOptions = managerOptions.modOptions },
+})
+local managerRows = manager:buildOptionRows({ id = "DRAMALESS_SHAPE" }, {
+  { key = "tshift", label = "T-SHIFT", type = "toggle", default = false },
+  { key = "v_curve", label = "V-CURVE", type = "toggle", default = true },
+  { key = "active_quest_control", label = "QUEST SCALE", type = "number",
+    default = 5, min = 1, max = 10, step = 1 },
+})
+local managerIds = {}
+for _, row in ipairs(managerRows) do managerIds[row.id] = true end
+check(not managerIds.tshift and not managerIds.v_curve
+    and managerIds.active_quest_control and managerIds.__reset,
+  "Quest mod manager hides only flat-display rows and keeps active controls")
+check(managerOptions.modOptions.DRAMALESS_SHAPE.tshift == true
+    and managerOptions.modOptions.DRAMALESS_SHAPE.v_curve == false,
+  "mod manager filtering keeps hidden saved values byte-for-byte equivalent")
 
 for _, path in ipairs({
   "src/import/LauncherSettings.lua",

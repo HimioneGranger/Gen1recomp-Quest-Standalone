@@ -16,5 +16,7 @@ check(script:find('gen1recomp-unplugged-$BUILD_VARIANT-$apk_name', 1, true),
   "Android APK copy has a variant-specific filename")
 check(not script:find('local dist_dir="$DIST/debug"\n', 1, true),
   "shared debug output directory is not cleared")
+check(script:find('zip -q -X -9 -r "$LOVE_FILE"', 1, true),
+  "Android game.love packaging strips host-specific ZIP metadata")
 
 print(("android build variant output: %d checks passed"):format(checks))
