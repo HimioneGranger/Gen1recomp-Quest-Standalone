@@ -155,7 +155,7 @@ function App.load(pathOverride, opts)
   -- the same mod set the game loads, merged into Data before the catalogs
   -- build, so modded species/items/moves are editable and MonOps stops
   -- asserting on them
-  if not mods then
+  if not mods or App.dataVersion ~= opts.version then
     -- One loader per editor session.  A previous session leaves Data holding
     -- that session's merged registries (and possibly the other game's cache),
     -- and a second builtin registration over them collides -- "statuses

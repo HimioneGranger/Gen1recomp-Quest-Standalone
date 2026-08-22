@@ -154,7 +154,7 @@ os.remove(tmpPath)
 love.filesystem = savedFS
 -- leave shared singletons the way we found them (the fixture merged one
 -- record into Data.pokemon)
-Data.pokemon.EDITMON = nil
+if Data.pokemon then Data.pokemon.EDITMON = nil end
 Assets.loader = savedBridge
 Assets.invalidate()
 Runtime.install(savedEvents, savedHooks, savedErrors)

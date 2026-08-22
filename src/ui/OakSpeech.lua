@@ -99,14 +99,14 @@ function OakSpeech.resolvePic(game, desc, speech)
   local t = desc.type
   if t == "trainer" then
     if speech and desc.id == "OPP_PROF_OAK" and speech.oakPic then
-      return speech.oakPic, false, false
+      return speech.oakPic, false, speech.oakTrueColor or false
     end
     if speech and desc.id == "OPP_RIVAL1" and speech.rivalPic then
-      return speech.rivalPic, false, false
+      return speech.rivalPic, false, speech.rivalTrueColor or false
     end
     local trainers = game.data.trainers or {}
     local tr = trainers[desc.id]
-    return tryImage(tr and tr.pic), false, false
+    return tryImage(tr and tr.pic), false, tr and tr.trueColor or false
   elseif t == "pokemon" then
     if speech and desc.id == speech.demoSpecies and speech.demoPic then
       return speech.demoPic, desc.flip and true or false, speech.demoTrueColor
@@ -243,7 +243,11 @@ function OakSpeech.new(game, onDone)
   self.answers = {}
   local trainers = game.data.trainers or {}
   self.oakPic = tryImage(trainers.OPP_PROF_OAK and trainers.OPP_PROF_OAK.pic)
+  self.oakTrueColor = self.oakPic
+    and trainers.OPP_PROF_OAK and trainers.OPP_PROF_OAK.trueColor or false
   self.rivalPic = tryImage(trainers.OPP_RIVAL1 and trainers.OPP_RIVAL1.pic)
+  self.rivalTrueColor = self.rivalPic
+    and trainers.OPP_RIVAL1 and trainers.OPP_RIVAL1.trueColor or false
   local oakGfx = (game.data.field and game.data.field.oakSpeech) or {}
   self.cfg = oakGfx
   -- the show-off mon and the name length cap come from data; the vanilla

@@ -43,7 +43,7 @@ local BATTLE_FIELDS = {
   "moveIndex", "moveSwapIndex", "aiUses", "runAttempts", "payDay",
   "sideToxic", "isGymLeader", "musicKind", "lastBall", "lockedBall",
   "lowHealthAlarmDisabled", "lowHealthAlarmOn", "victoryMusicPlayed",
-  "endBattleText",
+  "endBattleText", "playerPartyIndices",
 }
 
 local function partyIndex(party, mon)
@@ -89,6 +89,23 @@ end
 local function integer(value, min, max)
   return type(value) == "number" and value % 1 == 0
     and value >= (min or -math.huge) and value <= (max or math.huge)
+end
+
+local function exactIndexSet(indices, maxIndex, requireMember)
+  if type(indices) ~= "table" then return nil end
+  local count, keys = #indices, 0
+  for key in pairs(indices) do
+    keys = keys + 1
+    if not integer(key, 1, count) then return nil end
+  end
+  if keys ~= count or (requireMember and count == 0) then return nil end
+  local seen = {}
+  for i = 1, count do
+    local index = indices[i]
+    if not integer(index, 1, maxIndex) or seen[index] then return nil end
+    seen[index] = true
+  end
+  return seen
 end
 
 local function validateMoveList(data, moves)
@@ -200,6 +217,16 @@ function BattleCheckpoint.validate(game, checkpoint)
   if type(party) ~= "table" or not validateBattler(game.data, model.player, #party) then
     return nil, "invalid_content", "Player battle state is invalid."
   end
+  local scopedIndices
+  if model.playerPartyIndices ~= nil then
+    if model.kind ~= "trainer" then
+      return nil, "invalid_checkpoint", "Battle party scope is invalid."
+    end
+    scopedIndices = exactIndexSet(model.playerPartyIndices, #party, true)
+    if not scopedIndices or not scopedIndices[model.player.index] then
+      return nil, "invalid_checkpoint", "Battle party scope is invalid."
+    end
+  end
   if model.kind == "wild" then
     if not validateMon(game.data, model.enemyMon)
         or not validateBattler(game.data, model.enemy, 1) then
@@ -220,12 +247,15 @@ function BattleCheckpoint.validate(game, checkpoint)
     end
   end
   for _, indices in ipairs({ model.participants, model.leveledUp }) do
-    if type(indices) ~= "table" then
+    local referenced = exactIndexSet(indices, #party, false)
+    if not referenced then
       return nil, "invalid_checkpoint", "Battle party reference set is missing."
     end
-    for _, index in ipairs(indices) do
-      if not integer(index, 1, #party) then
-        return nil, "invalid_checkpoint", "Battle party reference is invalid."
+    if scopedIndices then
+      for index in pairs(referenced) do
+        if not scopedIndices[index] then
+          return nil, "invalid_checkpoint", "Battle party reference is invalid."
+        end
       end
     end
   end
@@ -276,7 +306,9 @@ function BattleCheckpoint.restore(game, checkpoint, copy)
   local model = checkpoint.runtime.battle
   local battle
   if model.kind == "trainer" then
-    battle = BattleState.newTrainer(game, model.oppClass, model.partyIndex)
+    battle = BattleState.newTrainer(game, model.oppClass, model.partyIndex, {
+      playerPartyIndices = model.playerPartyIndices,
+    })
     battle.enemyParty = assert(copy(model.enemyParty))
     battle.enemyIndex = model.enemyIndex
   else

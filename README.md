@@ -201,6 +201,7 @@ OpenXR integration and Quest mod forks are maintained and tested here.
 - Contributors: start with [CONTRIBUTING.md](CONTRIBUTING.md)
 - Release maintainers: use the [Quest release checklist](docs/quest-release-checklist.md)
 - OpenXR architecture: read the [Quest backend notes](docs/quest-openxr-backend.md)
+- Link-play trust boundaries: read the [link security model](docs/link-security.md)
 - Upstream platform maintainers: the preserved Switch **CI vs release**
   contract remains documented in [switch-build.md](docs/switch-build.md)
 

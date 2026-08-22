@@ -130,6 +130,7 @@ TextBox.TOKENS = {
   STRBUF = function(game) return game.stringBuffer end,
   RAM = function(game, arg)
     if arg == "wStringBuffer" then return game.stringBuffer end
+    if arg == "wNameBuffer" then return game.stringBuffer end
     if arg == "wBoxNumString" then return game.boxNumString end
     -- SendNewMonToBox / _SentToBoxText reads the deposited nick here
     if arg == "wBoxMonNicks" then return game.boxMonNicks end

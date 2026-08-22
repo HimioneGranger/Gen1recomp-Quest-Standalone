@@ -891,8 +891,7 @@ do
     check(tb:lockedAction(tb.enemy) == nil, "victim is free after the release")
   end
 
-  -- #2: recoil and drain use the RAW computed damage, not the HP-capped
-  -- amount dealt
+  -- engine/battle/core.asm ApplyDamageToEnemyPokemon
   do
     Game.save.party = { Pokemon.new(Data, "BULBASAUR", 20) }
     local rb = BattleState.newWild(Game, "RATTATA", 3)
@@ -903,8 +902,8 @@ do
     rb.rng = mkseq({ 0, 255, 255 })
     local hpBefore = rb.player.mon.hp
     rb:performMove(rb.player, rb.enemy, { id = "TAKE_DOWN", pp = 10 })
-    eq(hpBefore - rb.player.mon.hp, math.floor(raw / 4),
-       "recoil is raw damage / 4 even when only 1 HP was dealt")
+    eq(hpBefore - rb.player.mon.hp, 1,
+       "recoil is capped damage / 4 with a minimum of 1")
 
     local db = BattleState.newWild(Game, "RATTATA", 3)
     db.enemy.mon.hp = 1
@@ -914,9 +913,9 @@ do
     check(rawD >= 4, "raw MEGA DRAIN damage is meaningful (" .. rawD .. ")")
     db.rng = mkseq({ 0, 255, 255 })
     db:performMove(db.player, db.enemy, { id = "MEGA_DRAIN", pp = 10 })
-    eq(db.player.mon.hp - 1, math.floor(rawD / 2),
-       "drain heals raw damage / 2 even when only 1 HP was dealt")
-    eq(db.lastDamage, math.floor(rawD / 2),
+    eq(db.player.mon.hp - 1, 1,
+       "drain heals capped damage / 2 with a minimum of 1")
+    eq(db.lastDamage, 1,
        "drain halves wDamage in place (Counter would see the half)")
   end
 

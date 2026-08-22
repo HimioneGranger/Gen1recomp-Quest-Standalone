@@ -65,7 +65,7 @@ T.check(pushed[1].text:find(BYE, 1, true) == nil,
 
 pushed[1].onDone()
 T.eq(#pushed, 1, "the farewell waits for the bow")
-T.eq(nurse.facing, "up", "image index $14: the nurse bows")
+T.eq(nurse.frameOverride, 3, "image index $1: the nurse bows")
 T.check(fakeSelf.emote ~= nil, "the bow is a world hold, not a text pause")
 local hold = fakeSelf.emote or {}
 T.eq(hold.npc, nurse, "the hold is anchored on the nurse")
@@ -79,11 +79,12 @@ if hold.onDone then hold.onDone() end
 T.eq(#pushed, 2, "the farewell follows the bow")
 local farewell = pushed[2] or {}
 T.eq(farewell.text, BYE, "second box is the farewell text")
-T.eq(nurse.facing, "up", "she is still bowed while the farewell prints")
+T.eq(nurse.frameOverride, nil, "the bow ends before the farewell prints")
+T.eq(nurse.facing, "down", "the nurse faces the player for the farewell")
 
 if farewell.onDone then farewell.onDone() end
-T.eq(nurse.facing, "down", "the trailing UpdateSprites faces her back")
-T.eq(faced, 1, "she is turned back exactly once")
+T.eq(nurse.facing, "down", "the trailing UpdateSprites keeps her facing")
+T.eq(faced, 2, "she is turned back before and after the farewell")
 T.eq(finished, 1, "control returns to the player once, after the farewell")
 
 -- === no nurse sprite (the Yellow/rest-stop callers): no bow, same text

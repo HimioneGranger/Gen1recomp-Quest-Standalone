@@ -87,13 +87,19 @@ end
 
 -- ------- a mod registers two pipelines and the engine dispatches them
 
-local trace = {}
-
+-- The probe table is the mod's, published through mod.exports: a mod's
+-- globals are its own now (src/mods/Sandbox.lua).  The world/present folds
+-- accept only a real Canvas, so the mod makes concrete ones to return and the
+-- test pins identity through the dispatch.
 local FILES = {
   ["mods/painter/manifest.json"] = manifest("painter", ',"priority":10'),
   ["mods/painter/main.lua"] = [[
     local mod = ...
-    local T = _G.__RENDER_TEST
+    local T = mod.exports
+    T.trace, T.available = {}, true
+    T.worldOut = love.graphics.newCanvas(2, 2)
+    T.blurOut = love.graphics.newCanvas(2, 2)
+    T.gradeOut = love.graphics.newCanvas(2, 2)
     mod.content.render_pipelines:register("diorama", {
       label = "DIORAMA",
       levels = { "OFF", "LOW", "HIGH" },
@@ -101,8 +107,6 @@ local FILES = {
       priority = 20,
       available = function() return T.available end,
       update = function(dt, level) T.trace[#T.trace + 1] = "update:" .. level end,
-      -- the folds composite only a real Canvas, so the mod hands back the
-      -- canvases the test pre-created (see T.worldOut / T.blurOut / T.gradeOut)
       drawWorld = function(ctx)
         T.trace[#T.trace + 1] = "world:" .. tostring(ctx.tag)
         return T.worldOut
@@ -123,17 +127,12 @@ local FILES = {
   ]],
 }
 
-_G.__RENDER_TEST = { trace = trace, available = true }
--- the world/present folds accept only a real Canvas, so give the mod concrete
--- ones to return and pin identity through the dispatch
-_G.__RENDER_TEST.worldOut = love.graphics.newCanvas(2, 2)
-_G.__RENDER_TEST.blurOut = love.graphics.newCanvas(2, 2)
-_G.__RENDER_TEST.gradeOut = love.graphics.newCanvas(2, 2)
-
 local data = {}
 local loader = Loader.new({ fs = memfs(FILES) })
 local okLoad = loader:load(data)
 check(okLoad, "the pipeline mod loads clean: " .. table.concat(loader.errors, "; "))
+local RT = loader.exports.painter
+local trace = RT.trace
 Pipelines.install(data)
 
 check(type(data.render_pipelines) == "table",
@@ -169,24 +168,24 @@ Pipelines.setLevel("grade", 1)
 
 eq(Pipelines.worldPipeline(), "diorama",
   "the eligible world pipeline claims the world pass")
-eq(Pipelines.drawWorld("diorama", { tag = "ctx" }), _G.__RENDER_TEST.worldOut,
+eq(Pipelines.drawWorld("diorama", { tag = "ctx" }), RT.worldOut,
   "drawWorld returns the mod's canvas")
 eq(trace[#trace], "world:ctx", "drawWorld received the frame context")
 
-eq(Pipelines.worldPresent(_G.__RENDER_TEST.worldOut), _G.__RENDER_TEST.blurOut,
+eq(Pipelines.worldPresent(RT.worldOut), RT.blurOut,
   "worldPresent folds its canvas over the world image")
 eq(Pipelines.wantsPresent(), true, "a live present pass asks for the canvas")
-eq(Pipelines.present(_G.__RENDER_TEST.gradeOut), _G.__RENDER_TEST.gradeOut,
+eq(Pipelines.present(RT.gradeOut), RT.gradeOut,
   "present folds its canvas over the finished composite")
 
 -- ------- the hardware gate
 
-_G.__RENDER_TEST.available = false
+RT.available = false
 eq(Pipelines.worldPipeline(), nil,
   "an unavailable pipeline never takes the world pass")
 eq(Pipelines.worldPresent("world-canvas"), "world-canvas",
   "an unavailable pipeline's worldPresent is skipped")
-_G.__RENDER_TEST.available = true
+RT.available = true
 eq(Pipelines.worldPipeline(), "diorama", "availability is re-read each frame")
 
 -- ------- the gate governs input, never the draw
@@ -282,7 +281,8 @@ local SLOPPY = {
   ["mods/sloppy/manifest.json"] = manifest("sloppy"),
   ["mods/sloppy/main.lua"] = [[
     local mod = ...
-    local T = _G.__SLOPPY
+    local T = mod.exports
+    T.ran = 0
     mod.content.render_pipelines:register("sloppy", {
       label = "SLOPPY",
       present = function(canvas)
@@ -302,20 +302,20 @@ local SLOPPY = {
     })
   ]],
 }
-_G.__SLOPPY = { ran = 0 }
 local sloppyData = {}
 local sloppyLoader = Loader.new({ fs = memfs(SLOPPY) })
 sloppyLoader:load(sloppyData)
+local SL = sloppyLoader.exports.sloppy
 Pipelines.install(sloppyData)
 
 local composite = love.graphics.newCanvas(4, 4)
 Pipelines.setLevel("sloppy", 1)
 for _, bad in ipairs({ "just-a-string", true, 42 }) do
-  _G.__SLOPPY.ret = bad
+  SL.ret = bad
   eq(Pipelines.present(composite), composite,
     "a present returning a " .. type(bad) .. " leaves the composite untouched")
 end
-check(_G.__SLOPPY.ran == 3, "the present callback still ran each frame")
+check(SL.ran == 3, "the present callback still ran each frame")
 check(Pipelines.eligible("sloppy") == true,
   "a non-canvas return does not retire the pipeline as broken")
 Pipelines.setLevel("sloppy", 0)
@@ -334,11 +334,9 @@ eq(love.graphics.getCanvas(), "engine-canvas",
 eq(love.graphics.getBlendMode(), "alpha",
   "a present that changed blend mode cannot leak it past the fold")
 Pipelines.setLevel("dirty", 0)
-_G.__SLOPPY = nil
 
 Pipelines.reset()
 Pipelines.install(nil)
-_G.__RENDER_TEST = nil
 
 -- ------- and with no mods at all, the whole subsystem is inert
 

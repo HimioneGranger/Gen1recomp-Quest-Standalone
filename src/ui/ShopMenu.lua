@@ -106,6 +106,27 @@ local function sell(game)
     dialogue = true,
     money = function() return game.save.money end,
     footer = greet,
+    onSelectKey = function(item, l)
+      if not item then return end
+      if not l.swapIndex then
+        l.swapIndex = l.index
+        return
+      end
+      local order = Bag.order(game.save)
+      order[l.swapIndex], order[l.index] = order[l.index], order[l.swapIndex]
+      l.swapIndex = nil
+      require("src.core.Sound").play(game.data, "Swap")
+      local rebuilt = {}
+      for _, id in ipairs(order) do
+        local def = game.data.items[id]
+        rebuilt[#rebuilt + 1] = {
+          value = id,
+          label = def and def.name or id,
+          right = "x" .. game.save.inventory[id],
+        }
+      end
+      l.items = rebuilt
+    end,
     onChoose = function(item)
       local def = game.data.items[item.value]
       -- only key items and HMs are unsellable (pokemart.asm IsKeyItem /

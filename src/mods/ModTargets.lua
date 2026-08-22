@@ -168,4 +168,40 @@ function ModTargets.detail(manifest, version)
     ModTargets.gameLabel(version))
 end
 
+-- Does a dependency spec apply to this game / version?
+-- If spec.games is provided, it must match version / generation.
+-- If spec.game_version is provided, the engine version must satisfy it.
+function ModTargets.specApplies(spec, version, generation)
+  if not spec then return false end
+  if type(spec.games) == "table" and #spec.games > 0 then
+    if version or generation then
+      local match = false
+      for _, id in ipairs(spec.games) do
+        if version and id == version then
+          match = true
+          break
+        end
+        if generation and GameVersion.generation(id) == generation then
+          match = true
+          break
+        end
+      end
+      if not match then return false end
+    end
+  end
+  if spec.game_version then
+    local ok = pcall(function()
+      local Semver = require("src.mods.Semver")
+      local Version = require("src.core.Version")
+      if Version and Version.engine
+          and Version.engine:match("^0%.0%.0%-") == nil then
+        return Semver.satisfies(Version.engine, spec.game_version)
+      end
+      return true
+    end)
+    if not ok then return false end
+  end
+  return true
+end
+
 return ModTargets

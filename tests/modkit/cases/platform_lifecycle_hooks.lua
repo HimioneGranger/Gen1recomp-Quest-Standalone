@@ -23,21 +23,21 @@ local FIXTURE = {
       extraPolls = extraPolls + 1
       if not paused then nextFn(game, dt) end
     end)
+    local vetoQuit = false
     mod.hooks:wrap("core.quit_to_launcher", function(nextFn)
-      if os.getenv("FIXTURE_VETO_QUIT") == "1" then return false end
+      if vetoQuit then return false end
       return nextFn()
     end)
+    local frames = {}
     mod.events:on("render.frame_drawn", function(frame)
-      _G.__fixturePlatformBridge.frames[#_G.__fixturePlatformBridge.frames + 1]
-        = frame
+      frames[#frames + 1] = frame
     end)
-    -- test-only knobs, read back through mod.storage-free globals since
-    -- this fixture never leaves the process
-    _G.__fixturePlatformBridge = {
-      setPaused = function(v) paused = v end,
-      extraPolls = function() return extraPolls end,
-      frames = {},
-    }
+    -- test-only knobs on mod.exports: a sandboxed mod has no shared _G to
+    -- smuggle them through (src/mods/Sandbox.lua)
+    mod.exports.setPaused = function(v) paused = v end
+    mod.exports.extraPolls = function() return extraPolls end
+    mod.exports.setVetoQuit = function(v) vetoQuit = v end
+    mod.exports.frames = frames
   ]],
 }
 
@@ -48,23 +48,23 @@ do
   T.eq(#run.errors, 0,
     "the fixture mod loads clean (" .. tostring(run.errors[1]) .. ")")
 
+  local bridge = run.loader.exports.fix_platform_bridge
   local calls = 0
   local fakeGame = { update = function(self, dt) calls = calls + 1 end }
 
-  _G.__fixturePlatformBridge.setPaused(false)
+  bridge.setPaused(false)
   PlatformHooks.update(fakeGame, 1 / 60)
   T.eq(calls, 1, "unpaused: vanilla Game:update runs")
-  T.eq(_G.__fixturePlatformBridge.extraPolls(), 1,
+  T.eq(bridge.extraPolls(), 1,
     "the subscriber's wrapper runs every frame")
 
-  _G.__fixturePlatformBridge.setPaused(true)
+  bridge.setPaused(true)
   PlatformHooks.update(fakeGame, 1 / 60)
   T.eq(calls, 1, "paused: vanilla Game:update is skipped")
-  T.eq(_G.__fixturePlatformBridge.extraPolls(), 2,
+  T.eq(bridge.extraPolls(), 2,
     "the subscriber keeps polling every frame while paused")
 
   run.release()
-  _G.__fixturePlatformBridge = nil
 end
 
 -- render.frame_drawn: observers receive the exact completed frame identity.
@@ -75,17 +75,17 @@ do
   T.eq(#run.errors, 0,
     "the fixture mod loads clean (" .. tostring(run.errors[1]) .. ")")
 
+  local bridge = run.loader.exports.fix_platform_bridge
   local subject = { tag = "finished-game-frame" }
   PlatformHooks.frameDrawn("game", subject)
-  T.eq(#__fixturePlatformBridge.frames, 1,
+  T.eq(#bridge.frames, 1,
     "one post-draw event is emitted for one completed frame")
-  T.eq(__fixturePlatformBridge.frames[1].kind, "game",
+  T.eq(bridge.frames[1].kind, "game",
     "post-draw event identifies the frame kind")
-  T.eq(__fixturePlatformBridge.frames[1].subject, subject,
+  T.eq(bridge.frames[1].subject, subject,
     "post-draw event carries the exact drawn subject")
 
   run.release()
-  _G.__fixturePlatformBridge = nil
   -- No live listener: the public call remains a safe vanilla no-op.
   T.eq(PlatformHooks.frameDrawn("game", subject), nil,
     "post-draw seam is inert without a subscriber")
@@ -99,11 +99,8 @@ do
   T.eq(#run.errors, 0,
     "the fixture mod loads clean (" .. tostring(run.errors[1]) .. ")")
 
-  local realGetenv = os.getenv
-  os.getenv = function(name)
-    if name == "FIXTURE_VETO_QUIT" then return "1" end
-    return realGetenv(name)
-  end
+  local bridge = run.loader.exports.fix_platform_bridge
+  bridge.setVetoQuit(true)
   local vanillaCalls = 0
   local vetoed = PlatformHooks.quitToLauncher(function()
     vanillaCalls = vanillaCalls + 1
@@ -111,7 +108,7 @@ do
   end)
   T.eq(vetoed, false, "a subscriber can veto the return-to-launcher decision")
   T.eq(vanillaCalls, 0, "a veto never evaluates the vanilla condition")
-  os.getenv = realGetenv
+  bridge.setVetoQuit(false)
 
   local passed = PlatformHooks.quitToLauncher(function() return true end)
   T.eq(passed, true, "with no veto, the vanilla decision passes through unchanged")

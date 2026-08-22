@@ -1064,6 +1064,9 @@ R.trainers = {
     index = f.opt(f.int(0, 255)),
     -- unused vanilla classes ship without a pic, so it cannot be required
     pic = f.opt(f.path),
+    -- Full-color portrait: skip the 4-shade palette remap, like pokemon and
+    -- sprites that already carry the same flag.
+    trueColor = f.opt(f.bool),
     -- Optional Advanced-mode OBJ palette source for a custom trainer portrait.
     -- It follows the same ROM crosswalk form as sprites.paletteSource.
     paletteSource = f.opt(f.str),

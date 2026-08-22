@@ -62,6 +62,8 @@ local function getObpImage(path, colors, group)
   return obpCache[key]
 end
 
+SpriteRenderer.obpImage = getObpImage
+
 -- hot reload drops the sheets; live instances hold their own image, so
 -- the world rebuilds them (MapLoader.invalidateAll) rather than this
 function SpriteRenderer.invalidate()
@@ -232,8 +234,12 @@ function SpriteRenderer:gen2Obp()
     self.objGroup .. "|" .. tostring(GbcPalette.mode)
 end
 
+local function liveTrueColor(def)
+  return def and def.trueColor and PaletteFX.honorsTrueColor()
+end
+
 function SpriteRenderer:resolveImage()
-  if self.def.trueColor then return self.image end
+  if liveTrueColor(self.def) then return self.image end
   if self.objColors then
     return getObpImage(self.def.image, self:gen2Obp())
   end
@@ -281,13 +287,13 @@ end
 -- swapped and OAM_XFLIP on each (data/sprites/facings.asm:192-197).  Optional
 -- and trailing, so every existing call site is unchanged.
 function SpriteRenderer:draw(px, py, camX, camY, facing, walkPhase, stepFlip,
-    topHalf, forceFlip)
+    topHalf, forceFlip, frameOverride)
   local x, y = self:getScreenOrigin(px, py, camX, camY)
   local image = self.image
   local redraw = false
   -- True-color sheets bypass every palette bake; the screen-space exemption
   -- is recorded below once the final frame/height is known.
-  if self.def.trueColor then
+  if liveTrueColor(self.def) then
     image = self.image
   elseif self.objColors then
     -- Gen 2: the palette came from the caller (setObjPalette).  Like RED++
@@ -329,6 +335,9 @@ function SpriteRenderer:draw(px, py, camX, camY, facing, walkPhase, stepFlip,
   -- still 3-frame sprites turn to face (the nurse at her machine,
   -- facePlayer on STAY NPCs) but never show walk frames.
   local frame, flip = pose(self, facing, walkPhase, stepFlip)
+  if frameOverride and self.frames[frameOverride] then
+    frame, flip = frameOverride, false
+  end
   if forceFlip then flip = true end
   local quad = self.frames[frame]
   local drawHeight = self.frameHeight
@@ -344,7 +353,7 @@ function SpriteRenderer:draw(px, py, camX, camY, facing, walkPhase, stepFlip,
     drawHeight = math.max(1, self.frameHeight - math.min(8, self.frameHeight))
   end
   -- Full-color art claims exactly the portion of the frame that was drawn.
-  if self.def.trueColor then
+  if liveTrueColor(self.def) then
     PaletteFX.markTrueColor(x, y, self.frameWidth, drawHeight)
   end
   blitFrame(image, quad, x, y, flip, redraw, self.frameWidth)
@@ -357,7 +366,7 @@ end
 -- raw DMG shades (#384).
 function SpriteRenderer:drawTile(path, x, y, flip)
   local image, redraw = getImage(path), false
-  if self.def.trueColor then
+  if liveTrueColor(self.def) then
     PaletteFX.markTrueColor(x, y, 16, 8)
   elseif PaletteFX.usesGbcPack() then
     local colors, group = PaletteFX.spriteObp(self.def, self.seed)

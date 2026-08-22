@@ -65,6 +65,17 @@ function PikachuFollower.starterInParty(save, needHealthy)
   return nil
 end
 
+function PikachuFollower.isStarterPikachu(save, mon)
+  if not (mon and mon.species == "PIKACHU") then return false end
+  local player = save.player or {}
+  return mon.otId == player.id and mon.ot == player.name
+end
+
+function PikachuFollower.isFollowingDisabled(ow)
+  return ow and (ow.pikachuBillsScene or ow.pikachuFanClubScene
+    or ow.pikachuPewterSleepScene) and true or false
+end
+
 -- ModifyPikachuHappiness.  mon is the party mon the event applied to for
 -- the per-mon reasons (IsThisPartyMonStarterPikachu); GYMLEADER and
 -- WALKING instead require any healthy starter in the party
@@ -199,6 +210,7 @@ function PikachuFollower.onMapEntered(game, ow, opts, viaMapLoad)
   -- Bill's House owns a short scripted scene that deliberately keeps
   -- Pikachu off the normal trailing loop.  A new map instance ends it.
   ow.pikachuBillsScene = nil
+  ow.pikachuFanClubScene = nil
   remove(ow)
   if not shouldSpawn(game, ow) then return end
   -- opts.keepPikachu is the follower a connection crossing kept alive:
@@ -410,7 +422,8 @@ end
 -- (pikachu_follow.asm keeps it one walk step behind)
 function PikachuFollower.update(game, ow)
   if ow.pikaHop then return end -- the counter hop owns the follower (#417)
-  if ow.pikachuBillsScene then return end
+  if ow.pikachuBillsScene or ow.pikachuFanClubScene
+      or ow.pikachuPewterSleepScene then return end
   local npc = findFollower(ow)
   if not npc then
     if shouldSpawn(game, ow) then PikachuFollower.onMapEntered(game, ow) end
@@ -713,6 +726,13 @@ function PikachuFollower.talk(game, ow, npc, done)
   ow.player.facing = OPPOSITE[npc.facing] or ow.player.facing
   local save = game.save
   local emotion = selectEmotion(game, ow, save)
+  if ow.pikachuPewterSleepScene then
+    local finish = done
+    done = function()
+      ow.pikachuPewterSleepScene = nil
+      if finish then finish() end
+    end
+  end
   local e = EMOTIONS[emotion] or EMOTIONS[1]
   if e.turnAway then
     npc.facing = ow.player.facing -- pikaemotion_9: back to the player
@@ -796,6 +816,28 @@ local function movePikachu(ow, npc, steps, onDone)
     ow:scriptMove(npc, step[1], step[2], function() nextStep(i + 1) end)
   end
   nextStep(1)
+end
+
+function PikachuFollower.onFanClubEntered(game, ow)
+  if not (GameVersion.isYellow() and ow.map
+      and ow.map.id == "POKEMON_FAN_CLUB") then return end
+  local starter = PikachuFollower.starterInParty(game.save)
+  local npc = findFollower(ow)
+  if not npc or (starter and starter.status) then return end
+  ow.pikachuFanClubScene = true
+  ow.pikachuMapScriptActive = true
+  ow.player.facing = "down"
+  for _, other in ipairs(ow.npcs or {}) do
+    if other.def and other.def.name == "POKEMONFANCLUB_SEEL" then
+      other.movementStatus = 2
+      other.facing = "down"
+      break
+    end
+  end
+  billsHouseEmotion(game, ow, npc, "EXCLAMATION_BUBBLE")
+  movePikachu(ow, npc, { { "up", 1 }, { "right", 3 }, { "up", 1 } }, function()
+    npc.facing = "up"
+  end)
 end
 
 function PikachuFollower.onBillsHouseEnter(game, ow)

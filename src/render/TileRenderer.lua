@@ -760,6 +760,36 @@ function TileRenderer:markCellBottomRedraw(cx, cy, camX, camY, colors)
   end
 end
 
+-- Draw the bottom tile row of every visible grass cell after sprites.
+-- DMG/SGB: one SpriteBatch draw under the color-0-key shader.
+-- GBC:     per-cell draws using pre-keyed images (can't share one batch).
+function TileRenderer:drawGrassOverdraw(camX, camY)
+  local ox, oy = -math.floor(camX), -math.floor(camY)
+  if self.gbcCtx then
+    if self.grassCells then
+      for _, c in ipairs(self.grassCells) do
+        self:drawCellBottomRaw(c[1], c[2], camX, camY)
+      end
+    end
+  else
+    local shader = getColor0KeyShader()
+    if shader then love.graphics.setShader(shader) end
+    if self.grassBatch then
+      love.graphics.draw(self.grassBatch, ox, oy)
+    end
+    if shader then love.graphics.setShader() end
+  end
+end
+
+-- Queue every visible grass cell's bottom row for the post-zone
+-- sprite-redraw pass (GBC OBP replay; mirrors markCellBottomRedraw).
+function TileRenderer:markGrassOverdrawRedraw(camX, camY, colors)
+  if not self.grassCells then return end
+  for _, c in ipairs(self.grassCells) do
+    self:markCellBottomRedraw(c[1], c[2], camX, camY, colors)
+  end
+end
+
 local WINDOW_MARGIN = 8 -- tiles of slack kept around the view between refills
 
 function TileRenderer:ensureWindow(camX, camY, vw, vh)
@@ -785,6 +815,16 @@ function TileRenderer:ensureWindow(camX, camY, vw, vh)
     self.winBatch = love.graphics.newSpriteBatch(self.image, 1024, "dynamic")
   end
   self.winBatch:clear()
+  -- grass-overdraw pass structures: a SpriteBatch for the DMG/SGB shader
+  -- path (one atlas, one shader draw call) and a plain list for the GBC
+  -- path (per-cell pre-keyed images can't share a single SpriteBatch).
+  if not self.gbcCtx then
+    if not self.grassBatch then
+      self.grassBatch = love.graphics.newSpriteBatch(self.image, 1024, "dynamic")
+    end
+    self.grassBatch:clear()
+  end
+  self.grassCells = {}
   local anims = self.anims
   for _, anim in ipairs(anims) do
     if not anim.batch then
@@ -794,6 +834,9 @@ function TileRenderer:ensureWindow(camX, camY, vw, vh)
   end
   local map, quads = self.map, self.quads
   local claimedBy, aliasMap = self.claimedBy, self.aliasMap
+  -- track which grass cells we've already added so each cx/cy pair is only
+  -- recorded once even though its two bottom-row tiles share the same cell.
+  local grassSeen = {}
   for ty = ty0, ty1 - 1 do
     local by = math.floor(ty / 4)
     local ty4 = ty % 4
@@ -814,6 +857,25 @@ function TileRenderer:ensureWindow(camX, camY, vw, vh)
             anim.batch:add(anim.quadFor(tile), wx, wy)
           else
             anim.batch:add(wx, wy)
+          end
+        end
+        -- bottom tile row of a 2×2 cell (ty is odd) that is a grass cell:
+        -- record it for the post-sprite grass overdraw pass.
+        if ty % 2 == 1 then
+          local cx, cy = math.floor(tx / 2), math.floor(ty / 2)
+          local key = cy * 65536 + cx
+          if not grassSeen[key] and map:isGrassCell(cx, cy) then
+            grassSeen[key] = true
+            self.grassCells[#self.grassCells + 1] = { cx, cy }
+            -- DMG/SGB path: bake both tiles of the bottom row into the batch
+            if self.grassBatch then
+              -- left tile (tx = cx*2)
+              local lq = quads[map:tileAt(cx * 2, ty)]
+              if lq then self.grassBatch:add(lq, cx * 16, ty * 8) end
+              -- right tile (tx = cx*2+1)
+              local rq = quads[map:tileAt(cx * 2 + 1, ty)]
+              if rq then self.grassBatch:add(rq, cx * 16 + 8, ty * 8) end
+            end
           end
         end
       end
@@ -891,6 +953,8 @@ end
 -- :release on eviction.
 function TileRenderer:releaseBatches()
   safeRelease(self.winBatch); self.winBatch = nil
+  safeRelease(self.grassBatch); self.grassBatch = nil
+  self.grassCells = nil
   safeRelease(self.borderFill); self.borderFill = nil
   safeRelease(self.borderQuad); self.borderQuad = nil
   -- shared shift-variant cache; only drop the reference

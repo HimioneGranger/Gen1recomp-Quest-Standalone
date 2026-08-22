@@ -5,7 +5,36 @@ package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local T = require("tests.harness")
 local check = T.check
-love = love or require("tests.love_stub")
+-- This profile test must never inherit a real LÖVE filesystem.  In particular,
+-- a native runner can otherwise write options.lua and the mod schema snapshot
+-- in the repository root.  The isolated stub keeps every runtime write in the
+-- test-owned namespace below; it cannot remove or overwrite host files.
+local hostLove = rawget(_G, "love")
+local testLove = require("tests.love_stub")
+love = testLove
+local runtimeDirectory = os.getenv("POKEPORT_TEST_RUNTIME_DIR")
+  or ".codex-test-tmp/quest-settings-profile"
+local realSaveDirectory = testLove.filesystem.getSaveDirectory
+testLove.filesystem.getSaveDirectory = function() return runtimeDirectory end
+
+local protectedRoots = {
+  "mod_option_schemas.json", "options.lua", "options.lua.bak", "options.lua.tmp",
+  "docs/project-coordination/protected-residue-recovery-20260821.md",
+}
+local function residueSnapshot()
+  local snapshot = {}
+  for _, path in ipairs(protectedRoots) do
+    local file = io.open(path, "rb")
+    if file then
+      snapshot[path] = assert(file:read("*a"))
+      file:close()
+    else
+      snapshot[path] = false
+    end
+  end
+  return snapshot
+end
+local rootsBefore = residueSnapshot()
 
 local realGetOS = love.system.getOS
 love.system.getOS = function() return "Android" end
@@ -102,11 +131,12 @@ check(not launcher["VIDEO MODE"], "Quest launcher hides VIDEO MODE")
 check(not launcher["ORIENTATION"], "Quest launcher hides ORIENTATION")
 check(not launcher["TOUCH PAD"], "Quest launcher hides TOUCH PAD")
 check(not launcher["VIBRATION"], "Quest launcher hides VIBRATION")
+check(not launcher["SKIN STUDIO"], "Quest launcher hides flat-display Skin Studio")
 check(launcher["COLORS"], "Quest launcher keeps COLORS")
 check(launcher["PERFORMANCE"], "Quest launcher keeps PERFORMANCE")
 for _, label in ipairs({
   "TEXT SPEED", "BATTLE ANIMATION", "BATTLE STYLE", "BATTLE LAYOUT",
-  "BATTLE SIZE", "BATTLE BG", "UI LAYOUT", "MUSIC VOL", "SFX VOL",
+  "BATTLE SIZE", "BATTLE HUD", "BATTLE BG", "UI LAYOUT", "MUSIC VOL", "SFX VOL",
   "MUSIC FILTER", "TILT", "VOID FILL", "FAITHFUL RATIO", "MAX FPS",
   "OVERWORLD SPEED", "BATTLE SPEED", "MENU SPEED", "RESET REBINDS",
 }) do
@@ -134,7 +164,7 @@ check(rows.colors, "Quest in-game menu keeps COLORS")
 check(rows.performance, "Quest in-game menu keeps PERFORMANCE")
 for _, id in ipairs({
   "textSpeed", "animations", "battleStyle", "battleLayout", "battleFit",
-  "battleBg", "uiLayout", "ruleset", "musicVol", "sfxVol", "musicFilter",
+  "battleHud", "battleBg", "uiLayout", "ruleset", "musicVol", "sfxVol", "musicFilter",
   "tilt", "zoom", "voidFill", "faithfulRes", "fpsCap", "speedOverworld",
   "speedBattle", "speedMenu", "mods", "controls", "dateFormat", "timeFormat",
 }) do
@@ -151,6 +181,10 @@ local TouchControls = require("src.core.TouchControls")
 TouchControls:init()
 check(not TouchControls.active,
   "Quest flavor disables touch overlay without the panel FFI backend")
+TouchControls:applyOptions({ touchControls = { skin = "tv_crt" } })
+check(TouchControls.skinId == nil
+    and require("src.core.TouchSkin").active == nil,
+  "Quest ignores a saved flat-display skin and preserves its OpenXR viewport")
 
 local yellowSource
 do
@@ -166,6 +200,9 @@ local function read(path)
   file:close()
   return text
 end
+check(read("src/import/LauncherView.lua"):find(
+  "not PlatformProfile.isQuestStandalone()", 1, true),
+  "Quest launcher keeps the flat-display skins tab out of its header")
 check(read("src/ui/TitleState.lua"):find(
   "self.questLetterboxWhite = self.letterboxWhite", 1, true),
   "Quest Red Blue Yellow titles opt into the paper side fill")
@@ -202,4 +239,10 @@ check(PlatformProfile.isQuestStandalone(),
   "legacy panel signal remains a compatibility fallback")
 os.getenv = realGetenv
 _G.QUEST_PANEL_ACTIVE = realQuestPanel
+for _, path in ipairs(protectedRoots) do
+  check(residueSnapshot()[path] == rootsBefore[path],
+    "Quest settings profile leaves protected root residue unchanged: " .. path)
+end
+testLove.filesystem.getSaveDirectory = realSaveDirectory
+love = hostLove
 T.finish("quest settings profile")

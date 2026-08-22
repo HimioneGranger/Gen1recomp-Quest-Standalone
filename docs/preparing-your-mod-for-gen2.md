@@ -260,18 +260,13 @@ selected game reads `Needs <id> (not for Gold)` rather than `Ready`.
 
 ### One limit worth knowing
 
-**Per-game enable flags are still a preview.** The overlay
-`options.modsByVersion[version][id]` exists and every surface goes through
-`SaveData.modEnabled` / `SaveData.setModEnabled`, but
-`SaveData.PER_VERSION_MODS` is `false`
-(`src/core/SaveData.lua:489`). While it is false, `SaveData.modScope` answers
-nil for every caller, so the launcher panel, the in-game manager *and* the
-loader all read and write the one shared `options.mods` flag and the overlay is
-not consulted for enablement anywhere. That matters because the overlay is
-plantable from an imported `.g1rmodlist`: keeping every reader on the same
-scope as every writer is what stops a stored per-game flag from showing a mod
-set no boot would honour. Nothing about this affects a mod author; it affects
-what a player can currently express.
+**Enablement is per game.** The overlay
+`options.modsByVersion[version][id]` is read and written through
+`SaveData.modEnabled` / `SaveData.setModEnabled` by the launcher, in-game
+manager, and loader. Existing shared settings are copied to every game the
+first time this version sees the installed mods; from then on, each coloured
+game checkbox changes only that game's next boot. Nothing about this affects a
+mod author; it affects what a player can express.
 
 Targeting is a different question from enablement and *is* enforced per game,
 as above. The two do not share a switch.

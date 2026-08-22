@@ -239,6 +239,11 @@ function SaveData.defaultOptions()
     -- scale the battle surface to the window so it fills vertically.  See
     -- BattleState:wantsFillScale.
     battleFit = "fixed",
+    -- BATTLE HUD: STANDARD keeps every wide-battle element inside the native
+    -- 304x144 surface. EXTENDED is opt-in window-space placement for selected
+    -- wide layouts; unsupported combinations deliberately fall back to the
+    -- standard composition.
+    battleHud = "standard",
     -- BATTLE BG: what fills the screen behind and around the battle.
     -- "white" = the display mode's paper shade (the classic look),
     -- "black" = plain black bars, "world" = the frozen overworld showing
@@ -304,6 +309,10 @@ function SaveData.defaultOptions()
     -- options.lua written before this key keeps its exact meaning.  Read and
     -- written through SaveData.modEnabled / SaveData.setModEnabled.
     modsByVersion = {},
+    -- Set after the first per-game enablement migration.  Older options files
+    -- have only `mods`, so the migration copies each installed mod's current
+    -- answer to every game before game-specific toggles begin changing it.
+    modsByVersionMigrated = false,
     -- Named setups the player can switch between (#593; src/mods/ModProfile.lua
     -- owns the shape, src/mods/ManagerState.lua the UI): each row is
     -- { name, enabled = {id=bool}, options = {id={k=v}}, slots = {version=slotId} }.
@@ -563,17 +572,66 @@ end
 -- only holds the games the player actually chose for, so a mod set can differ
 -- between Red and Gold without either one owning the other's flags.
 
--- Whether a per-game answer is honoured at boot.  The loader reads the enable
--- flags once, before any entry chunk (src/mods/Loader.lua _loadState), so this
--- flips on with that read and not before: until then every writer keeps to the
--- shared flag and no surface promises what the boot does not do.
-SaveData.PER_VERSION_MODS = false
+-- Per-game answers are live.  Every reader and writer goes through modScope,
+-- so a choice made in the launcher is the choice the next boot loads.
+SaveData.PER_VERSION_MODS = true
 
--- The version a write should be scoped to: the game asked for once per-game
--- flags are live, nil (the shared flag) while they are only a preview.
+-- The version a write is scoped to: per-game controls name one game; a nil
+-- caller still addresses the legacy shared fallback.
 function SaveData.modScope(version)
   if SaveData.PER_VERSION_MODS then return version end
   return nil
+end
+
+-- Promote an installation that predates per-game flags.  `mods` may contain
+-- manifest rows ({ id, experimental }) or bare ids.  A mod with no old entry
+-- had the loader default: on, except for experimental mods.  Copy that answer
+-- to every game once, preserving any per-game overlay somebody imported before
+-- this feature shipped.  New installs need no rows here: an absent answer
+-- still defaults to enabled for every game.
+function SaveData.migrateModEnablement(options, mods)
+  if type(options) ~= "table" or options.modsByVersionMigrated then return false end
+  options.mods = type(options.mods) == "table" and options.mods or {}
+  options.modsByVersion = type(options.modsByVersion) == "table"
+    and options.modsByVersion or {}
+
+  local known = {}
+  for id in pairs(options.mods) do
+    if type(id) == "string" and id ~= "" then known[id] = { id = id } end
+  end
+  for version, bucket in pairs(options.modsByVersion) do
+    if GameVersion.VERSIONS[version] and type(bucket) == "table" then
+      for id in pairs(bucket) do
+        if type(id) == "string" and id ~= "" then known[id] = known[id] or { id = id } end
+      end
+    end
+  end
+  for _, mod in ipairs(mods or {}) do
+    local id = type(mod) == "table" and mod.id or mod
+    if type(id) == "string" and id ~= "" then
+      known[id] = type(mod) == "table" and mod or (known[id] or { id = id })
+    end
+  end
+
+  -- Do not create options.lua just to record an empty migration on a fresh
+  -- no-mod boot.  Keep it pending until there is a real installed or saved
+  -- mod answer to preserve.
+  if next(known) == nil then return false end
+
+  for id, mod in pairs(known) do
+    local shared = options.mods[id]
+    if type(shared) ~= "boolean" then shared = not (mod.experimental == true) end
+    for _, version in ipairs(GameVersion.ORDER) do
+      local bucket = options.modsByVersion[version]
+      if type(bucket) ~= "table" then
+        bucket = {}
+        options.modsByVersion[version] = bucket
+      end
+      if type(bucket[id]) ~= "boolean" then bucket[id] = shared end
+    end
+  end
+  options.modsByVersionMigrated = true
+  return true
 end
 
 -- true/false as chosen for `version`, else the shared flag, else nil -- the
@@ -779,9 +837,40 @@ local function tryMigrateLegacy(version, fs)
   return id
 end
 
+-- Scan saves/<version>/ for slot files when options.lua lost its registry.
+-- This recovery only rebuilds metadata. It does not rewrite a save file.
+local function scanDiskSlots(version, fs)
+  if not fs then return nil end
+  local dir = "saves/" .. version
+  local slots = {}
+  if fs.getDirectoryItems and fs.getInfo and fs.getInfo(dir) then
+    local ok, items = pcall(fs.getDirectoryItems, dir)
+    items = ok and items or {}
+    local numbers = {}
+    for _, item in ipairs(items) do
+      local slotId = item:match("^(slot%d+)%.lua$")
+      if slotId then
+        local n = tonumber(slotId:match("%d+"))
+        numbers[#numbers + 1] = { id = slotId, num = n or 0 }
+      end
+    end
+    table.sort(numbers, function(a, b) return a.num < b.num end)
+    for _, item in ipairs(numbers) do slots[#slots + 1] = item.id end
+  else
+    -- Minimal injected filesystems cannot list directories. Probe the slot
+    -- range that the launcher supports so the same recovery stays testable.
+    for i = 1, 30 do
+      local slotId = "slot" .. i
+      local path = dir .. "/" .. slotId .. ".lua"
+      if fs.getInfo and fs.getInfo(path) then slots[#slots + 1] = slotId end
+    end
+  end
+  return #slots > 0 and slots or nil
+end
+
 -- Resolve (once per version per process) which slot in-game saves use: an
 -- existing registry wins; otherwise a lazy legacy migration may create
--- slot1; otherwise false, meaning the flat legacy path.
+-- slot1; otherwise recover orphaned disk slots; otherwise use the flat path.
 local function ensureVersionSlots(version, fs)
   if slotsChecked[version] then return end
   slotsChecked[version] = true
@@ -795,7 +884,22 @@ local function ensureVersionSlots(version, fs)
     activeSlotCache[version] = reg.active or reg.list[1]
     return
   end
-  activeSlotCache[version] = tryMigrateLegacy(version, fs) or false
+  local migrated = tryMigrateLegacy(version, fs)
+  if migrated then
+    activeSlotCache[version] = migrated
+    return
+  end
+  local recovered = scanDiskSlots(version, fs)
+  if recovered then
+    opts.saveSlots = opts.saveSlots or {}
+    opts.saveSlots[version] = { list = recovered, active = recovered[1] }
+    SaveData.saveOptions(opts, fs)
+    activeSlotCache[version] = recovered[1]
+    Logger.info("auto-recovered %d save slot(s) for %s from disk",
+                #recovered, version)
+    return
+  end
+  activeSlotCache[version] = false
 end
 
 -- (body for the forward-declared saveNames.)  Resolves the ACTIVE slot for
@@ -1858,6 +1962,8 @@ function SaveData.newGame(boot)
   boot = type(boot) == "table" and boot or {}
   local map = boot.startMap or "REDS_HOUSE_2F"
   local x, y = boot.startX or 3, boot.startY or 6
+  local facing = boot.startFacing or "down"
+  if map == "REDS_HOUSE_2F" and boot.version ~= "yellow" then facing = "up" end
   local heal = SaveData.defaultHeal(boot)
   local save = {
     meta = { format = Version.saveFormat, mods = {} },
@@ -1868,7 +1974,7 @@ function SaveData.newGame(boot)
       map = map,
       x = x,
       y = y,
-      facing = boot.startFacing or "down",
+      facing = facing,
       name = boot.playerName or "RED",
       rival = boot.rivalName or "BLUE",
       -- 16-bit trainer ID rolled at new game (wPlayerID, filled from

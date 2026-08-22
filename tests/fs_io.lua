@@ -138,6 +138,15 @@ function FsIo.new(rootDir)
     return loadfile(abs(path))
   end
 
+  function fs.createDirectory(path)
+    os.execute(("mkdir -p %q"):format(abs(path)))
+    return true
+  end
+
+  function fs.remove(path)
+    return os.remove(abs(path)) ~= nil
+  end
+
   function fs.getDirectoryItems(path)
     return FsIo.listDir(abs(path))
   end

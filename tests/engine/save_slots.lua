@@ -132,6 +132,30 @@ do
   T.eq(#opts.saveSlots.red.list, 1, "the registry still lists exactly one slot")
 end
 
+-- ---------------------------------------------- lost registry recovery
+
+do
+  local files = fresh()
+  local slot2 = SaveSerializer.encode(legacySave("TWO", { "PIKACHU" }, {}, 2))
+  local slot10 = SaveSerializer.encode(legacySave("TEN", { "EEVEE" }, {}, 10))
+  files["saves/red/slot10.lua"] = slot10
+  files["saves/red/slot2.lua"] = slot2
+  files["options.lua"] = SaveSerializer.encode({ textSpeed = 3 })
+
+  local slots = SaveData.listSlots("red")
+  T.eq(#slots, 2, "lost registry recovers both on-disk slots")
+  T.eq(slots[1].id, "slot2", "recovered slots use numeric order")
+  T.eq(slots[2].id, "slot10", "numeric order does not sort slot10 before slot2")
+  T.eq(slots[1].name, "TWO", "recovered slot remains decodable")
+
+  local opts = SaveSerializer.decode(files["options.lua"])
+  T.eq(opts.saveSlots.red.active, "slot2", "first recovered slot becomes active")
+  T.eq(opts.saveSlots.red.list[2], "slot10", "recovered registry persists")
+  T.eq(files["saves/red/slot2.lua"], slot2, "recovery does not rewrite slot2")
+  T.eq(files["saves/red/slot10.lua"], slot10, "recovery does not rewrite slot10")
+  T.eq(files["save.lua"], nil, "recovery does not create a flat save")
+end
+
 -- ---------------------------------------------- mixed real / empty slots
 
 do

@@ -7,6 +7,7 @@ love = love or require("tests.love_stub")
 local T = require("tests.harness").suite("mod storage")
 local Loader = require("src.mods.Loader")
 local Runtime = require("src.mods.Runtime")
+local Storage = require("src.mods.Storage")
 local Version = require("src.core.Version")
 
 local savedEvents, savedHooks = Runtime.events, Runtime.hooks
@@ -22,7 +23,9 @@ local function memfs(files)
   function fs.read(path) return files[path] end
   function fs.write(path, body)
     if fs.failTmp and path:sub(-4) == ".tmp" then return false, "tmp denied" end
-    if fs.failMain and path:sub(-4) == ".lua" then return false, "main denied" end
+    if fs.failMain and (path:sub(-4) == ".lua" or path:sub(-4) == ".bin") then
+      return false, "main denied"
+    end
     files[path] = body
     return true
   end
@@ -66,12 +69,13 @@ end
 
 local files = {
   ["mods/alpha/manifest.json"] = manifest("alpha"),
+  -- mod.exports, not _G: a mod's globals are its own (src/mods/Sandbox.lua)
   ["mods/alpha/main.lua"] = [[
-return function(mod) _G.MOD_STORAGE_ALPHA = mod.storage end
+return function(mod) mod.exports.storage = mod.storage end
 ]],
   ["mods/beta/manifest.json"] = manifest("beta"),
   ["mods/beta/main.lua"] = [[
-return function(mod) _G.MOD_STORAGE_BETA = mod.storage end
+return function(mod) mod.exports.storage = mod.storage end
 ]],
 }
 local fs = memfs(files)
@@ -80,12 +84,12 @@ local current = game("red", "play-a")
 loader.game = current
 T.check(loader:load({}) == true, "storage fixture mods load")
 
-local alpha, beta = _G.MOD_STORAGE_ALPHA, _G.MOD_STORAGE_BETA
+local alpha = (loader.exports.alpha or {}).storage
+local beta = (loader.exports.beta or {}).storage
 T.check(type(alpha) == "table" and type(beta) == "table",
   "Loader exposes mod.storage through the public mod object")
 if type(alpha) ~= "table" or type(beta) ~= "table" then
   Runtime.events, Runtime.hooks = savedEvents, savedHooks
-  _G.MOD_STORAGE_ALPHA, _G.MOD_STORAGE_BETA = nil, nil
   T.finish()
 end
 
@@ -106,6 +110,50 @@ T.same(loaded, payload, "stored payload roundtrips as data")
 T.check(loaded ~= payload and loaded.nested ~= payload.nested,
   "read returns decoded data rather than the caller's live table")
 
+T.check(type(alpha.writeBytes) == "function"
+    and type(alpha.readBytes) == "function",
+  "mod.storage exposes opaque byte read/write methods")
+if type(alpha.writeBytes) == "function" and type(alpha.readBytes) == "function" then
+  local binary = "MESH\0\1\255\128\nreturn _G.MOD_STORAGE_EXECUTED = true"
+  local binaryOk, binaryCode, binaryMessage =
+    alpha:writeBytes(current, "states/quick/blob", binary)
+  T.check(binaryOk == true,
+    "opaque bytes write exactly: " .. tostring(binaryCode or binaryMessage))
+  local binaryLoaded, binaryReadCode =
+    alpha:readBytes(current, "states/quick/blob")
+  T.eq(binaryLoaded, binary,
+    "opaque bytes round-trip without text or Lua decoding")
+  T.eq(binaryReadCode, nil, "successful opaque byte read has no error")
+  T.eq(_G.MOD_STORAGE_EXECUTED, nil,
+    "Lua-looking opaque bytes are never executed")
+
+  local emptyOk = alpha:writeBytes(current, "binary/empty", "")
+  T.check(emptyOk == true, "empty opaque byte payloads are valid")
+  T.eq(alpha:readBytes(current, "binary/empty"), "",
+    "empty opaque byte payloads round-trip")
+
+  local badBytes, badBytesCode =
+    alpha:writeBytes(current, "binary/bad-type", { byte = true })
+  T.check(not badBytes and badBytesCode == "invalid_bytes",
+    "non-string opaque payloads are rejected")
+
+  local savedLimit = Storage.MAX_BYTES
+  Storage.MAX_BYTES = 4
+  local tooLarge, tooLargeCode =
+    alpha:writeBytes(current, "binary/too-large", "12345")
+  Storage.MAX_BYTES = savedLimit
+  T.check(not tooLarge and tooLargeCode == "size_limit",
+    "opaque payloads over the per-key limit are rejected")
+
+  local tableConflict, tableConflictCode =
+    alpha:writeBytes(current, "states/quick/q1", "table-key-conflict")
+  T.check(not tableConflict and tableConflictCode == "type_conflict",
+    "bytes cannot replace a table record without deletion")
+  local wrongType, wrongTypeCode = alpha:read(current, "states/quick/blob")
+  T.check(wrongType == nil and wrongTypeCode == "type_mismatch",
+    "table reads identify byte records as the wrong storage type")
+end
+
 local bad, badCode = alpha:write(current, "states/bad", { callback = function() end })
 T.check(not bad and badCode == "encode_failed",
   "functions are rejected with a stable data-only error")
@@ -119,25 +167,45 @@ T.check(alpha:write(current, "states/quick/zeta", { n = 2 }), "write zeta")
 T.check(alpha:write(current, "states/quick/alpha", { n = 1 }), "write alpha")
 T.check(alpha:write(current, "settings", { enabled = true }), "write settings")
 local keys = alpha:list(current, "states/quick")
-T.same(keys, { "states/quick/alpha", "states/quick/q1", "states/quick/zeta" },
+T.same(keys, { "states/quick/alpha", "states/quick/blob",
+  "states/quick/q1", "states/quick/zeta" },
   "list returns sorted logical keys under the requested prefix")
 
 -- Mod, playthrough, and game namespaces cannot observe each other.
 local missing, missingCode = beta:read(current, "states/quick/q1")
 T.check(missing == nil and missingCode == "not_found",
   "another mod cannot read the first mod's payload")
+if type(alpha.readBytes) == "function" then
+  missing, missingCode = beta:readBytes(current, "states/quick/blob")
+  T.check(missing == nil and missingCode == "not_found",
+    "another mod cannot read the first mod's opaque payload")
+end
 missing, missingCode = alpha:read(game("red", "play-b"), "states/quick/q1")
 T.check(missing == nil and missingCode == "not_found",
   "another playthrough cannot read the payload")
 missing, missingCode = alpha:read(game("blue", "play-a"), "states/quick/q1")
 T.check(missing == nil and missingCode == "not_found",
   "another game version cannot read the payload")
+if type(alpha.readBytes) == "function" then
+  missing, missingCode = alpha:readBytes(game("red", "play-b"), "states/quick/blob")
+  T.check(missing == nil and missingCode == "not_found",
+    "another playthrough cannot read the opaque payload")
+  missing, missingCode = alpha:readBytes(game("blue", "play-a"), "states/quick/blob")
+  T.check(missing == nil and missingCode == "not_found",
+    "another game version cannot read the opaque payload")
+end
 
 -- Find the implementation-owned file only to inject corruption; assertions stay
 -- on public read behavior, not the path shape.
 local function mainFor(fragment)
   for path in pairs(files) do
     if path:find(fragment, 1, true) and path:sub(-4) == ".lua" then return path end
+  end
+end
+
+local function byteMainFor(fragment)
+  for path in pairs(files) do
+    if path:find(fragment, 1, true) and path:sub(-4) == ".bin" then return path end
   end
 end
 
@@ -156,6 +224,47 @@ fs.failTmp = false
 T.check(not ok and code == "write_failed", "staging failure is reported")
 T.same(alpha:read(current, "replace"), { version = 1 },
   "staging failure leaves the prior value readable")
+
+if type(alpha.writeBytes) == "function" and type(alpha.readBytes) == "function" then
+  T.check(alpha:writeBytes(current, "binary/recover", "old-bytes"),
+    "seed opaque recovery value")
+  local recoverMain = byteMainFor("binary/recover")
+  T.check(type(recoverMain) == "string", "failure fixture locates opaque recovery data")
+  files[recoverMain] = nil
+  T.eq(alpha:readBytes(current, "binary/recover"), "old-bytes",
+    "missing opaque main recovers the last verified backup")
+
+  T.check(alpha:writeBytes(current, "binary/replace", "version-1"),
+    "seed opaque replacement value")
+  fs.failTmp = true
+  ok, code = alpha:writeBytes(current, "binary/replace", "version-2")
+  fs.failTmp = false
+  T.check(not ok and code == "write_failed",
+    "opaque staging failure is reported")
+  T.eq(alpha:readBytes(current, "binary/replace"), "version-1",
+    "opaque staging failure leaves the prior value readable")
+
+  fs.failMain = true
+  ok, code = alpha:writeBytes(current, "binary/replace", "version-3")
+  fs.failMain = false
+  T.check(not ok and code == "write_failed",
+    "opaque replacement failure is reported")
+  T.eq(alpha:readBytes(current, "binary/replace"), "version-1",
+    "opaque replacement failure leaves the prior value readable")
+
+  local byteConflict, byteConflictCode =
+    alpha:write(current, "binary/replace", { version = 3 })
+  T.check(not byteConflict and byteConflictCode == "type_conflict",
+    "tables cannot replace a byte record without deletion")
+
+  T.check(alpha:writeBytes(current, "binary/delete", "delete-me"),
+    "seed opaque delete target")
+  T.check(alpha:delete(current, "binary/delete") == true,
+    "delete removes an opaque record")
+  missing, missingCode = alpha:readBytes(current, "binary/delete")
+  T.check(missing == nil and missingCode == "not_found",
+    "deleted opaque key is unavailable")
+end
 
 -- Delete is exact and idempotent-not-found is explicit.
 T.check(alpha:write(current, "delete/me", { yes = true }), "seed delete target")
@@ -176,6 +285,5 @@ T.eq(next(emptyFiles), nil, "no-mod boot creates no storage paths or files")
 
 Runtime.events, Runtime.hooks = savedEvents, savedHooks
 Runtime.currentMod = nil
-_G.MOD_STORAGE_ALPHA, _G.MOD_STORAGE_BETA = nil, nil
 
 T.finish()

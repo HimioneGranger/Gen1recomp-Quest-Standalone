@@ -12,12 +12,18 @@ local Manifest = require("src.mods.Manifest")
 local Merge = require("src.mods.Merge")
 local ModTargets = require("src.mods.ModTargets")
 local Registry = require("src.mods.Registry")
+local SafePath = require("src.mods.SafePath")
+local Sandbox = require("src.mods.Sandbox")
 local Schemas = require("src.mods.Schemas")
 local Semver = require("src.mods.Semver")
 local Events = require("src.mods.Events")
 local Gen2Compat = require("src.mods.Gen2Compat")
 local Hooks = require("src.mods.Hooks")
+local LegacyCompat = require("src.mods.LegacyCompat")
 local Runtime = require("src.mods.Runtime")
+local Steps = require("src.mods.Steps")
+local Net = require("src.mods.Net")
+local Job = require("src.mods.Job")
 
 local Loader = {}
 Loader.__index = Loader
@@ -72,10 +78,12 @@ local function orderedIds(mods, filter)
   return ids
 end
 
--- ------- dev-mode permissions tripwire
--- Attribution only: the shim delegates unconditionally and blocks nothing.
--- Installed once per process and only when the loader runs in dev mode, so a
--- player build has zero interposition.
+-- ------- the require gate
+-- Two jobs in one interposition.  The engine_internals/network scan is
+-- attribution only and stays dev-mode: it warns and delegates.  The
+-- Sandbox.moduleDenial check is not -- require("io") would hand back
+-- package.loaded.io and undo the whole mod environment -- so it is installed
+-- in player builds too, for any boot that has mods on it.
 
 local devShim = { installed = false, permissions = {}, warned = {}, depth = 0 }
 
@@ -135,7 +143,8 @@ end
 
 local function scanRequire(name)
   local modId = Runtime.currentMod
-  if not modId or type(name) ~= "string" then return end
+  if type(modId) ~= "string" then modId = Runtime.modRequire end
+  if type(modId) ~= "string" or type(name) ~= "string" then return end
   local granted = devShim.permissions[modId] or {}
   local function warnOnce(permission)
     local key = modId .. "|" .. permission .. "|" .. name
@@ -188,6 +197,7 @@ function Loader:_installDevShim()
   for id, mod in pairs(self.mods) do
     devShim.permissions[id] = mod.manifest.permissionSet
   end
+  devShim.dev = self.dev
   if devShim.installed then return end
   devShim.installed = true
   local delegate = require
@@ -195,12 +205,22 @@ function Loader:_installDevShim()
     -- only the mod's own call is the mod's doing; whatever that module
     -- requires in turn is the engine wiring itself up
     if devShim.depth == 0 then
-      scanRequire(name)
+      -- Backstop for the deny list Sandbox.envFor's require already applies:
+      -- an engine module requiring io is the engine wiring itself up, a mod
+      -- doing it is the hole this closes, and any future path that runs mod
+      -- code without a sandbox env still lands here.
+      local owner = Runtime.currentMod or Runtime.modRequire
+      if owner or callerIsMod(3) then
+        local id = type(owner) == "string" and owner or nil
+        local denial = Sandbox.moduleDenial(name, devShim.permissions[id])
+        if denial then error(("[%s] %s"):format(id or "mod", denial), 0) end
+      end
+      if devShim.dev or devShim.generation ~= 1 then scanRequire(name) end
       -- The Gen 1 name a mod asked for, answered by the Gen 2 arm behind it.
       -- Engine code keeps the real module: src/render/PaletteFX.lua:776
       -- requires src.core.Game on both generations and means it.
       if devShim.generation ~= 1 and Gen2Compat.serves(name)
-          and callerIsMod(3) then
+          and (owner or callerIsMod(3)) then
         local adapter = Gen2Compat.resolve(name, Runtime.currentMod)
         if adapter then
           local key = "adapter|" .. name
@@ -235,7 +255,7 @@ function Loader.new(opts)
     events = Events.new(), hooks = Hooks.new(), content = {}, assets = {},
     exports = {}, migrations = {}, order = {},
     modSave = {}, modOptions = {}, optionSchemas = {}, imageCache = {},
-    modInput = {},
+    modInput = {}, modEnv = {}, stepsQueues = {},
     fs = (opts and opts.fs) or (love and love.filesystem),
     dev = dev,
     -- Which generation this boot is (1 or 2).  Fixed at construction: the
@@ -270,8 +290,7 @@ function Loader:_targetVersion()
   return version
 end
 
--- The version an enable flag is read and written under: this game once
--- per-game flags are live, nil (the shared flag) while they are a preview.
+-- The version an enable flag is read and written under: this running game.
 -- Reads and writes go through the same answer so the two can never drift.
 function Loader:_enableScope()
   return SaveData.modScope(self:_targetVersion())
@@ -358,11 +377,13 @@ function Loader:_writeOptionSchemas()
       -- demand; using it here means older mods do not need to migrate to
       -- mod.options:define just to appear in a launcher settings screen.
       if schema == nil and mod.manifest.options_schema and self.fs.load then
-        local chunk = self.fs.load(mod.path .. "/" .. mod.manifest.options_schema)
-        if chunk then
-          local ok, rows = pcall(chunk)
-          if ok and type(rows) == "table" then schema = rows end
-        end
+        local ok, rows = pcall(function()
+          local path = SafePath.join(mod.path, mod.manifest.options_schema,
+            "options_schema")
+          local chunk = Sandbox.loadFile(self.fs, path, self:_modEnv(mod))
+          return chunk and chunk()
+        end)
+        if ok and type(rows) == "table" then schema = rows end
       end
       if schema ~= nil then
         mods[id] = schema
@@ -562,42 +583,41 @@ end
 -- hard dependencies must exist, be enabled, have survived, and satisfy their
 -- range; run to a fixpoint so failures propagate to dependents transitively
 function Loader:_enforceDependencies()
+  local targetVersion = self:_targetVersion()
+  local generation = self.generation
   local changed = true
   while changed do
     changed = false
     for _, id in ipairs(orderedIds(self.mods, isActive)) do
       local mod = self.mods[id]
       for _, spec in ipairs(mod.manifest.dependencySpecs) do
-        local dep = self.mods[spec.id]
-        local reason, skip
-        if not dep then
-          reason = "missing dependency: " .. spec.id
-        elseif not dep.enabled then
-          reason = ("dependency %s is disabled"):format(spec.id)
-        elseif dep.state == "wrong_generation" then
-          -- the gate's skip is contagious as a SKIP, not as a failure: the
-          -- dependency has no bug to report and neither does this mod, so
-          -- nothing here lands on the boot error list
-          skip = true
-          -- carry the dependency's own reason: it names the game or the
-          -- missing gen2compat, and a guess here would name the wrong one
-          reason = ("depends on %s, which does not run here (%s)")
-            :format(spec.id, dep.skipReason or "not made for this game")
-        elseif dep.failed then
-          reason = ("dependency %s failed to load"):format(spec.id)
-        elseif spec.range
-            and not Semver.satisfies(dep.manifest.version, spec.range) then
-          reason = ("needs %s@%s, found %s")
-            :format(spec.id, spec.range, dep.manifest.version)
-        end
-        if reason then
-          if skip then
-            self:_skip(mod, "wrong_generation", reason)
-          else
-            self:_fail(mod, "blocked_dependency", reason)
+        if ModTargets.specApplies(spec, targetVersion, generation) then
+          local dep = self.mods[spec.id]
+          local reason, skip
+          if not dep then
+            reason = "missing dependency: " .. spec.id
+          elseif not dep.enabled then
+            reason = ("dependency %s is disabled"):format(spec.id)
+          elseif dep.state == "wrong_generation" then
+            skip = true
+            reason = ("depends on %s, which does not run here (%s)")
+              :format(spec.id, dep.skipReason or "not made for this game")
+          elseif dep.failed then
+            reason = ("dependency %s failed to load"):format(spec.id)
+          elseif spec.range
+              and not Semver.satisfies(dep.manifest.version, spec.range) then
+            reason = ("needs %s@%s, found %s")
+              :format(spec.id, spec.range, dep.manifest.version)
           end
-          changed = true
-          break
+          if reason then
+            if skip then
+              self:_skip(mod, "wrong_generation", reason)
+            else
+              self:_fail(mod, "blocked_dependency", reason)
+            end
+            changed = true
+            break
+          end
         end
       end
     end
@@ -607,6 +627,8 @@ end
 -- Tarjan SCC over the hard-dependency graph: only a cycle's own members
 -- fail, so an unrelated mod beside a cycle still loads
 function Loader:_failCycles()
+  local targetVersion = self:_targetVersion()
+  local generation = self.generation
   local mods = self.mods
   local counter, stack, onStack, index, low = 0, {}, {}, {}, {}
   local cycles = {}
@@ -617,14 +639,16 @@ function Loader:_failCycles()
     onStack[id] = true
     local selfEdge = false
     for _, spec in ipairs(mods[id].manifest.dependencySpecs) do
-      local dep = mods[spec.id]
-      if spec.id == id then selfEdge = true end
-      if dep and isActive(dep) and spec.id ~= id then
-        if not index[spec.id] then
-          connect(spec.id)
-          if low[spec.id] < low[id] then low[id] = low[spec.id] end
-        elseif onStack[spec.id] and index[spec.id] < low[id] then
-          low[id] = index[spec.id]
+      if ModTargets.specApplies(spec, targetVersion, generation) then
+        local dep = mods[spec.id]
+        if spec.id == id then selfEdge = true end
+        if dep and isActive(dep) and spec.id ~= id then
+          if not index[spec.id] then
+            connect(spec.id)
+            if low[spec.id] < low[id] then low[id] = low[spec.id] end
+          elseif onStack[spec.id] and index[spec.id] < low[id] then
+            low[id] = index[spec.id]
+          end
         end
       end
     end
@@ -675,6 +699,8 @@ end
 -- Kahn over the surviving graph with the ready set kept in (priority, id)
 -- order, so dependencies come first and the rest matches the v1 contract
 function Loader:_order()
+  local targetVersion = self:_targetVersion()
+  local generation = self.generation
   local pending, indegree, dependents = {}, {}, {}
   for _, id in ipairs(orderedIds(self.mods, isActive)) do
     pending[id], indegree[id] = true, 0
@@ -687,9 +713,17 @@ function Loader:_order()
       dependents[depId][#dependents[depId] + 1] = id
       indegree[id] = indegree[id] + 1
     end
-    for _, spec in ipairs(manifest.dependencySpecs) do edge(spec.id) end
+    for _, spec in ipairs(manifest.dependencySpecs) do
+      if ModTargets.specApplies(spec, targetVersion, generation) then
+        edge(spec.id)
+      end
+    end
     -- optional dependencies order without requiring anything
-    for _, spec in ipairs(manifest.optionalSpecs) do edge(spec.id) end
+    for _, spec in ipairs(manifest.optionalSpecs) do
+      if ModTargets.specApplies(spec, targetVersion, generation) then
+        edge(spec.id)
+      end
+    end
   end
   local ordered = {}
   local function nextId()
@@ -981,6 +1015,102 @@ function Loader:_api(mod)
         return DateTime.dateTime(game, timestamp)
       end,
     },
+    -- The read-only part of love.system that device UIs legitimately need.
+    -- Do not expose the module: openURL and clipboard access stay sandboxed.
+    device = {
+      powerInfo = function()
+        local getPowerInfo = love and love.system and love.system.getPowerInfo
+        if not getPowerInfo then return "unknown", nil end
+        local state, percent = getPowerInfo()
+        return state, percent
+      end,
+    },
+    -- The native step bridge (#1186), behind the "steps" permission the
+    -- player sees in the mod manager: sync asks the platform to refresh
+    -- its count, poll hands this mod its copy of what the bridge
+    -- delivered.  The engine owns the pending file -- a mod never names a
+    -- path, it only receives { steps, from, to }.  available() answers
+    -- false without the permission (a probe stays quiet); the calls that
+    -- would do something name the missing permission instead, the way the
+    -- network gate does.
+    steps = (function()
+      if mod.manifest.permissionSet.steps then
+        loader.stepsQueues[modId] = loader.stepsQueues[modId] or {}
+        return {
+          available = function() return Steps.available() end,
+          sync = function() return Steps.sync() end,
+          poll = function() return Steps.poll(loader, modId) end,
+        }
+      end
+      local function refuse()
+        error(('[%s] mod.steps needs the "steps" permission in '
+          .. "manifest.json"):format(modId), 2)
+      end
+      return { available = function() return false end,
+               sync = refuse, poll = refuse }
+    end)(),
+    -- Background HTTP, behind the "network" permission the player already
+    -- sees.  This is what love.thread is NOT: the worker runs engine code in
+    -- an engine-owned pool, so a mod gets asynchrony without getting a Lua
+    -- state the sandbox cannot reach.  get() hands back an opaque handle;
+    -- poll() is non-blocking, so nothing here can hang a frame.
+    fetch = (function()
+      if mod.manifest.permissionSet.network then
+        return {
+          available = function() return Net.available() end,
+          get = function(_, url, opts) return Net.get(loader, modId, url, opts) end,
+          poll = function(_, handle) return Net.poll(loader, modId, handle) end,
+          release = function(_, handle) return Net.release(loader, modId, handle) end,
+          cancel = function(_, handle) return Net.cancel(loader, modId, handle) end,
+        }
+      end
+      local function refuse()
+        error(('[%s] mod.fetch needs the "network" permission in '
+          .. "manifest.json"):format(modId), 2)
+      end
+      return { available = function() return false end,
+               get = refuse, poll = refuse, release = refuse, cancel = refuse }
+    end)(),
+    -- One-way crash-log reporting to the https URL the manifest declares in
+    -- log_url.  The destination is reviewed at load, not chosen per call, so
+    -- a mod cannot aim this at arbitrary hosts; the response body is never
+    -- returned, and the worker pool bounds the transfer.  Same handle/poll/
+    -- release shape as mod.fetch, so mod.job's sibling patterns carry over.
+    postLog = (function()
+      if mod.manifest.permissionSet.network and mod.manifest.log_url then
+        return function(_, body, opts)
+          return Net.postLog(loader, modId, mod.manifest.log_url, body, opts)
+        end
+      end
+      local function refuse()
+        error(('[%s] mod.postLog needs the "network" permission and a '
+          .. "log_url in manifest.json"):format(modId), 2)
+      end
+      return refuse
+    end)(),
+    -- Background compute, behind the "background" permission.  The worker
+    -- rebuilds this mod's sandbox before loading the script, so a job is the
+    -- one thing love.thread is not: off the main thread without a Lua state
+    -- that escapes the sandbox.  Plain data in, plain data out.
+    job = (function()
+      if mod.manifest.permissionSet.background then
+        return {
+          available = function() return Job.available() end,
+          run = function(_, script, arg, opts)
+            return Job.run(loader, modId, mod.path, script, arg, opts)
+          end,
+          poll = function(_, handle) return Job.poll(loader, modId, handle) end,
+          release = function(_, handle) return Job.release(loader, modId, handle) end,
+          cancel = function(_, handle) return Job.cancel(loader, modId, handle) end,
+        }
+      end
+      local function refuse()
+        error(('[%s] mod.job needs the "background" permission in '
+          .. "manifest.json"):format(modId), 2)
+      end
+      return { available = function() return false end,
+               run = refuse, poll = refuse, release = refuse, cancel = refuse }
+    end)(),
     -- namespaced per mod; M11 backs these with save.modData /
     -- options.modOptions, the shape mods compile against is already final
     save = {
@@ -999,7 +1129,8 @@ function Loader:_api(mod)
         bucket[key] = value
       end,
     },
-    -- Data-only state independent of the vanilla progress checkpoint. The
+    -- Data-only and opaque-byte state independent of the vanilla progress
+    -- checkpoint. The
     -- engine binds version/playthrough/mod scope and portable persistence;
     -- callers never receive paths or a raw filesystem handle.
     storage = {
@@ -1007,6 +1138,10 @@ function Loader:_api(mod)
       selected = function(_, game) return storage:selected(game) end,
       write = function(_, game, key, value) return storage:write(game, key, value) end,
       read = function(_, game, key) return storage:read(game, key) end,
+      writeBytes = function(_, game, key, bytes)
+        return storage:writeBytes(game, key, bytes)
+      end,
+      readBytes = function(_, game, key) return storage:readBytes(game, key) end,
       list = function(_, game, prefix) return storage:list(game, prefix) end,
       delete = function(_, game, key) return storage:delete(game, key) end,
     },
@@ -1088,12 +1223,47 @@ function Loader:_api(mod)
     api.content[alias] = self:_contentApi(mod, self.content[canonical],
       ("the %s registry is deprecated; use %s"):format(alias, canonical))
   end
+  -- A relative path inside this mod, or the mod root when relative is
+  -- omitted.  Empty is the one listing case SafePath.safe rejects on
+  -- purpose (it is not a file), so it is special-cased here.
+  local function ownPath(relative, what)
+    if relative == nil or relative == "" then return mod.path end
+    return SafePath.join(mod.path, relative, what)
+  end
+
+  -- Shallow directory listing, the sandboxed stand-in for
+  -- love.filesystem.getDirectoryItems.  Names only, sorted, never a host
+  -- path.  A missing directory is an empty list, not an error.
+  local function listOwn(_, relative)
+    local dir = ownPath(relative, "mod:list")
+    local fs = loader.fs
+    if not (fs and fs.getDirectoryItems) then return {} end
+    local items = fs.getDirectoryItems(dir) or {}
+    local out = {}
+    for i = 1, #items do out[i] = items[i] end
+    table.sort(out)
+    return out
+  end
+
+  -- love.filesystem.getInfo for a path inside this mod.  type is "file" or
+  -- "directory"; size is set for files.  nil when the path does not exist.
+  local function infoOwn(_, relative)
+    local path = ownPath(relative, "mod:info")
+    local fs = loader.fs
+    if not (fs and fs.getInfo) then return nil end
+    local info = fs.getInfo(path)
+    if not info then return nil end
+    return { type = info.type, size = info.size }
+  end
+
   -- assets keeps the v1 alias to the content accessors and adds the file
   -- helpers on top, so mod.assets.pokemon and mod.assets:image both resolve
   api.assets = setmetatable({
-    path = function(_, relative) return mod.path .. "/" .. relative end,
+    path = function(_, relative)
+      return SafePath.join(mod.path, relative, "mod.assets:path")
+    end,
     image = function(_, relative)
-      local full = mod.path .. "/" .. relative
+      local full = SafePath.join(mod.path, relative, "mod.assets:image")
       local cached = loader.imageCache[full]
       if cached then return cached end
       assert(love and love.graphics,
@@ -1102,11 +1272,16 @@ function Loader:_api(mod)
       loader.imageCache[full] = image
       return image
     end,
+    list = listOwn,
+    info = infoOwn,
   }, { __index = api.content })
+  -- the mod's own directory and nothing above it: PhysFS already refuses a
+  -- climb, but loader.fs is injectable and has no such floor
   function api:read(relative)
-    local path = self.path .. "/" .. relative
-    return loader.fs.read(path)
+    return loader.fs.read(SafePath.join(self.path, relative, "mod:read"))
   end
+  api.list = listOwn
+  api.info = infoOwn
   -- mod.world materializes on first touch, like the image helper above: a
   -- headless load must not drag the world stack in, and the Game the facade
   -- acts on is still being wired when the entry chunk runs
@@ -1149,9 +1324,33 @@ function Loader:_game()
   return engineRequire("src.core.Game")
 end
 
+-- The environment every chunk this mod authors runs in, built once per mod so
+-- its entry file and its options_schema share one globals table.
+function Loader:_modEnv(mod)
+  local id = mod.manifest.id
+  local env = self.modEnv[id]
+  if not env then
+    local loader = self
+    local compat = LegacyCompat.new({
+      modId = id, modPath = mod.path, fs = self.fs,
+      game = function() return loader:_game() end,
+    })
+    env = Sandbox.envFor({ modId = id, permissions = mod.manifest.permissionSet,
+      compat = compat })
+    self.modEnv[id] = env
+  end
+  return env
+end
+
+-- Which pre-sandbox calls each loaded mod actually took, for the manager's
+-- "needs updating" badge; nil id answers for every mod.
+function Loader:legacyReport(modId)
+  return LegacyCompat.report(modId)
+end
+
 function Loader:_loadMod(mod)
-  local path = mod.path .. "/" .. mod.manifest.entry
-  local chunk, err = self.fs.load(path)
+  local path = SafePath.join(mod.path, mod.manifest.entry, "manifest entry")
+  local chunk, err = Sandbox.loadFile(self.fs, path, self:_modEnv(mod))
   if not chunk then error(err or ("unable to load " .. path)) end
   local api = self:_api(mod)
   local result = chunk(api)
@@ -1183,6 +1382,9 @@ function Loader:_rollback(modId)
   self.optionSchemas[modId] = nil
   self.migrations[modId] = nil
   self.modSave[modId] = nil
+  self.stepsQueues[modId] = nil
+  Net.releaseAll(self, modId)
+  Job.releaseAll(self, modId)
 end
 
 -- a mod that explicitly swears it stays link-compatible while writing into a
@@ -1306,13 +1508,30 @@ function Loader:load(data)
   require("src.mods.Builtins").install(self.content, data, self.generation)
   self:_loadState()
   self:_discover()
+  -- Existing installs stored one shared answer.  Once their manifests are
+  -- known, split that answer across every game before the next launcher/game
+  -- toggle can change one independently.  _loadState already used the same
+  -- fallback, so this write cannot change the current boot's result.
+  do
+    local options = SaveData.loadOptions(self.fs)
+    local installed = {}
+    for id, mod in pairs(self.mods) do
+      installed[#installed + 1] = {
+        id = id,
+        experimental = mod.manifest and mod.manifest.experimental == true,
+      }
+    end
+    if SaveData.migrateModEnablement(options, installed) and self.fs.write then
+      SaveData.saveOptions(options, self.fs)
+    end
+  end
   -- Experimental mods stay off until the player opts in: a missing
   -- options.mods entry normally means enabled, but experimental flips that.
   do
     local options = SaveData.loadOptions(self.fs)
-    local modsOpt = options.mods or {}
+    local scope = self:_enableScope()
     for id, mod in pairs(self.mods) do
-      if not self.disabled[id] and modsOpt[id] == nil
+      if not self.disabled[id] and SaveData.modEnabled(options, id, scope) == nil
           and mod.manifest.experimental then
         self.disabled[id] = true
       end
@@ -1349,10 +1568,12 @@ function Loader:load(data)
   -- every touch: a mod captures the facade at file scope, before Game2 has a
   -- save or a world (src/mods/Gen2Compat.lua).
   Gen2Compat.bind(function() return self:_game() end)
-  -- Dev mode wants the permissions tripwire; a Gold boot with mods on it wants
-  -- the Gen 1-only require report, which is the difference between "the mod
-  -- does nothing" and knowing why.  A Gold boot with no mods pays nothing.
-  if self.dev or (self.generation ~= 1 and next(self.mods) ~= nil) then
+  -- Any boot with mods on it needs the gate, because require("io") is how a
+  -- mod would walk out of Sandbox.envFor.  Dev mode adds the permissions
+  -- tripwire on top, and a Gold boot the Gen 1-only require report -- the
+  -- difference between "the mod does nothing" and knowing why.  A boot with no
+  -- mods pays nothing.
+  if self.dev or next(self.mods) ~= nil then
     self:_installDevShim()
   end
   for _, mod in ipairs(ordered) do

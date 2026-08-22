@@ -149,8 +149,8 @@ No device action was done during this audit.
 
 ### Recovery point and source provenance
 
-- Target workspace:
-  `C:\Users\bolay\Documents\Gen1recomp-Unplugged-Corrected-Split-Candidate-20260821`.
+- Target workspace: local worktree
+  `Gen1recomp-Unplugged-Corrected-Split-Candidate-20260821`.
 - Target branch: `codex/unplugged-corrected-split-candidate-20260821`.
 - Verified clean target start: `3cfc9d6c65954ec22308f6cb1ee5af2734dba3ed`.
 - Latest launcher checkpoint at that start: `3cfc9d6c`,

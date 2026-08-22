@@ -325,7 +325,8 @@ function HostShell.httpDownload(url, absPath, userAgent, accept, maxTime)
   if type(absPath) ~= "string" or absPath == "" then return nil, "missing path" end
   userAgent = userAgent or "gen1recomp"
   if HostShell.haveCurl() then
-    local cmd = ("curl -fsSL --connect-timeout 15 --max-time %d ")
+    local cmd = ("curl -fsSL --proto =http,https --proto-redir =http,https "
+      .. "--connect-timeout 15 --max-time %d ")
       :format(tonumber(maxTime) or 300)
       .. "-H " .. HostShell.quote("User-Agent: " .. userAgent) .. " "
     if accept then
@@ -370,7 +371,8 @@ function HostShell.httpGet(url, userAgent, accept, maxTime)
     -- BODY, and on the two services this talks to that body is the whole
     -- diagnosis: GitHub's 403 says "API rate limit exceeded for <ip>", which
     -- tells a user to wait rather than to go hunting for a broken index.
-    local cmd = ("curl -sSL --connect-timeout 10 --max-time %d ")
+    local cmd = ("curl -sSL --proto =http,https --proto-redir =http,https "
+      .. "--connect-timeout 10 --max-time %d ")
       :format(tonumber(maxTime) or 40)
       .. "-H " .. HostShell.quote("User-Agent: " .. userAgent) .. " "
     if accept then
@@ -413,6 +415,58 @@ function HostShell.httpGet(url, userAgent, accept, maxTime)
     return nil, "empty response from " .. url
   end
   return body
+end
+
+-- POST returning success/failure.  Strictly one-way: the response body is
+-- discarded, only the HTTP status class is surfaced (postLog callers never
+-- trust the reply).  curl --data-binary reads the payload from a pipe, so a
+-- large body never lands in the command line; the Android bridge has no POST
+-- transport, and httpPost reports that instead of half-working through
+-- httpDownload (a GET round-trip to a POST endpoint would be a lie).
+function HostShell.httpPost(url, body, contentType, userAgent, maxTime)
+  if type(url) ~= "string" or url == "" then return nil, "missing url" end
+  if type(body) ~= "string" then return nil, "missing body" end
+  userAgent = userAgent or "gen1recomp"
+  if HostShell.haveCurl() then
+    -- --data-binary @- keeps the payload out of argv (command-line length
+    -- limits on Windows) and preserves every byte including trailing
+    -- newlines.  No -f, matching httpGet: the response body is discarded
+    -- anyway, and curl's stderr carries the real diagnosis on failure.
+    local cmd = ("curl -sSL --proto =http,https --proto-redir =http,https "
+      .. "--connect-timeout 10 --max-time %d ")
+      :format(tonumber(maxTime) or 40)
+      .. "-X POST "
+      .. "-H " .. HostShell.quote("User-Agent: " .. userAgent) .. " "
+    if contentType then
+      cmd = cmd .. "-H " .. HostShell.quote("Content-Type: " .. contentType) .. " "
+    end
+    cmd = cmd .. "-H " .. HostShell.quote("Content-Length: " .. tostring(#body)) .. " "
+      .. "--data-binary @- "
+      .. "-w " .. HostShell.quote(HTTP_MARK_FMT) .. " "
+      .. HostShell.quote(url) .. " 2>&1"
+    local pipe = HostShell.popen(cmd, "rw")
+    if not pipe then return nil, "could not run curl" end
+    local writeOk, werr = pcall(pipe.write, pipe, body)
+    if not writeOk then
+      HostShell.pclose(pipe)
+      return nil, "could not write body: " .. tostring(werr)
+    end
+    local readOk, out = pcall(function() return pipe:read("*a") end)
+    HostShell.pclose(pipe)
+    if not readOk then
+      return nil, fetchError(url, nil, tostring(out))
+    end
+    local _, status, noise = splitCurlOutput(out)
+    if not status then return nil, fetchError(url, nil, noise) end
+    if status < 200 or status >= 300 then
+      return nil, fetchError(url, status, "log post rejected")
+    end
+    return true
+  end
+  if not haveBridge() then
+    return nil, "no network transport on this platform"
+  end
+  return nil, "no POST transport on this platform"
 end
 
 return HostShell

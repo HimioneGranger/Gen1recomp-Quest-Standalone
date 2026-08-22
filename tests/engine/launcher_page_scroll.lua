@@ -60,4 +60,25 @@ T.eq(paged, false, "a first frame with nothing measured yet does not scroll")
 T.eq(scroll, 0, "and sits at the top")
 T.eq(maxPage, 0, "with no extent")
 
+-- Refreshing or paging the MODS list is local display work. Update lookup is
+-- an explicit user action, so a list refresh must not create a transport job.
+do
+  local savedMods = package.loaded["src.mods.LauncherMods"]
+  local savedSaveData = package.loaded["src.core.SaveData"]
+  local checks = 0
+  package.loaded["src.mods.LauncherMods"] = {
+    list = function() return { { id = "probe", github = "owner/repo" } } end,
+  }
+  package.loaded["src.core.SaveData"] = {
+    loadOptions = function() return {} end,
+    isSafeMode = function() return false end,
+  }
+  local imp = setmetatable({ modStraysChecked = true,
+    _syncModUpdateInfo = function() checks = checks + 1 end }, RomImporter)
+  imp:_refreshMods()
+  T.eq(checks, 0, "refreshing MODS does not begin an update lookup")
+  package.loaded["src.mods.LauncherMods"] = savedMods
+  package.loaded["src.core.SaveData"] = savedSaveData
+end
+
 T.finish("launcher page scroll")

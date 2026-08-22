@@ -526,6 +526,22 @@ function Commands.set_field(ctx, key, value)
   ctx.save[key] = value
 end
 
+function Commands.load_player_starter_name(ctx)
+  local flags = ctx.save.flags or {}
+  local species = flags.EVENT_CHOSE_PIKACHU and "PIKACHU"
+    or flags.EVENT_CHOSE_CHARMANDER and "CHARMANDER"
+    or flags.EVENT_CHOSE_SQUIRTLE and "SQUIRTLE"
+    or flags.EVENT_CHOSE_BULBASAUR and "BULBASAUR"
+    or (ctx.save.party and ctx.save.party[1] and ctx.save.party[1].species)
+  local def = species and ctx.game.data.pokemon[species]
+  ctx.game.stringBuffer = def and def.name or species or ""
+end
+
+function Commands.spawn_pikachu_follower(ctx)
+  require("src.world.PikachuFollower").onMapEntered(
+    ctx.game, ctx.overworld, nil, false)
+end
+
 local function toggleObject(ctx, mapId, objName, visible)
   local save = ctx.save
   save.objectToggles = save.objectToggles or {}
@@ -1131,9 +1147,7 @@ end
 -- opts.tempo is the Music_*AlternateTempo override (audio/alternate_tempo.asm
 -- re-points channel 1 at a stub that only changes the song's `tempo`) (#847).
 function Commands.play_music(ctx, songId, opts)
-  local tempo = opts and opts.tempo
-  require("src.core.Music").play(ctx.game.data, songId, nil,
-                                 tempo and { tempo = tempo } or nil)
+  require("src.core.Music").play(ctx.game.data, songId, nil, opts)
   if opts and opts.keep and ctx.overworld then
     ctx.overworld.keepMusicOnce = true
   end

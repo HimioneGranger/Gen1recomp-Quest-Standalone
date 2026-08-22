@@ -140,6 +140,7 @@ function Evolution.learnEvolutionMoves(game, mon, onDone)
     if #mon.moves < 4 then
       table.insert(mon.moves, { id = moveId, pp = mdef.pp })
       Runtime.emit("pokemon.move_learned", { mon = mon, moveId = moveId })
+      require("src.core.Sound").play(game.data, "Get_Item1")
       game.stack:push(TextBox.new(game,
         romText(game.data, "_LearnedMove1Text",
           "%s learned\n%s!", name, mdef.name), nextStep))

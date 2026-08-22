@@ -130,18 +130,20 @@ before `Game:load`, so **it never loads a mod's entry chunk**; only
   duplicate) and returns one row per mod:
   `{id, name, version, badge, description, enabled, status, statusDetail}`.
   `badge` is the manifest's `category`, falling back to `profile`, then
-  `"MOD"`, uppercased. `enabled` reads `options.mods[id]` (missing means
-  enabled, matching the loader's own default).
+  `"MOD"`, uppercased. `enabledByVersion` contains an answer for each game;
+  missing entries default to enabled (except experimental mods), matching the
+  loader. On the first run with per-game controls, legacy shared choices are
+  copied to every installed game's answer.
 - `status` is `"ok"`, `"warn"`, or `"conflict"`, computed by the pure
   `LauncherMods.deriveList`/`statusFor` against `ManagerState.resolveToggle`
   and the validated manifests: `conflict` when enabling this mod collides
   with another enabled one; `warn` for an out-of-range `game_version` or an
   absent/disabled/wrong-version hard dependency; `ok` otherwise. Having no
   `love.*` calls, this half is table-driven by the test suite on its own.
-- `LauncherMods.setEnabled(id, bool)` persists `options.mods[id]` as a plain
-  boolean, the exact shape `Loader:_saveState` writes, so the running game
-  and the in-game `ManagerState` see the change on next boot. The mods panel
-  calls this on every toggle and re-derives the list right away
+- `LauncherMods.setEnabled(id, bool, version)` persists the selected game's
+  answer, so the running game and the in-game `ManagerState` see the change on
+  next boot. The MODS panel renders a coloured checkbox for Red, Blue, Yellow,
+  and Gold on every row and re-derives the list right away
   (`RomImporter:_refreshMods`) so a status change (e.g. a new conflict)
   shows without waiting for a reload.
 - `LauncherMods.installZip(path)` mounts the archive with

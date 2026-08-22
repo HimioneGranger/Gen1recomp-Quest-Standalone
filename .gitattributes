@@ -1,2 +1,5 @@
 # Bash build scripts must retain LF endings in Windows checkouts.
 *.sh text eol=lf
+# RetroArch overlay descriptors are text; keep their index form stable so
+# whitespace and packaging checks do not treat CR bytes as trailing content.
+assets/skins/**/*.cfg text eol=lf

@@ -124,6 +124,17 @@ local function addTouchRows(rows, add, opts, hooks)
       end,
     }
   end
+
+  if hooks and hooks.openSkinStudio then
+    rows[#rows + 1] = {
+      label = Strings("SKIN STUDIO"),
+      actionLabel = Strings("Open"),
+      action = function()
+        hooks.openSkinStudio()
+        return false
+      end,
+    }
+  end
 end
 
 local function coreRows(opts, hooks)
@@ -140,15 +151,72 @@ local function coreRows(opts, hooks)
     ladder(opts, "battleStyle",
       { { "shift", "SHIFT" }, { "set", "SET" } }, "shift"))
   add(Strings("BATTLE LAYOUT"),
-    ladder(opts, "battleLayout",
-      { { "og", "OG" }, { "wide", "WIDE" } }, "og"))
+    function()
+      return opts.battleLayout == "wide" and Strings("WIDE") or Strings("OG")
+    end,
+    function()
+      opts.battleLayout = opts.battleLayout == "wide" and "og" or "wide"
+      if opts.battleLayout ~= "wide" then
+        opts.battleHud = "standard"
+      elseif opts.battleFit == "fill" and opts.battleHud == "extended" then
+        opts.battleBg = "white"
+      end
+      return true
+    end)
   add(Strings("BATTLE SIZE"),
-    ladder(opts, "battleFit",
-      { { "fixed", "FIXED" }, { "fill", "FILL" } }, "fixed"))
+    function()
+      return opts.battleFit == "fill" and Strings("FILL") or Strings("FIXED")
+    end,
+    function()
+      opts.battleFit = opts.battleFit == "fill" and "fixed" or "fill"
+      if opts.battleFit == "fill" and opts.battleLayout == "wide"
+         and opts.battleHud == "extended" then
+        opts.battleBg = "white"
+      end
+      return true
+    end)
+  add(Strings("BATTLE HUD"),
+    function()
+      return opts.battleLayout == "wide" and opts.battleHud == "extended"
+             and Strings("EXTENDED")
+             or Strings("STANDARD")
+    end,
+    function()
+      if opts.battleLayout ~= "wide" then
+        opts.battleHud = "standard"
+        return false
+      end
+      opts.battleHud = opts.battleHud == "extended" and "standard" or "extended"
+      if opts.battleHud == "extended" and opts.battleFit == "fill" then
+        opts.battleBg = "white"
+      end
+      return true
+    end)
   add(Strings("BATTLE BG"),
-    ladder(opts, "battleBg",
-      { { "white", "WHITE" }, { "black", "BLACK" }, { "world", "WORLD" } },
-      "white"))
+    function()
+      if opts.battleLayout == "wide" and opts.battleFit == "fill"
+         and opts.battleHud == "extended" then
+        opts.battleBg = "white"
+        return Strings("AUTO")
+      end
+      if opts.battleBg == "black" then return Strings("BLACK") end
+      if opts.battleBg == "world" then return Strings("WORLD") end
+      return Strings("WHITE")
+    end,
+    function(dir)
+      if opts.battleLayout == "wide" and opts.battleFit == "fill"
+         and opts.battleHud == "extended" then
+        opts.battleBg = "white"
+        return false
+      end
+      local order = { "white", "black", "world" }
+      local cur = 1
+      for i, mode in ipairs(order) do
+        if opts.battleBg == mode then cur = i break end
+      end
+      opts.battleBg = order[wrapIndex(cur - 1 + (dir or 1), #order) + 1]
+      return true
+    end)
   add(Strings("UI LAYOUT"),
     ladder(opts, "uiLayout",
       { { "centered", "CENTERED" }, { "dynamic", "DYNAMIC" } }, "centered"))
@@ -577,6 +645,7 @@ end
 -- writes options while a modal covers it, so the cached table stays true.
 -- `hooks` carries the host actions a row cannot perform itself:
 --   editTouchControls()  -- hand the screen to the touch-overlay editor
+--   openSkinStudio()     -- hand the screen to the desktop skin studio
 --
 -- `version` is the game the gear was opened on.  It picks the row set, and
 -- for Gold it also picks WHICH table the rows edit: the `gold` block inside

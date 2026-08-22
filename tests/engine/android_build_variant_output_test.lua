@@ -1,5 +1,4 @@
--- Normal, Test, and Diagnostic builds must remain available together with
--- stable package identities and distinct user-visible labels.
+-- Normal, Test, and Diagnostic builds must remain available together.
 
 local file = assert(io.open("scripts/build_android.sh", "rb"))
 local script = file:read("*a")
@@ -15,9 +14,7 @@ end
 local function property(text, key)
   local prefix = key .. "="
   for line in text:gmatch("[^\r\n]+") do
-    if line:sub(1, #prefix) == prefix then
-      return line:sub(#prefix + 1)
-    end
+    if line:sub(1, #prefix) == prefix then return line:sub(#prefix + 1) end
   end
 end
 
@@ -40,11 +37,11 @@ check(not script:find('local dist_dir="$DIST/debug"\n', 1, true),
   "shared debug output directory is not cleared")
 check(script:find('zip -q -X -9 -r "$LOVE_FILE"', 1, true),
   "Android game.love packaging strips host-specific ZIP metadata")
-
+check(script:find('touch -t 202608210000.00 "$stamp_dir/src/core/Version.lua"', 1, true),
+  "Android version stamp uses a fixed ZIP entry time")
 check(property(properties, "app.name") == "Gen1Recomp VR Unplugged",
   "normal Android label stays exactly Gen1Recomp VR Unplugged")
-check(script:find('DISPLAY_NAME_OVERRIDE=""', 1, true) and
-      script:find('normal) ;;', 1, true),
+check(script:find('DISPLAY_NAME_OVERRIDE=""', 1, true) and script:find('normal) ;;', 1, true),
   "normal builds use the tracked label without an override")
 check(script:find('DISPLAY_NAME_OVERRIDE="Gen1Recomp Test"', 1, true),
   "test builds use the exact compact label")
@@ -56,7 +53,6 @@ check(script:find('if [ -n "$DISPLAY_NAME_OVERRIDE" ]; then', 1, true) and
       script:find('gradle_args+=("-Papp.display_name=$DISPLAY_NAME_OVERRIDE")', 1, true) and
       not script:find('"-Papp.display_name=$DISPLAY_NAME_OVERRIDE" \\', 1, true),
   "only non-normal variants pass a display-name override to Gradle")
-
 check(property(properties, "app.application_id") == "com.theboisclub.pokemonred" and
       script:find('APPLICATION_ID="com.theboisclub.pokemonred"', 1, true) and
       script:find('APPLICATION_ID+=".test"', 1, true) and
