@@ -1906,6 +1906,26 @@ protected-residue gates remain mandatory after the final later change.
 | `4b0496bad1a9110d5aad3b5be551664098c28ec0` | Applied | Gen 1 `src/battle/BattleState.lua` subset committed in Batch 41; `src/battle/gen2/Battle.lua` is Gen 2-only. |
 | `bb0f156497e7ad73c5a0553f9b724cac3dffeb0e` | Inapplicable | Changes only Gold continuation assertions in `tests/engine/battle_charge_required.lua`; the Gen 1 focused contract is present. |
 
+### Batch 42: explicit launcher update checks
+
+Upstream source: `5c1837b1eb61ca3501f47c443e44e8c38cd2cd53`.
+
+The current launcher already has fixed-page virtualization in
+`src/import/LauncherView.lua`, which is equivalent to the upstream bounded
+row scan while preserving Quest compact-label and focus behavior. This batch
+applies the remaining behavioral change: `RomImporter:_refreshMods()` no
+longer starts update transport work. The existing explicit **Updates** action
+is unchanged. This prevents background network work when the MODS list opens,
+refreshes, pages, toggles, or changes scope.
+
+Focused verification:
+
+- Launcher page and refresh/no-lookup contract: 20/20 passed.
+- Quest settings profile: 100/100 passed.
+- `git diff --check` passed.
+
+| `5c1837b1eb61ca3501f47c443e44e8c38cd2cd53` | Applied / already equivalent | `RomImporter.lua` opt-in update behavior applied; `LauncherView.lua` row-scan optimization is already equivalent through fixed-page bounds and is intentionally retained for Quest UI compatibility. |
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
