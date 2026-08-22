@@ -384,6 +384,33 @@ check(math.abs(r - 0.4) < 1e-6 and math.abs(g - 0.7) < 1e-6
       and math.abs(b - 0.9) < 1e-6,
       "a trueColor pic keeps a pixel no 4-shade palette contains")
 
+-- trainers.trueColor is the same opt-out on a class portrait
+BattleState.invalidate()
+local trainerPicData = {
+  trainers = {
+    SHADED = { pic = "assets/generated/battle/front/shaded.png" },
+    FULLCOLOR = { pic = "assets/generated/battle/front/full.png",
+                  trueColor = true },
+    REUSED = { basePic = "FULLCOLOR" },
+  },
+  palettes = { palettes = { MEWMON = monPalette }, pokemon = {} },
+}
+local shadedTrainer = BattleState.trainerSprite(trainerPicData,
+  trainerPicData.trainers.SHADED)
+r, g, b = shadedTrainer.data:getPixel(0, 0)
+check(not (math.abs(r - 0.4) < 1e-6 and math.abs(g - 0.7) < 1e-6
+      and math.abs(b - 0.9) < 1e-6),
+      "a 4-shade trainer pic is palette-quantized onto the active palette")
+local fullTrainer = BattleState.trainerSprite(trainerPicData,
+  trainerPicData.trainers.FULLCOLOR)
+r, g, b = fullTrainer.data:getPixel(0, 0)
+check(math.abs(r - 0.4) < 1e-6 and math.abs(g - 0.7) < 1e-6
+      and math.abs(b - 0.9) < 1e-6,
+      "a trueColor trainer pic keeps a pixel no 4-shade palette contains")
+check(BattleState.trainerTrueColor(trainerPicData,
+        trainerPicData.trainers.REUSED) == true,
+      "a basePic reuse inherits the base portrait's trueColor flag")
+
 -- ------- trueColor: the colors == false zone sentinel
 
 check(PaletteFX.zone(nil, 0, 0, 1, 1) == nil, "nil colors is still no zone")

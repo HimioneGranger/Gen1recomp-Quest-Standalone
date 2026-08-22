@@ -23,6 +23,7 @@ local MoveEffects = require("src.battle.MoveEffects")
 local Pokemon = require("src.pokemon.Pokemon")
 local Runtime = require("src.mods.Runtime")
 local SaveData = require("src.core.SaveData")
+local Schemas = require("src.mods.Schemas")
 local Status = require("src.battle.Status")
 local TrainerAI = require("src.battle.TrainerAI")
 local TurnOrder = require("src.battle.TurnOrder")
@@ -346,6 +347,16 @@ do
   check(BattleState.trainerPicPath(Data, { basePic = "OPP_ENGINEER" })
         == Data.trainers.OPP_ENGINEER.pic,
         "a custom trainer can reuse a base trainer portrait by id")
+  check(BattleState.trainerTrueColor(Data, { trueColor = true }) == true,
+        "a trainer record's trueColor flag is readable")
+  check(BattleState.trainerTrueColor(Data, { trueColor = false }) == false,
+        "explicit false stays false")
+  check(BattleState.trainerTrueColor(Data, { basePic = "OPP_ENGINEER" })
+        == false,
+        "a vanilla base portrait is not trueColor")
+  check(Schemas.check(Schemas.REGISTRIES.trainers, "trainers", "OPP_BROCK",
+                      { trueColor = true }, "patch"),
+        "a trueColor trainers patch validates against the catalog schema")
 end
 
 do

@@ -347,6 +347,25 @@ function BattleState.trainerPicPath(data, trainer, oppClass, partyIndex)
   return base and base.pic or nil
 end
 
+-- trueColor on the trainer record, or on the basePic it reuses when the
+-- subclass does not set the flag itself. Explicit false stays false.
+function BattleState.trainerTrueColor(data, trainer)
+  if not trainer then return false end
+  if trainer.trueColor ~= nil then
+    return trainer.trueColor and true or false
+  end
+  local base = trainer.basePic and data and data.trainers
+    and data.trainers[trainer.basePic]
+  return (base and base.trueColor) and true or false
+end
+
+function BattleState.trainerSprite(data, trainer, oppClass, partyIndex)
+  return getImage(
+    BattleState.trainerPicPath(data, trainer, oppClass, partyIndex),
+    BattleState.trainerPalette(data, trainer),
+    BattleState.trainerTrueColor(data, trainer))
+end
+
 -- The battle-BGP fade variant of a pic (AnimationFlashScreen and the
 -- SetAnimationBGPalette effects remap the four BG shades; on the SGB
 -- the colorizer then colors the REMAPPED shade, so a faded pic shows
@@ -828,9 +847,8 @@ function BattleState.newTrainer(game, oppClass, partyIndex, opts)
   -- MonsterPalettes[0] = PAL_MEWMON -- InitBattleCommon zeroes
   -- wEnemyMonSpecies2 before the intro's SET_PAL_BATTLE
   -- (engine/battle/core.asm:6682, engine/gfx/palettes.asm SetPal_Battle)
-  self.trainerPic = getImage(
-    BattleState.trainerPicPath(game.data, self.trainer, oppClass, partyIndex),
-    BattleState.trainerPalette(game.data, self.trainer))
+  self.trainerPic = BattleState.trainerSprite(
+    game.data, self.trainer, oppClass, partyIndex)
   self.introText = Strings("%s wants\nto fight!", self.trainer.name)
   return self
 end

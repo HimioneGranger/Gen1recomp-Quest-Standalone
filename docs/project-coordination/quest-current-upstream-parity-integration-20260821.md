@@ -1814,6 +1814,50 @@ Focused verification:
   untracked and unchanged.
 - Staged scope/provenance, whitespace, and diff checks passed.
 
+### Batch 40: full-color Gen 1 trainer portraits
+
+Audit lane: M8 Gen 1 trainer-registry and presentation subset.
+
+Upstream source:
+
+- `c8f6c7241b64e318034fc5c668f8d6f78cc32e5b`
+
+Exact imported/adapted path set:
+
+```text
+docs/modding/reference/registries.md
+src/battle/BattleState.lua
+src/mods/Schemas.lua
+src/ui/OakSpeech.lua
+tests/engine/trainer_true_color.lua
+tests/mod_battle_tests.lua
+tests/mod_graphics_tests.lua
+```
+
+Gen 1 trainer records can declare `trueColor`. Battle portraits and Oak intro
+trainer art preserve full-color pixels in color modes, while ordinary portraits
+keep the active palette conversion. A `basePic` reuse inherits the base flag,
+and an explicit false overrides it. The registry schema and generated reference
+describe the field.
+
+Gen2Compat, the Gen 2 BattleState implementation, Gen 2 registry fields, and
+the Gen 2 half of the upstream focused test are excluded as Gen 2-only. Q47's
+mode-aware true-color gate remains stronger: monochrome modes still quantize
+full-color art.
+
+Focused verification:
+
+- Gen 1 schema, inheritance, explicit false, and OakSpeech propagation: 11/11
+  passed.
+- Full mod graphics, including three trainer-pixel assertions: 197/197 passed.
+- Quest settings profile: 95/95 passed.
+- Direct changed-source compilation passed.
+- Direct `tests/mod_battle_tests.lua` remains at its existing generated-ROM-data
+  boundary; its four new assertions are covered by the ROM-free focused test.
+- No app was launched and no network was used. Protected residues remained
+  untracked and unchanged.
+- Staged scope/provenance, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1826,8 +1870,8 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 39 integrates the Gen 1 subset of audited M8
-source `dcc388a94218b0724264ec7d51f95346e2a30eeb`. Resume with the next
-unreconciled M8 row, `c8f6c7241b64e318034fc5c668f8d6f78cc32e5b`. Keep the C8
+Current recovery point: Batch 40 integrates the Gen 1 subset of audited M8
+source `c8f6c7241b64e318034fc5c668f8d6f78cc32e5b`. Resume with the next
+unreconciled M8 row, `2b6473ae03e07bcde11e18d4f5b13b01a730bb9c`. Keep the C8
 SAVE-panel field deferred until the `0f8f6d0e` and `dbecc345` menu foundation
 is integrated and tested.
