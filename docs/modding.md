@@ -454,15 +454,19 @@ mod.hooks:wrap("trainer.before_battle", function(next, game, context, continue)
       continue({ playerPartyIndices = indices })
     end,
     onCancel = function()
-      continue()
+      continue({ cancel = true })
     end,
   })
   return true
 end)
 ```
 
-Return `true` only when retaining `continue` for a later callback. Calling
-`continue()` uses the full save party. Passing
+Return `true` only when retaining `continue` for a later callback.
+`continue({ cancel = true })` ends the encounter without constructing a battle.
+The normal encounter completion callback returns control to the overworld and
+no trainer-defeated state is written. A cancelled sight encounter is suppressed
+at the current player cell; moving one cell or talking to the trainer permits a
+new challenge. Calling `continue()` uses the full save party. Passing
 `{ playerPartyIndices = { 2, 4, 5 } }` uses those ordered, one-based party
 members for initial send, switching, forced replacement, exhaustion,
 experience traversal, and battle party displays. The continuation is one-shot.

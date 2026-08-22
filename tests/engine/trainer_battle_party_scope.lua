@@ -6,12 +6,16 @@ love = love or require("tests.love_stub")
 
 local T = require("tests.harness").suite("trainer battle party scope")
 local BattleState = require("src.battle.BattleState")
+local BagMenu = require("src.ui.BagMenu")
 local Fixtures = require("tests.modkit").fixtures
 local PartyMenu = require("src.ui.PartyMenu")
 local Pokemon = require("src.pokemon.Pokemon")
 local SaveData = require("src.core.SaveData")
+local Bag = require("src.inventory.Bag")
 
 local Data = Fixtures.fresh()
+Data.items.POTION = { id = "POTION", index = 99, name = "POTION",
+  price = 300, tossable = true }
 
 local function makeGame()
   local save = SaveData.newGame()
@@ -20,9 +24,11 @@ local function makeGame()
     Pokemon.new(Data, "FIXMON_B", 11),
     Pokemon.new(Data, "FIXMON_C", 12),
   }
-  return { data = Data, save = save, stack = {
-    push = function() end, pop = function() end, top = function() end,
-  } }
+  local stack = { states = {} }
+  function stack:push(value) self.states[#self.states + 1] = value end
+  function stack:pop() return table.remove(self.states) end
+  function stack:top() return self.states[#self.states] end
+  return { data = Data, save = save, stack = stack }
 end
 
 local game = makeGame()
@@ -46,6 +52,18 @@ T.check(battle.player.mon == second,
 local menu = PartyMenu.new(game, { battle = battle })
 T.check(menu.party == battle.playerParty,
   "battle party menus traverse only the local eligible view")
+
+Bag.add(game.save, "POTION", 1)
+local bag = BagMenu.new(game, { battle = battle })
+local potion
+for _, row in ipairs(bag.items) do
+  if row.value == "POTION" then potion = row; break end
+end
+T.check(potion ~= nil, "the fixture potion is available for target selection")
+bag.onChoose(potion, bag)
+local targetPicker = game.stack:top()
+T.check(targetPicker and targetPicker.party == battle.playerParty,
+  "in-battle item target selection traverses only eligible members")
 
 second.hp = 0
 battle.player.mon.hp = 0
@@ -83,6 +101,12 @@ for _, bad in ipairs({ { 0, 99, 1.5, 0 }, { 2, 99 }, { 2, 2 } }) do
   T.eq(fallback.player.mon, fallbackGame.save.party[1],
     "invalid scope fallback preserves vanilla initial send")
 end
+
+local malformedOptionsGame = makeGame()
+local malformedOptions = BattleState.newTrainer(malformedOptionsGame,
+  "OPP_FIX_YOUNGSTER", 1, 7)
+T.eq(malformedOptions.playerParty, nil,
+  "a malformed options value degrades to the vanilla full-party path")
 
 local linkGame = makeGame()
 local linkBattle = BattleState.newTrainer(linkGame,

@@ -231,6 +231,7 @@ function OverworldState:enter(mapId, x, y, facing, opts)
   -- a fresh entry, or a stale flag can freeze player input forever
   self.engaging = false
   self.emote = nil
+  self.cancelledTrainerSight = nil
   -- volatile WRAM state in pokered; never serialize across save/load
   self.wildEncounterGraceSteps = 0
   -- survives save/load: a loaded game may start inside a building whose
@@ -3091,7 +3092,8 @@ end
 -- Public pre-trainer gate. A mod may retain continueBattle while a registered
 -- preparation screen is on top, then resume once with an optional ordered
 -- save-party index scope. The hook is cold on a no-mod boot.
-function OverworldState.prepareTrainerBattle(game, context, startBattle)
+function OverworldState.prepareTrainerBattle(game, context, startBattle,
+    cancelBattle)
   if not Runtime.wantsHook("trainer.before_battle") then
     startBattle()
     return false
@@ -3100,7 +3102,11 @@ function OverworldState.prepareTrainerBattle(game, context, startBattle)
   local function continueBattle(options)
     if started then return false end
     started = true
-    startBattle(options)
+    if type(options) == "table" and options.cancel == true then
+      if cancelBattle then cancelBattle() end
+    else
+      startBattle(options)
+    end
     return true
   end
   local deferred = Runtime.call("trainer.before_battle",
@@ -3137,6 +3143,7 @@ function OverworldState:engageTrainer(npc, onDone, endBattleText, skipBattleText
 
   local BattleState = require("src.battle.BattleState")
   local function startBattle(options)
+    self.cancelledTrainerSight = nil
     -- TalkToTrainer (home/trainers.asm:88) prints the before-battle text
     -- FIRST and only then runs `call EngageMapTrainer` / `jp
     -- StartTrainerBattle`, so a trainer challenged on foot gets the sting
@@ -3199,7 +3206,16 @@ function OverworldState:engageTrainer(npc, onDone, endBattleText, skipBattleText
       partyIndex = d.trainerParty or 1,
       mapId = self.map.id,
       npcId = npc.id,
-    }, startBattle)
+    }, startBattle, function()
+      if self.player then
+        self.cancelledTrainerSight = {
+          npcId = npc.id,
+          playerX = self.player.cellX,
+          playerY = self.player.cellY,
+        }
+      end
+      if onDone then onDone() end
+    end)
   end
   if skipBattleText then
     prepareBattle()
@@ -3373,11 +3389,18 @@ function OverworldState:checkTrainerSight()
   if self.player.moving or self.engaging then return end
   if Game.stack:top() ~= self then return end
   local p = self.player
+  local cancelled = self.cancelledTrainerSight
+  if cancelled and (cancelled.playerX ~= p.cellX
+      or cancelled.playerY ~= p.cellY) then
+    self.cancelledTrainerSight = nil
+    cancelled = nil
+  end
   for _, npc in ipairs(self.npcs) do
     local d = npc.def
     -- CheckFightingMapTrainers engages ANY aligned trainer sprite,
     -- walkers included (they sight between steps)
     if d.trainerClass and not npc.moving
+       and not (cancelled and cancelled.npcId == npc.id)
        and not self:trainerDefeated(npc)
        and not mapScripts.talkScript(self.map.id, d.text)
        and trainerSpriteOnScreen(npc, p) then

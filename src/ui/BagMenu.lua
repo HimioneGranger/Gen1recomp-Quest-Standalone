@@ -397,6 +397,7 @@ local function pickTargetAndUse(game, battle, id, list)
   local def = game.data.items[id]
   local opts = {
     pickOnly = true,
+    battle = battle,
     -- HP medicine animates its bar with the picker still up (#252).  Only
     -- out of battle: the in-battle tail closes the bag list underneath
     -- first, which needs the picker already gone.

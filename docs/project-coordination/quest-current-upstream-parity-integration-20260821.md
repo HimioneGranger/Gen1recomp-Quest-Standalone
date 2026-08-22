@@ -1728,6 +1728,53 @@ Focused verification:
   untracked and unchanged.
 - Staged scope/provenance, whitespace, and diff checks passed.
 
+### Batch 38: deferred trainer cancellation hardening
+
+Audit lane: M8 direct trainer-scope hardening.
+
+Upstream source:
+
+- `407f649e9dd97d500b14d6ea5dae7e4ef671829a`
+
+Exact imported/adapted path set:
+
+```text
+docs/modding.md
+docs/rfcs/0010-trainer-battle-party-scope.md
+src/battle/BattleState.lua
+src/ui/BagMenu.lua
+src/world/OverworldController.lua
+tests/engine/trainer_battle_party_scope.lua
+tests/engine/trainer_talk_sting_bug764.lua
+tests/modkit/cases/trainer_before_battle.lua
+```
+
+The retained continuation can now cancel without constructing a battle or
+writing defeated-trainer state. A cancelled sight encounter is latched only at
+the current player cell to prevent immediate reacquisition; movement clears it,
+and a new overworld entry always resets it. Cancellation remains one-shot.
+Malformed constructor options fall back to the full party. In-battle item
+target selection now receives the battle and therefore uses the same scoped
+party view as switch menus.
+
+All upstream paths are applicable Gen 1/shared paths and are represented. The
+merge preserves Q47's existing item-use hook wrapper, overworld lifecycle,
+checkpoint behavior, Quest menu/input behavior, and link outcome repair.
+
+Focused verification:
+
+- Trainer party scope, including bag targeting and malformed options: 22/22
+  passed.
+- Talk/sight sting, cancellation latch, movement release, and lifecycle reset:
+  24/24 passed.
+- Public defer/resume/cancel one-shot contract: 15/15 passed.
+- Existing item-use mod hook: 7/7 passed.
+- Quest settings profile: 95/95 passed; direct changed-source compilation
+  passed.
+- No app was launched and no network was used. Protected residues remained
+  untracked and unchanged.
+- Staged scope/provenance, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1740,8 +1787,8 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 37 integrates audited M8 source
-`a77210799f6feee7f57df7cf37626de16e492a93` for Gen 1. Resume with its direct
-hardening follow-up, `407f649e9dd97d500b14d6ea5dae7e4ef671829a`.
-Keep the C8 SAVE-panel field deferred until the `0f8f6d0e` and `dbecc345` menu
-foundation is integrated and tested.
+Current recovery point: Batch 38 integrates audited M8 hardening source
+`407f649e9dd97d500b14d6ea5dae7e4ef671829a`. Resume with the next unreconciled
+M8 row, `dcc388a94218b0724264ec7d51f95346e2a30eeb`. Keep the C8 SAVE-panel
+field deferred until the `0f8f6d0e` and `dbecc345` menu foundation is
+integrated and tested.

@@ -65,4 +65,25 @@ T.eq(out.continue({ playerPartyIndices = { 1 } }), false,
 T.eq(calls, 1, "a duplicate resume cannot start a second battle")
 run.release()
 
+local cancelRun = T.sdk.loadMods({ "mods/scope_probe" }, {
+  fs = T.sdk.memfs(FIXTURE),
+})
+local starts, cancels = 0, 0
+OW.prepareTrainerBattle(game, {
+  trainerClass = "OPP_FIX_YOUNGSTER", partyIndex = 2,
+  mapId = "FIX_ROUTE", npcId = "TRAINER_7",
+}, function()
+  starts = starts + 1
+end, function()
+  cancels = cancels + 1
+end)
+local cancelOut = cancelRun.loader.exports.scope_probe or {}
+T.eq(cancelOut.continue({ cancel = true }), true,
+  "the retained continuation can cancel a deferred encounter")
+T.eq(starts, 0, "cancelling never constructs a trainer battle")
+T.eq(cancels, 1, "cancelling invokes the encounter's completion callback")
+T.eq(cancelOut.continue(), false,
+  "a cancelled continuation remains one-shot")
+cancelRun.release()
+
 T.finish("trainer_before_battle")

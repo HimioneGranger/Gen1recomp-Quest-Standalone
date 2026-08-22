@@ -20,6 +20,7 @@ construction:
 mod.hooks:wrap("trainer.before_battle", function(next, game, context, continue)
   -- context = { trainerClass, partyIndex, mapId, npcId }
   -- Return true only when the battle is deferred.
+  -- continue({ cancel = true }) returns without constructing a battle.
   -- continue() uses the full party.
   -- continue({ playerPartyIndices = { 2, 4, 5 } }) selects a local view.
 end)
@@ -49,4 +50,10 @@ implement this deferred preparation boundary.
 - Engine tests cover identity, menus, replacement, exhaustion, experience,
   invalid fallback, and link-outcome preservation.
 - Checkpoint tests cover scoped capture/restore, invalid references, and old
-  checkpoint compatibility.
+checkpoint compatibility.
+
+`{ cancel = true }` ends a deferred encounter through its normal completion
+callback without constructing a battle or writing trainer-defeated state. A
+cancelled sight encounter is suppressed while the player remains on the same
+cell. Moving or directly talking permits a new challenge. Cancellation is also
+one-shot and takes precedence over a supplied party index list.

@@ -770,7 +770,7 @@ function BattleState.newTrainer(game, oppClass, partyIndex, opts)
   -- data/scripts/victories.lua on class#party, so keep it on the battle (#782).
   self.partyIndex = partyIndex or 1
   self.playerParty, self.playerPartyIndices = scopedPlayerParty(game,
-    opts and opts.playerPartyIndices)
+    type(opts) == "table" and opts.playerPartyIndices or nil)
   self.trainer = game.data.trainers[oppClass]
   assert(self.trainer, "unknown trainer class " .. tostring(oppClass))
   -- pret GetTrainerName_: RIVAL1/2/3 copy wRivalName into wTrainerName
