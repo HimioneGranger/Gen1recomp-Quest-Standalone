@@ -21,6 +21,74 @@ luajit tools/gen_registry_docs.lua
 luajit tools/gen_registry_docs.lua ../gen1recomp.wiki
 ```
 
+## Manifest specification (`manifest.json`)
+
+Every mod contains a root `manifest.json` that defines its metadata, supported
+games, and engine dependencies.
+
+```json
+{
+  "id": "my_mod",
+  "name": "My Cool Mod",
+  "version": "1.0.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "GAMEPLAY",
+  "games": ["gen1", "gen2"],
+  "game_version": ">=0.0.0-dev <2.0.0",
+  "priority": 100,
+  "dependencies": [
+    "helper_lib@^1.0.0",
+    { "id": "pokegear_cards", "games": ["gen2"], "range": "^1.0.0", "github": "1jamie/pokegear_cards" }
+  ],
+  "optional_dependencies": ["gen1_modern_ui"],
+  "conflicts": [],
+  "permissions": ["engine_internals"],
+  "description": "A brief description of the mod.",
+  "github": "author/my_mod"
+}
+```
+
+### Manifest fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | `string` | Unique lowercase identifier. |
+| `name` | `string` | Human-readable launcher title. |
+| `version` | `string` | Semantic version string. |
+| `api` | `integer` | Mod API level. |
+| `entry` | `string` | Entry Lua path relative to the mod root. |
+| `profile` | `string` | `content`, `overhaul`, or `total_conversion`. |
+| `category` | `string` | Launcher category chip. |
+| `games` | `array` | Supported game versions or generations. |
+| `game_version` | `string` | Required engine semantic-version range. |
+| `priority` | `integer` | Load priority; dependencies still load first. |
+| `dependencies` | `array` | Hard dependencies. |
+| `optional_dependencies` | `array` | Ordering-only soft dependencies. |
+| `conflicts` / `incompatible` | `array` | Mods that cannot run together. |
+| `permissions` | `array` | Requested sandbox capabilities. |
+| `github` | `string` | `owner/repo` used for update metadata. |
+
+### Declaring and scoping dependencies
+
+A dependency can be a simple ID, an ID with a semantic-version range, an ID
+with an `owner/repo` hint, or a structured object:
+
+```json
+{
+  "id": "mod_id",
+  "range": "^1.2.0",
+  "games": ["gen2"],
+  "github": "owner/repo"
+}
+```
+
+For a mod that supports multiple games, `games` on a dependency limits that
+dependency to the listed games or generations. For example, a `gen2` dependency
+does not block the parent mod on Red, Blue, or Yellow. Use
+`optional_dependencies` when the integration is optional on every game.
+
 ## Mods and Gold (Gen 2)
 
 The mod API is one API across both generations, but Gold runs its own battle

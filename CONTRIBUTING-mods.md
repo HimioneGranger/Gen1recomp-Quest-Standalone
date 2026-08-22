@@ -316,7 +316,8 @@ cover.
 ### 6. `mod.card`
 
 The manifest is the *engine's* contract: identity, load order, dependencies,
-permissions, profile. The card is the *human-facing* one: who made this,
+permissions, profile (see [Manifest specification](docs/modding.md#manifest-specification-manifestjson)).
+The card is the *human-facing* one: who made this,
 what it changes, what it does not do yet. It is never read by the loader's
 merge — only by tooling and the manager's detail pane — so an absent or
 malformed card can never break a load.

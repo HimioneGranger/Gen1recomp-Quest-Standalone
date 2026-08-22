@@ -87,21 +87,20 @@ local function statusFor(mods, id, enabledSet, enabled, version, forcedFor)
   -- resolveToggle would cascade-enable a merely-disabled dep rather than flag
   -- it, so the disabled case is judged straight off the manifest here.
   for _, spec in ipairs(m.dependencySpecs or {}) do
-    local dep = mods[spec.id]
-    if not dep then
-      return "warn", "Needs " .. spec.id .. " (not installed)"
-    elseif not enabledSet[spec.id] then
-      return "warn", "Needs " .. spec.id .. " (disabled)"
-    -- installed and on, but not for THIS game: the loader skips the
-    -- dependency and the skip is contagious (Loader:_enforceDependencies),
-    -- so a mod that runs everywhere still does not run here
-    elseif version
-        and not ModTargets.runsHere(dep, version, nil, forcedFor(spec.id)) then
-      return "warn", "Needs " .. spec.id .. " (not for "
-        .. ModTargets.gameLabel(version) .. ")"
-    elseif spec.range
-        and not Semver.satisfies(dep.version, spec.range) then
-      return "warn", "Needs " .. spec.id .. " " .. spec.range
+    if ModTargets.specApplies(spec, version) then
+      local dep = mods[spec.id]
+      if not dep then
+        return "warn", "Needs " .. spec.id .. " (not installed)"
+      elseif not enabledSet[spec.id] then
+        return "warn", "Needs " .. spec.id .. " (disabled)"
+      elseif version
+          and not ModTargets.runsHere(dep, version, nil, forcedFor(spec.id)) then
+        return "warn", "Needs " .. spec.id .. " (not for "
+          .. ModTargets.gameLabel(version) .. ")"
+      elseif spec.range
+          and not Semver.satisfies(dep.version, spec.range) then
+        return "warn", "Needs " .. spec.id .. " " .. spec.range
+      end
     end
   end
   return "ok", "Ready"
@@ -168,33 +167,35 @@ function LauncherMods.checkDependencies(manifest, options, version, installedMan
   -- 1. Hard Dependencies (dependencySpecs)
   if type(manifest.dependencySpecs) == "table" then
     for _, spec in ipairs(manifest.dependencySpecs) do
-      local depId = spec.id
-      local range = spec.range
-      local installedDep = installedMap[depId]
-      local status = "satisfied"
-      local installedVersion = installedDep and installedDep.version or nil
+      if not version or ModTargets.specApplies(spec, version) then
+        local depId = spec.id
+        local range = spec.range
+        local installedDep = installedMap[depId]
+        local status = "satisfied"
+        local installedVersion = installedDep and installedDep.version or nil
 
-      if not installedDep then
-        status = "missing"
-        hasIssues = true
-      elseif range and not Semver.satisfies(installedDep.version, range) then
-        status = "incompatible"
-        hasIssues = true
+        if not installedDep then
+          status = "missing"
+          hasIssues = true
+        elseif range and not Semver.satisfies(installedDep.version, range) then
+          status = "incompatible"
+          hasIssues = true
+        end
+
+        local ghRepo = LauncherMods.resolveDependencyRepo(depId, manifest, installedDep)
+        local safeUrl = ghRepo and ("https://github.com/" .. ghRepo) or nil
+
+        depsResult[#depsResult + 1] = {
+          id = depId,
+          name = (installedDep and installedDep.name) or depId,
+          range = range,
+          status = status,
+          kind = "dependency",
+          installedVersion = installedVersion,
+          github = ghRepo,
+          safeUrl = safeUrl,
+        }
       end
-
-      local ghRepo = LauncherMods.resolveDependencyRepo(depId, manifest, installedDep)
-      local safeUrl = ghRepo and ("https://github.com/" .. ghRepo) or nil
-
-      depsResult[#depsResult + 1] = {
-        id = depId,
-        name = (installedDep and installedDep.name) or depId,
-        range = range,
-        status = status,
-        kind = "dependency",
-        installedVersion = installedVersion,
-        github = ghRepo,
-        safeUrl = safeUrl,
-      }
     end
   end
 

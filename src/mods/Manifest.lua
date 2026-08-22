@@ -61,11 +61,13 @@ local function parseSpecs(list, field, sources)
   local specs = {}
   sources = type(sources) == "table" and sources or {}
   for _, entry in ipairs(list) do
-    local id, range, ghHint
+    local id, range, ghHint, gamesRaw, gameVersion
     if type(entry) == "table" then
       id = entry.id
       range = entry.range or entry.version
       ghHint = entry.github or entry.repo
+      gamesRaw = entry.games or entry.game
+      gameVersion = entry.game_version
     elseif type(entry) == "string" and entry ~= "" then
       local main, hashRepo = entry:match("^([^#]+)#(.*)$")
       if main then
@@ -85,6 +87,22 @@ local function parseSpecs(list, field, sources)
     local ok, err = Semver.validRange(range)
     assert(ok, ("malformed %s range in %q: %s"):format(field, tostring(entry), tostring(err)))
 
+    if gameVersion then
+      local okV, errV = Semver.validRange(gameVersion)
+      assert(okV, ("malformed %s game_version range in %q: %s")
+        :format(field, tostring(entry), tostring(errV)))
+    end
+
+    local parsedGames = nil
+    if gamesRaw ~= nil then
+      if type(gamesRaw) == "string" then gamesRaw = { gamesRaw } end
+      assert(type(gamesRaw) == "table", "dependency games must be a string or table")
+      local normalized, unknown = ModTargets.normalize(gamesRaw)
+      assert(#unknown == 0,
+        ("unknown game in %s: %s"):format(field, table.concat(unknown, ", ")))
+      parsedGames = normalized
+    end
+
     local parsedGh = nil
     local rawGh = ghHint or sources[id]
     if rawGh then
@@ -92,7 +110,13 @@ local function parseSpecs(list, field, sources)
       if okGh and cleanGh then parsedGh = cleanGh end
     end
 
-    specs[#specs + 1] = { id = id, range = range, github = parsedGh }
+    specs[#specs + 1] = {
+      id = id,
+      range = range,
+      github = parsedGh,
+      games = parsedGames,
+      game_version = gameVersion,
+    }
   end
   return specs
 end

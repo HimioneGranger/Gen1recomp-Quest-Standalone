@@ -1634,6 +1634,49 @@ Focused verification:
   remained visible, untracked, and unchanged.
 - Staged scope/provenance, whitespace, and diff checks passed.
 
+### Batch 36: game-scoped mod dependencies
+
+Audit lane: M8 shared manifest and loader behavior.
+
+Upstream source:
+
+- `dfeacc36b06892d116864e9b72f609ce3e54d4f0`
+
+Exact imported/adapted path set:
+
+```text
+CONTRIBUTING-mods.md
+docs/modding.md
+src/mods/LauncherMods.lua
+src/mods/Loader.lua
+src/mods/Manifest.lua
+src/mods/ModTargets.lua
+tests/mod_manifest_tests.lua
+```
+
+Structured hard and optional dependency entries can now declare `games` and a
+dependency-level `game_version`. Manifest validation normalizes the game list;
+the loader applies the same predicate to blocking, cycle detection, and order;
+and the Q47 launcher applies it to status and dependency-resolution panels. A
+Gen 2-only dependency no longer blocks a dual-generation mod on Red, Blue, or
+Yellow. Existing per-game enablement, forced-run warnings, semantic-version
+conflicts, profiles, asynchronous install, and Quest launcher behavior remain.
+
+Excluded paths are `.gitignore`, all three Linux/AppImage scripts, both Gen 2
+guide/reference edits, and `tools/modkit.py`. The first would hide broad zip
+and protected option residues; the scripts are unrelated Linux platform policy;
+and the remaining changes only alter the Gen 2 static checker or Gen 2 docs.
+
+Focused verification:
+
+- Manifest, loader, scoped dependency, and conflict behavior: 119/119 passed.
+- Launcher mod and profile/dependency contracts: 133/133 passed.
+- Full ROM-free Modkit: 21/21 suites passed.
+- Direct compilation of all four changed Lua modules passed.
+- No app was launched and no network was used. The four protected runtime
+  residues remained untracked and unchanged.
+- Staged scope/provenance, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1646,9 +1689,8 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 35 integrates audited M8 source
-`35d44efb8b5c993f9ffa523637540c71df3c2496` while preserving visible runtime
-residues. Resume with the next unreconciled M8 row,
-`dfeacc36b06892d116864e9b72f609ce3e54d4f0`. Keep the C8 SAVE-panel field
-deferred until the `0f8f6d0e` and `dbecc345` menu foundation is integrated and
-tested.
+Current recovery point: Batch 36 integrates the Gen 1/shared subset of audited
+M8 source `dfeacc36b06892d116864e9b72f609ce3e54d4f0`. Resume with the next
+unreconciled M8 row, `a77210799f6feee7f57df7cf37626de16e492a93`.
+Keep the C8 SAVE-panel field deferred until the `0f8f6d0e` and `dbecc345` menu
+foundation is integrated and tested.

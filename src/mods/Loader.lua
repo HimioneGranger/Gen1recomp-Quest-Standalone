@@ -583,42 +583,41 @@ end
 -- hard dependencies must exist, be enabled, have survived, and satisfy their
 -- range; run to a fixpoint so failures propagate to dependents transitively
 function Loader:_enforceDependencies()
+  local targetVersion = self:_targetVersion()
+  local generation = self.generation
   local changed = true
   while changed do
     changed = false
     for _, id in ipairs(orderedIds(self.mods, isActive)) do
       local mod = self.mods[id]
       for _, spec in ipairs(mod.manifest.dependencySpecs) do
-        local dep = self.mods[spec.id]
-        local reason, skip
-        if not dep then
-          reason = "missing dependency: " .. spec.id
-        elseif not dep.enabled then
-          reason = ("dependency %s is disabled"):format(spec.id)
-        elseif dep.state == "wrong_generation" then
-          -- the gate's skip is contagious as a SKIP, not as a failure: the
-          -- dependency has no bug to report and neither does this mod, so
-          -- nothing here lands on the boot error list
-          skip = true
-          -- carry the dependency's own reason: it names the game or the
-          -- missing gen2compat, and a guess here would name the wrong one
-          reason = ("depends on %s, which does not run here (%s)")
-            :format(spec.id, dep.skipReason or "not made for this game")
-        elseif dep.failed then
-          reason = ("dependency %s failed to load"):format(spec.id)
-        elseif spec.range
-            and not Semver.satisfies(dep.manifest.version, spec.range) then
-          reason = ("needs %s@%s, found %s")
-            :format(spec.id, spec.range, dep.manifest.version)
-        end
-        if reason then
-          if skip then
-            self:_skip(mod, "wrong_generation", reason)
-          else
-            self:_fail(mod, "blocked_dependency", reason)
+        if ModTargets.specApplies(spec, targetVersion, generation) then
+          local dep = self.mods[spec.id]
+          local reason, skip
+          if not dep then
+            reason = "missing dependency: " .. spec.id
+          elseif not dep.enabled then
+            reason = ("dependency %s is disabled"):format(spec.id)
+          elseif dep.state == "wrong_generation" then
+            skip = true
+            reason = ("depends on %s, which does not run here (%s)")
+              :format(spec.id, dep.skipReason or "not made for this game")
+          elseif dep.failed then
+            reason = ("dependency %s failed to load"):format(spec.id)
+          elseif spec.range
+              and not Semver.satisfies(dep.manifest.version, spec.range) then
+            reason = ("needs %s@%s, found %s")
+              :format(spec.id, spec.range, dep.manifest.version)
           end
-          changed = true
-          break
+          if reason then
+            if skip then
+              self:_skip(mod, "wrong_generation", reason)
+            else
+              self:_fail(mod, "blocked_dependency", reason)
+            end
+            changed = true
+            break
+          end
         end
       end
     end
@@ -628,6 +627,8 @@ end
 -- Tarjan SCC over the hard-dependency graph: only a cycle's own members
 -- fail, so an unrelated mod beside a cycle still loads
 function Loader:_failCycles()
+  local targetVersion = self:_targetVersion()
+  local generation = self.generation
   local mods = self.mods
   local counter, stack, onStack, index, low = 0, {}, {}, {}, {}
   local cycles = {}
@@ -638,14 +639,16 @@ function Loader:_failCycles()
     onStack[id] = true
     local selfEdge = false
     for _, spec in ipairs(mods[id].manifest.dependencySpecs) do
-      local dep = mods[spec.id]
-      if spec.id == id then selfEdge = true end
-      if dep and isActive(dep) and spec.id ~= id then
-        if not index[spec.id] then
-          connect(spec.id)
-          if low[spec.id] < low[id] then low[id] = low[spec.id] end
-        elseif onStack[spec.id] and index[spec.id] < low[id] then
-          low[id] = index[spec.id]
+      if ModTargets.specApplies(spec, targetVersion, generation) then
+        local dep = mods[spec.id]
+        if spec.id == id then selfEdge = true end
+        if dep and isActive(dep) and spec.id ~= id then
+          if not index[spec.id] then
+            connect(spec.id)
+            if low[spec.id] < low[id] then low[id] = low[spec.id] end
+          elseif onStack[spec.id] and index[spec.id] < low[id] then
+            low[id] = index[spec.id]
+          end
         end
       end
     end
@@ -696,6 +699,8 @@ end
 -- Kahn over the surviving graph with the ready set kept in (priority, id)
 -- order, so dependencies come first and the rest matches the v1 contract
 function Loader:_order()
+  local targetVersion = self:_targetVersion()
+  local generation = self.generation
   local pending, indegree, dependents = {}, {}, {}
   for _, id in ipairs(orderedIds(self.mods, isActive)) do
     pending[id], indegree[id] = true, 0
@@ -708,9 +713,17 @@ function Loader:_order()
       dependents[depId][#dependents[depId] + 1] = id
       indegree[id] = indegree[id] + 1
     end
-    for _, spec in ipairs(manifest.dependencySpecs) do edge(spec.id) end
+    for _, spec in ipairs(manifest.dependencySpecs) do
+      if ModTargets.specApplies(spec, targetVersion, generation) then
+        edge(spec.id)
+      end
+    end
     -- optional dependencies order without requiring anything
-    for _, spec in ipairs(manifest.optionalSpecs) do edge(spec.id) end
+    for _, spec in ipairs(manifest.optionalSpecs) do
+      if ModTargets.specApplies(spec, targetVersion, generation) then
+        edge(spec.id)
+      end
+    end
   end
   local ordered = {}
   local function nextId()

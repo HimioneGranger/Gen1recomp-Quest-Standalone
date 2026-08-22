@@ -560,6 +560,53 @@ local unconditionalConflict = LauncherMods.checkDependencies(testTargetManifest,
 check(unconditionalConflict.hasIssues == true,
   "dependency resolver reports an unversioned conflict")
 
+-- ------- scoped dependency tests
+local Json = require("src.link.Json")
+local scopedDepManifest = Manifest.validate({
+  id = "dual_gen_mod",
+  name = "Dual Gen Mod",
+  version = "1.0.0",
+  entry = "main.lua",
+  games = { "gen1", "gen2" },
+  dependencies = {
+    { id = "gen2_only_dep", games = { "gen2" }, version = "^1.0.0" }
+  },
+}, "mods/dual_gen_mod")
+check(#scopedDepManifest.dependencySpecs == 1, "scoped dependency parsed")
+check(scopedDepManifest.dependencySpecs[1].games ~= nil,
+  "dependency carries games list")
+
+local dualGenFiles = {
+  ["mods/dual_gen_mod/manifest.json"] = Json.encode({
+    id = "dual_gen_mod",
+    name = "Dual Gen Mod",
+    version = "1.0.0",
+    entry = "main.lua",
+    games = { "gen1", "gen2" },
+    dependencies = {
+      { id = "gen2_only_dep", games = { "gen2" } }
+    },
+  }),
+  ["mods/dual_gen_mod/main.lua"] = [[
+return function(mod)
+  mod.content.pokemon:register("DUAL_MON", { hp = 100 })
+end
+]],
+}
+local gen1Loader = Loader.new({ fs = memfs(dualGenFiles), generation = 1 })
+check(gen1Loader:load({}) == true,
+  "dual gen mod loads on Gen 1 when Gen 2 dep is absent")
+check(gen1Loader.content.pokemon:get("DUAL_MON") ~= nil,
+  "dual gen mod executed on Gen 1")
+
+local gen2Loader = Loader.new({ fs = memfs(dualGenFiles), generation = 2 })
+check(gen2Loader:load({}) == false,
+  "loader returns false on Gen 2 when missing required Gen 2 dep")
+check(gen2Loader.content.pokemon:get("DUAL_MON") == nil,
+  "dual gen mod is blocked on Gen 2 when missing required Gen 2 dep")
+check(#gen2Loader:status().errors > 0,
+  "missing dependency error logged on Gen 2")
+
 local function rangeTarget(version, conflicts)
   return Manifest.validate({
     id = "range_target",
