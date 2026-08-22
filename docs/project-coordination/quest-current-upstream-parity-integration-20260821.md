@@ -1858,6 +1858,54 @@ Focused verification:
   untracked and unchanged.
 - Staged scope/provenance, whitespace, and diff checks passed.
 
+### Batch 41: Gen 1 charge-decision hook
+
+Audit lane: remaining M8 shared battle API; Gen 1 subset of the mixed source.
+
+Upstream source:
+
+- `4b0496bad1a9110d5aad3b5be551664098c28ec0`
+- `bb0f156497e7ad73c5a0553f9b724cac3dffeb0e` (Gold-only test follow-up)
+
+Applied path set:
+
+```text
+src/battle/BattleState.lua
+tests/engine/battle_charge_required.lua
+```
+
+Gen 1 charge-capable moves now offer the guarded public
+`battle.charge_required` hook on their initial turn. A hook can return `false`
+to resolve SolarBeam through the normal damage path without creating a charge
+continuation. The unsubscribed path does not dispatch `Runtime.call`, and Fly
+continues to preserve its normal charge state. Gold implementation and
+Gold-only continuation coverage from the upstream mixed source remain
+inapplicable to this Gen 1 parity lane.
+
+Focused verification:
+
+- New ROM-free Gen 1 charge contract: 13/13 passed.
+- Direct `BattleState.lua` LuaJIT bytecode compilation passed.
+- Existing full-color trainer regression: 11/11 passed.
+- Quest settings profile: 100/100 passed.
+- `git diff --check` passed.
+
+### Batch 41 r4 gate record
+
+The completed r4 evidence is reused. No broad search and no full Batch 41
+suite was repeated because this batch changes only the Gen 1 charge seam.
+The final full engine, Modkit, Lua parse, diff, secret/private-data, and
+protected-residue gates remain mandatory after the final later change.
+
+### Continuation row classifications
+
+| Upstream row | Classification | Exact path/scope evidence |
+|---|---|---|
+| `c0ad6d0328708d3eec6f8a9fdc4c57e031a33ce1` | Inapplicable | Changes only `mobile/ios/app-repo.json`; iOS package-repository metadata is outside the Gen 1 Quest split. |
+| `c9d67582aeac84ce2583e9654089c748856d4f74` | Inapplicable | Changes only `mobile/ios/app-repo.json`; same iOS-only scope. |
+| `4b0496bad1a9110d5aad3b5be551664098c28ec0` | Applied | Gen 1 `src/battle/BattleState.lua` subset committed in Batch 41; `src/battle/gen2/Battle.lua` is Gen 2-only. |
+| `bb0f156497e7ad73c5a0553f9b724cac3dffeb0e` | Inapplicable | Changes only Gold continuation assertions in `tests/engine/battle_charge_required.lua`; the Gen 1 focused contract is present. |
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1870,8 +1918,8 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 40 integrates the Gen 1 subset of audited M8
-source `c8f6c7241b64e318034fc5c668f8d6f78cc32e5b`. Resume with the next
-unreconciled M8 row, `2b6473ae03e07bcde11e18d4f5b13b01a730bb9c`. Keep the C8
-SAVE-panel field deferred until the `0f8f6d0e` and `dbecc345` menu foundation
-is integrated and tested.
+Current recovery point: Batch 41 integrates the Gen 1 charge-decision subset
+of `4b0496ba`. Resume with the next unclassified row after this source in the
+exact `2b6473ae..d191aaa` non-merge inventory. Keep the C8 SAVE-panel field
+deferred until the `0f8f6d0e` and `dbecc345` menu foundation is integrated and
+tested.
