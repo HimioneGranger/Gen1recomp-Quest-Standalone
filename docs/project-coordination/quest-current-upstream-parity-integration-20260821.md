@@ -1938,8 +1938,44 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 41 integrates the Gen 1 charge-decision subset
-of `4b0496ba`. Resume with the next unclassified row after this source in the
-exact `2b6473ae..d191aaa` non-merge inventory. Keep the C8 SAVE-panel field
-deferred until the `0f8f6d0e` and `dbecc345` menu foundation is integrated and
-tested.
+## Completion record — 2026-08-21
+
+The exact non-merge inventory `2b6473ae..d191aaa34d987866521d76e2e2b8f7bfb3067227`
+contains 184 rows. Every row has a durable classification: the prior audit
+records the original path/scope decision, Batches 1–42 record each approved
+Gen 1 application or stronger equivalent, and the continuation table records
+the final iOS-only, Gen 2-only, charge-hook, and launcher rows. There is no
+unclassified row and no unexplained deferred row in this inventory.
+
+The audit source is read-only and preserved at
+`C:\\Users\\bolay\\Documents\\Gen1recomp-Upstream-Parity-Batch2\\docs\\project-coordination\\quest-split-current-upstream-parity-audit-20260821.md`
+(SHA-256 `F55C5697722F181BB6D429BE095892685EB3AB0E6FAE474C48808C0A12847CE3`).
+Its five historical hash records that are represented by grouped portable
+batch evidence rather than a literal hash in this ledger are reconciled here:
+
+| Upstream row | Final classification | Durable evidence |
+| --- | --- | --- |
+| `2da2168d` | Applied | Prior approved portable source/test map; Gen 1 TM/HM guard. |
+| `142d1358` | Applied | Prior approved portable source/test map; SaveData fresh-skeleton binding guard. |
+| `455ff21a` | Applied | Prior approved portable source/test map; Gen 1 map-object Pokemon validation. |
+| `f62b1268` | Applied | Prior approved portable source/test map; `item.use` hook retained and covered in Batches 8 and 38. |
+| `17fbf6ce` | Applied | Prior approved portable source/test map; Gen 1 slot-message companion coverage. |
+
+Final gate evidence at clean source checkpoint `b5383739`:
+
+- Focused final launcher and Quest contracts: 20/20 launcher page/update
+  checks, 100/100 Quest settings checks, and Quest load-report profile passed.
+- Full Modkit: 23/23 suites passed.
+- Full engine: 220/222 suites passed. The two failures are the existing
+  Windows-only Unix-tool assumptions: `build_zip_pipe_guard_bug774` needs
+  `bash`, `zip`, and `unzip`; `luajit_source_limits_test` invokes Unix `find`.
+  They do not exercise the final launcher change. All other suites passed.
+- LuaJIT bytecode parse: 1549/1552 tracked Lua files passed. The three
+  intentional Lua 5.3 vendor/test files (`tests/save_oversize_vendor_test.lua`,
+  `tools/save_convert/crosscheck.lua`, and
+  `tools/save_convert/vendor/gen1lib.lua`) use `&` or `//`, which LuaJIT 2.1
+  does not parse; no Lua 5.3 parser is installed in this workspace.
+
+Final split-integration handoff:
+`docs/project-coordination/quest-current-upstream-parity-final-handoff-20260822.md`.
+The parity gap through `d191aaa` is zero. No further upstream row is pending.
