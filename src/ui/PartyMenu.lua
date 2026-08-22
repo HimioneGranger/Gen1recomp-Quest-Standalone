@@ -281,6 +281,7 @@ function PartyMenu.new(game, opts)
   opts = opts or {}
   local self = setmetatable({}, PartyMenu)
   self.game = game
+  local party = opts.party or (opts.battle and opts.battle.playerParty)
   -- PartyMenuInit (home/pokemon.asm) seeds the cursor from
   -- wPartyAndBillsPCSavedMenuItem rather than from zero, and
   -- HandlePartyMenuInput writes wCurrentMenuItem back into it on every
@@ -289,7 +290,7 @@ function PartyMenu.new(game, opts)
   -- both zero the byte, which BattleState mirrors.  The clamp covers a
   -- party that shrank (deposit / release) while the saved index was
   -- pointing past the end. #768
-  local count = #(opts.party or (game.save and game.save.party) or {})
+  local count = #(party or (game.save and game.save.party) or {})
   self.index = math.min(math.max(1, game.partyMenuSavedIndex or 1),
                         math.max(1, count))
   self.onSwitch = opts.onSwitch
@@ -306,7 +307,7 @@ function PartyMenu.new(game, opts)
   self.tmhm = opts.tmhm
   self.forceSwitch = opts.forceSwitch
   self.battle = opts.battle
-  self.party = opts.party -- link battles pass their clamped copies
+  self.party = party -- link/scoped battles pass their local party view
   self.swapFrom = nil
   self.submenu = nil
   self.subIndex = 1

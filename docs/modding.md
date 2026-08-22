@@ -442,6 +442,34 @@ animation/messages, forced choices, and every phase that cannot safely be
 checkpointed remain excluded. Exceptions are contained by normal hook isolation
 and fall through without advancing a turn.
 
+Gen 1 trainer encounters also expose `trainer.before_battle` after the
+challenge text and immediately before battle construction. This lets a mod
+defer the encounter while it collects a player choice through a registered
+screen, then resume with a battle-local view of the save party:
+
+```lua
+mod.hooks:wrap("trainer.before_battle", function(next, game, context, continue)
+  mod.ui.push(game, "party_registration", {
+    onConfirm = function(indices)
+      continue({ playerPartyIndices = indices })
+    end,
+    onCancel = function()
+      continue()
+    end,
+  })
+  return true
+end)
+```
+
+Return `true` only when retaining `continue` for a later callback. Calling
+`continue()` uses the full save party. Passing
+`{ playerPartyIndices = { 2, 4, 5 } }` uses those ordered, one-based party
+members for initial send, switching, forced replacement, exhaustion,
+experience traversal, and battle party displays. The continuation is one-shot.
+Invalid scopes safely fall back to the full party. The view references the
+original Pokémon records and never reorders or replaces `game.save.party`.
+Trainer battle checkpoints retain the selected indices. See RFC 0010.
+
 ## Developer console
 
 Boot with developer mode on to unlock the in-game console and hot-reload

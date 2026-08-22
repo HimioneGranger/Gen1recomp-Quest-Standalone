@@ -3088,6 +3088,27 @@ local function meetTrainerTheme(cls)
          or "Music_MeetMaleTrainer"
 end
 
+-- Public pre-trainer gate. A mod may retain continueBattle while a registered
+-- preparation screen is on top, then resume once with an optional ordered
+-- save-party index scope. The hook is cold on a no-mod boot.
+function OverworldState.prepareTrainerBattle(game, context, startBattle)
+  if not Runtime.wantsHook("trainer.before_battle") then
+    startBattle()
+    return false
+  end
+  local started = false
+  local function continueBattle(options)
+    if started then return false end
+    started = true
+    startBattle(options)
+    return true
+  end
+  local deferred = Runtime.call("trainer.before_battle",
+    function() return false end, game, context, continueBattle)
+  if deferred ~= true and not started then continueBattle() end
+  return deferred == true
+end
+
 -- Run the pre-battle text -> battle -> won text -> flags sequence.
 -- skipBattleText is for map scripts shaped like SilphCo11FDefaultScript
 -- (scripts/SilphCo11F.asm), which DisplayTextID the challenge line BEFORE
@@ -3115,7 +3136,7 @@ function OverworldState:engageTrainer(npc, onDone, endBattleText, skipBattleText
                   or (header and header.won and Game.data.text[header.won])
 
   local BattleState = require("src.battle.BattleState")
-  local function startBattle()
+  local function startBattle(options)
     -- TalkToTrainer (home/trainers.asm:88) prints the before-battle text
     -- FIRST and only then runs `call EngageMapTrainer` / `jp
     -- StartTrainerBattle`, so a trainer challenged on foot gets the sting
@@ -3130,7 +3151,8 @@ function OverworldState:engageTrainer(npc, onDone, endBattleText, skipBattleText
       local theme = meetTrainerTheme(d.trainerClass)
       if theme then require("src.core.Music").play(Game.data, theme) end
     end
-    local battle = BattleState.newTrainer(Game, d.trainerClass, d.trainerParty)
+    local battle = BattleState.newTrainer(Game, d.trainerClass, d.trainerParty,
+      options)
     battle.checkpointOrigin = {
       kind = "trainer_encounter",
       map = self.map.id,
@@ -3167,10 +3189,22 @@ function OverworldState:engageTrainer(npc, onDone, endBattleText, skipBattleText
     end
     self:pushBattle(battle)
   end
+  local function prepareBattle()
+    if not Runtime.wantsHook("trainer.before_battle") then
+      startBattle()
+      return
+    end
+    OverworldState.prepareTrainerBattle(Game, {
+      trainerClass = d.trainerClass,
+      partyIndex = d.trainerParty or 1,
+      mapId = self.map.id,
+      npcId = npc.id,
+    }, startBattle)
+  end
   if skipBattleText then
-    startBattle()
+    prepareBattle()
   else
-    Game.stack:push(TextBox.new(Game, battleText, startBattle))
+    Game.stack:push(TextBox.new(Game, battleText, prepareBattle))
   end
 end
 

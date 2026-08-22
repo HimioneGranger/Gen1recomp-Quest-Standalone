@@ -1677,6 +1677,57 @@ Focused verification:
   residues remained untracked and unchanged.
 - Staged scope/provenance, whitespace, and diff checks passed.
 
+### Batch 37: deferred trainer preparation and battle-local party scope
+
+Audit lane: M8 public trainer-battle API.
+
+Upstream source:
+
+- `a77210799f6feee7f57df7cf37626de16e492a93`
+
+Exact imported/adapted path set:
+
+```text
+docs/modding.md
+docs/rfcs/0010-trainer-battle-party-scope.md
+src/battle/BattleState.lua
+src/core/BattleCheckpoint.lua
+src/ui/PartyMenu.lua
+src/world/OverworldController.lua
+tests/engine/trainer_battle_party_scope.lua
+tests/modkit/cases/checkpoints.lua
+tests/modkit/cases/trainer_before_battle.lua
+```
+
+The cold no-hook path starts a trainer battle once. A claiming public hook can
+defer construction and invoke a one-shot continuation with ordered save-party
+indices. The battle builds a local view of the original Pokémon records without
+replacing or reordering the save party. Initial send, menus, voluntary/forced
+replacement, exhaustion, EXP and EXP.ALL traversal, and party balls use the
+view. Invalid scopes use the full party.
+
+Checkpoint capture stores the normalized indices. Restore validates the active
+battler, participants, and leveled-up references against the scope, rebuilds
+the view, and remains compatible with old unscoped checkpoints. Q47's battle
+auxiliary action, screen construction, Quest menu behavior, and link outcome
+contract remain. The Gen 2 compatibility-document edit is excluded because Gen
+2 has no matching deferred preparation boundary.
+
+Focused verification:
+
+- Party identity, menus, replacement, exhaustion, experience, invalid fallback,
+  and link outcome: 19/19 passed.
+- Public deferred hook and one-shot continuation: 11/11 passed.
+- Public checkpoint suite, including 10 new scoped checks: 69/69 passed.
+- Existing battle checkpoint, auxiliary action, and party field-move order:
+  40/40 passed.
+- Full ROM-free Modkit: 22/22 suites passed.
+- Quest settings profile: 95/95 passed; direct changed-source compilation
+  passed.
+- No app was launched and no network was used. Protected residues remained
+  untracked and unchanged.
+- Staged scope/provenance, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1689,8 +1740,8 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 36 integrates the Gen 1/shared subset of audited
-M8 source `dfeacc36b06892d116864e9b72f609ce3e54d4f0`. Resume with the next
-unreconciled M8 row, `a77210799f6feee7f57df7cf37626de16e492a93`.
+Current recovery point: Batch 37 integrates audited M8 source
+`a77210799f6feee7f57df7cf37626de16e492a93` for Gen 1. Resume with its direct
+hardening follow-up, `407f649e9dd97d500b14d6ea5dae7e4ef671829a`.
 Keep the C8 SAVE-panel field deferred until the `0f8f6d0e` and `dbecc345` menu
 foundation is integrated and tested.
