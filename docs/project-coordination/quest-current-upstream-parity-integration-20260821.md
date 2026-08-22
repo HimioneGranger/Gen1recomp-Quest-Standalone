@@ -1775,6 +1775,45 @@ Focused verification:
   untracked and unchanged.
 - Staged scope/provenance, whitespace, and diff checks passed.
 
+### Batch 39: contextual Gen 1 field items
+
+Audit lane: M8 public world API.
+
+Upstream source:
+
+- `dcc388a94218b0724264ec7d51f95346e2a30eeb`
+
+Exact imported/adapted path set:
+
+```text
+docs/modding.md
+src/world/OverworldController.lua
+src/world/WorldAPI.lua
+tests/modkit/cases/world_field_items.lua
+```
+
+The public Gen 1 world facade lists bicycle and fishing actions only when the
+live idle-world, inventory, terrain, surfing, and forced-bike rules allow them.
+Execution delegates to new world-owned bicycle and fishing entry points, so
+mods do not reproduce music, dialogue, collision, or encounter behavior.
+Invalid, stale, unowned, and busy requests return a reason without state change.
+
+The Gen 2 WorldAPI, Gen2Compat coverage table, Gen 2 docs, and their test half
+are excluded as Gen 2-only. The focused test is the extracted Gen 1 half of the
+mixed upstream test. Q47 world, music, item hooks, lifecycle, and Quest input
+contracts remain.
+
+Focused verification:
+
+- Contextual bicycle/fishing discovery, execution, rejection, and busy state:
+  11/11 passed.
+- Existing world party reorder and item-use hook: 18/18 passed.
+- Quest settings profile: 95/95 passed.
+- Direct OverworldController and WorldAPI compilation passed.
+- No app was launched and no network was used. Protected residues remained
+  untracked and unchanged.
+- Staged scope/provenance, whitespace, and diff checks passed.
+
 ## Final acceptance
 
 The final branch must be clean and contain reviewable batch commits. Required
@@ -1787,8 +1826,8 @@ present; this task must not create it.
 
 ## Recovery point
 
-Current recovery point: Batch 38 integrates audited M8 hardening source
-`407f649e9dd97d500b14d6ea5dae7e4ef671829a`. Resume with the next unreconciled
-M8 row, `dcc388a94218b0724264ec7d51f95346e2a30eeb`. Keep the C8 SAVE-panel
-field deferred until the `0f8f6d0e` and `dbecc345` menu foundation is
-integrated and tested.
+Current recovery point: Batch 39 integrates the Gen 1 subset of audited M8
+source `dcc388a94218b0724264ec7d51f95346e2a30eeb`. Resume with the next
+unreconciled M8 row, `c8f6c7241b64e318034fc5c668f8d6f78cc32e5b`. Keep the C8
+SAVE-panel field deferred until the `0f8f6d0e` and `dbecc345` menu foundation
+is integrated and tested.

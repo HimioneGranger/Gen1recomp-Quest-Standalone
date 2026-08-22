@@ -759,6 +759,27 @@ function OverworldState:bikeAllowed(mapId)
   return false
 end
 
+-- Field-item entry points keep presentation and state transitions in the
+-- owning world instead of asking a public facade to reproduce either one.
+function OverworldState:useBicycle()
+  local name = Game.save.player.name
+  if Game.save.onBike then
+    if Game.save.forcedBike then return false end
+    Game.save.onBike = false
+    require("src.core.Music").playMap(Game.data, self.map.id, false)
+    Game.stack:push(TextBox.new(Game,
+      Strings("%s got off\nthe BICYCLE.", name)))
+  elseif self:bikeAllowed(self.map.id) and not self.player.surfing then
+    Game.save.onBike = true
+    require("src.core.Music").playMap(Game.data, self.map.id, true)
+    Game.stack:push(TextBox.new(Game,
+      Strings("%s got on\nthe BICYCLE!", name)))
+  else
+    return false
+  end
+  return true
+end
+
 -- The battle transition's dungeon wipe uses the explicit map lists in
 -- data/maps/dungeon_maps.asm (field.dungeonTransitionMaps): singles plus
 -- inclusive map-id ranges -- faithful to the original's omissions
@@ -1720,6 +1741,12 @@ function OverworldState:goFishing(rod)
       self:pushBattle(battle)
     end))
   end))
+end
+
+function OverworldState:useFishingRod(rod)
+  if self.player.surfing or not self:facingIsShoreOrWater() then return false end
+  self:goFishing(rod)
+  return true
 end
 
 -- Fly to a visited town (called from the party menu).

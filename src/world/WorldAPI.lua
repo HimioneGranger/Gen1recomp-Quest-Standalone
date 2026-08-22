@@ -15,6 +15,7 @@ local WorldAPI = {}
 WorldAPI.__index = WorldAPI
 
 local NO_OVERWORLD = "no overworld"
+local RODS = { "OLD_ROD", "GOOD_ROD", "SUPER_ROD" }
 local overviewShades = {}
 
 Assets.register(function() overviewShades = {} end)
@@ -137,6 +138,60 @@ function WorldAPI:reorderParty(fromSlot, toSlot)
     require("src.core.Sound").play(game.data, "Swap")
   end
   return true
+end
+
+-- Contextual field-item shortcuts. Only actions that can start immediately
+-- are listed; callers receive copied labels and never inspect world internals.
+function WorldAPI:availableFieldActions()
+  local game, ow, out = self.game, self:overworld(), {}
+  if not (game and game.save and ow and ow.map and ow.player)
+      or not acceptsMenuInput(game, ow) then return out end
+  local save, inventory = game.save, game.save.inventory or {}
+  local items = game.data and game.data.items or {}
+
+  if (inventory.BICYCLE or 0) > 0 and not ow.player.surfing
+      and not (save.onBike and save.forcedBike)
+      and (save.onBike or ow:bikeAllowed(ow.map.id)) then
+    out[#out + 1] = { id = "bicycle",
+      label = save.onBike and "BIKE OFF" or "BICYCLE" }
+  end
+
+  if not ow.player.surfing and ow:facingIsShoreOrWater() then
+    local rods = {}
+    for _, id in ipairs(RODS) do
+      if (inventory[id] or 0) > 0 then
+        local def = items[id]
+        rods[#rods + 1] = { id = id, label = def and def.name or id }
+      end
+    end
+    if #rods > 0 then
+      out[#out + 1] = { id = "fish", label = "FISH", rods = rods }
+    end
+  end
+  return out
+end
+
+function WorldAPI:useFieldAction(id, opts)
+  local game, ow = self.game, self:overworld()
+  if not ow then return nil, NO_OVERWORLD end
+  if not acceptsMenuInput(game, ow) then return nil, "world is busy" end
+  local found
+  for _, action in ipairs(self:availableFieldActions()) do
+    if action.id == id then found = action break end
+  end
+  if not found then return nil, "field action unavailable" end
+
+  if id == "bicycle" then
+    if ow:useBicycle() then return true end
+  elseif id == "fish" then
+    local rod = opts and opts.rod
+    if not rod and #found.rods == 1 then rod = found.rods[1].id end
+    for _, choice in ipairs(found.rods) do
+      if choice.id == rod and ow:useFishingRod(rod) then return true end
+    end
+    return nil, "fishing rod unavailable"
+  end
+  return nil, "field action unavailable"
 end
 
 -- A compact, read-only view of the active map for minimaps and companion UIs.
