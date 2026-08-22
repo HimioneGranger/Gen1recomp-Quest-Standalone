@@ -5,7 +5,36 @@ package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local T = require("tests.harness")
 local check = T.check
-love = love or require("tests.love_stub")
+-- This profile test must never inherit a real LÖVE filesystem.  In particular,
+-- a native runner can otherwise write options.lua and the mod schema snapshot
+-- in the repository root.  The isolated stub keeps every runtime write in the
+-- test-owned namespace below; it cannot remove or overwrite host files.
+local hostLove = rawget(_G, "love")
+local testLove = require("tests.love_stub")
+love = testLove
+local runtimeDirectory = os.getenv("POKEPORT_TEST_RUNTIME_DIR")
+  or ".codex-test-tmp/quest-settings-profile"
+local realSaveDirectory = testLove.filesystem.getSaveDirectory
+testLove.filesystem.getSaveDirectory = function() return runtimeDirectory end
+
+local protectedRoots = {
+  "mod_option_schemas.json", "options.lua", "options.lua.bak", "options.lua.tmp",
+  "docs/project-coordination/protected-residue-recovery-20260821.md",
+}
+local function residueSnapshot()
+  local snapshot = {}
+  for _, path in ipairs(protectedRoots) do
+    local file = io.open(path, "rb")
+    if file then
+      snapshot[path] = assert(file:read("*a"))
+      file:close()
+    else
+      snapshot[path] = false
+    end
+  end
+  return snapshot
+end
+local rootsBefore = residueSnapshot()
 
 local realGetOS = love.system.getOS
 love.system.getOS = function() return "Android" end
@@ -210,4 +239,10 @@ check(PlatformProfile.isQuestStandalone(),
   "legacy panel signal remains a compatibility fallback")
 os.getenv = realGetenv
 _G.QUEST_PANEL_ACTIVE = realQuestPanel
+for _, path in ipairs(protectedRoots) do
+  check(residueSnapshot()[path] == rootsBefore[path],
+    "Quest settings profile leaves protected root residue unchanged: " .. path)
+end
+testLove.filesystem.getSaveDirectory = realSaveDirectory
+love = hostLove
 T.finish("quest settings profile")

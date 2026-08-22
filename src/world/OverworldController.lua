@@ -780,6 +780,47 @@ function OverworldState:useBicycle()
   return true
 end
 
+-- Field-move entry points keep presentation and state transitions in the
+-- overworld. The party menu and supported mod facade both call these, so a
+-- shortcut cannot drift from the game's own move flow.
+function OverworldState:useFlashFieldMove(onClose)
+  -- A FLASH used in daylight must not carry into the next dark map. Lighting
+  -- also happens before the blink: setDark can rebuild an ADVANCED atlas.
+  local wasDark = self.dark
+  if wasDark then Game.save.flashLit = true end
+  Game.stack:push(TextBox.new(Game,
+    Game.data.text._FlashLightsAreaText
+      or Strings("A blinding FLASH\nlights the area!"), function()
+      if onClose then onClose() end
+      if wasDark then self:setDark(false) end
+      Game.stack:push(Transition.whiteFlash(Game))
+    end))
+  return true
+end
+
+function OverworldState:useStrengthFieldMove(mon, onClose)
+  mon = mon or self:partyKnows("STRENGTH")
+  if not mon then return false end
+  local def = Game.data.pokemon[mon.species]
+  local name = mon.nickname or def.name
+  self.strengthActive = true
+  local first = (Game.data.text._UsedStrengthText
+    or Strings("{RAM:wNameBuffer} used\nSTRENGTH."))
+    :gsub("{RAM:wNameBuffer}", name)
+  local second = (Game.data.text._CanMoveBouldersText
+    or Strings("{RAM:wNameBuffer} can\nmove boulders."))
+    :gsub("{RAM:wNameBuffer}", name)
+  Game.stack:push(TextBox.new(Game, first, function()
+    Game.stack:push(TextBox.new(Game, second, function()
+      if onClose then onClose() end
+      Game.stack:push(Transition.whiteFlash(Game))
+    end))
+  end, { auto = { sound = function()
+    return require("src.core.Sound").playCry(Game.data, mon.species)
+  end } }))
+  return true
+end
+
 -- The battle transition's dungeon wipe uses the explicit map lists in
 -- data/maps/dungeon_maps.asm (field.dungeonTransitionMaps): singles plus
 -- inclusive map-id ranges -- faithful to the original's omissions
@@ -2493,6 +2534,15 @@ function OverworldState:trySurf(fx, fy, onClose)
     end
     Game.stack:push(require("src.render.Transition").whiteFlash(Game, nil,
       function() self:stepForwardOrCrossEdge(p.facing) end))
+  end))
+end
+
+function OverworldState:stopSurfing(onClose)
+  if onClose then onClose() end
+  self.player.surfing = false
+  require("src.core.Music").setSurfing(Game.data, false)
+  Game.stack:push(Transition.whiteFlash(Game, nil, function()
+    self:stepForwardOrCrossEdge(self.player.facing)
   end))
 end
 

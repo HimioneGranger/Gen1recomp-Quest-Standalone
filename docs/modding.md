@@ -144,18 +144,21 @@ Companion UIs and alternate party screens can call
 operation is accepted only during idle overworld play; menus, movement,
 scripts, battles, and transitions leave the party untouched.
 
-## Contextual field items
+## Contextual field actions
 
-`mod.world:availableFieldActions()` returns the field items that can start at
-the player's current position. Gen 1 currently exposes `bicycle` and `fish`;
-fishing rows include the owned rods that are valid choices. The list is empty
-while the world is busy, while riding state or terrain forbids an action, or
-when the required item is not owned.
+`mod.world:availableFieldActions()` returns the field items and moves that can
+start at the player's current position. Gen 1 exposes `bicycle`, `fish`, `cut`,
+`surf`, `strength`, `flash`, `dig`, and `teleport`. Fishing rows include the
+owned rods that are valid choices. The list is empty while the world is busy,
+and omits an action when its item, move, badge, terrain, or engine state
+forbids it.
 
 Call `mod.world:useFieldAction(id, opts)` to perform a listed action through
 the game's own field-item path. Fishing accepts `{ rod = "OLD_ROD" }` and
 chooses automatically when only one rod is available. Invalid, stale, and busy
-requests return `nil` plus a reason without changing game state.
+requests return `nil` plus a reason without changing game state. Mods do not
+need badge, terrain, bike, fishing, or field-move logic. Action lists are
+extensible; callers must ignore unknown IDs.
 
 ## Rendering pipelines
 

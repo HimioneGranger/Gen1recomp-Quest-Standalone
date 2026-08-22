@@ -13,7 +13,8 @@ end
 
 local portablePaths = {
   "main.lua",
-  "src/import/LauncherView.lua",
+  -- LauncherView is a shared UI consumer. It may select Quest-compatible
+  -- launcher behavior, but its neutral import boundary is checked below.
   "src/import/RomImporter.lua",
   "src/core/HostBootstrap.lua",
   "src/core/HostDisplay.lua",

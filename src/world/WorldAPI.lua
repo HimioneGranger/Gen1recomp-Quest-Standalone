@@ -7,6 +7,8 @@
 
 local Logger = require("src.core.Logger")
 local Assets = require("src.render.Assets")
+local FieldDefaults = require("src.world.FieldDefaults")
+local Map = require("src.world.Map")
 local MapLoader = require("src.world.MapLoader")
 local Party = require("src.pokemon.Party")
 local Runtime = require("src.mods.Runtime")
@@ -15,6 +17,8 @@ local WorldAPI = {}
 WorldAPI.__index = WorldAPI
 
 local NO_OVERWORLD = "no overworld"
+local DIG_TILESETS = { FOREST = true, CEMETERY = true, CAVERN = true,
+                       FACILITY = true, INTERIOR = true }
 local RODS = { "OLD_ROD", "GOOD_ROD", "SUPER_ROD" }
 local overviewShades = {}
 
@@ -168,6 +172,29 @@ function WorldAPI:availableFieldActions()
       out[#out + 1] = { id = "fish", label = "FISH", rods = rods }
     end
   end
+
+  if ow:useCutFieldMove() == "ok" then
+    out[#out + 1] = { id = "cut", label = "CUT" }
+  end
+  local surf = ow:useSurfFieldMove()
+  if surf == "ok" or surf == "dismount" then
+    out[#out + 1] = { id = "surf",
+      label = surf == "dismount" and "LEAVE WATER" or "SURF" }
+  end
+  if not ow.strengthActive and ow:partyKnows("STRENGTH") then
+    out[#out + 1] = { id = "strength", label = "STRENGTH" }
+  end
+  if ow.dark and ow:partyKnows("FLASH") then
+    out[#out + 1] = { id = "flash", label = "FLASH" }
+  end
+  if DIG_TILESETS[ow.map.def.tileset] and ow.map.id ~= "AGATHAS_ROOM"
+      and ow:partyKnows("DIG") then
+    out[#out + 1] = { id = "dig", label = "DIG" }
+  end
+  if ow:partyKnows("TELEPORT") and Map.isOutside(ow.map.def,
+      FieldDefaults.field(game.data, "outsideTilesets")) then
+    out[#out + 1] = { id = "teleport", label = "TELEPORT" }
+  end
   return out
 end
 
@@ -183,6 +210,19 @@ function WorldAPI:useFieldAction(id, opts)
 
   if id == "bicycle" then
     if ow:useBicycle() then return true end
+  elseif id == "cut" then
+    local x, y = ow.player:facingCell()
+    if ow:tryCut(x, y) then return true end
+  elseif id == "surf" then
+    local mode = ow:useSurfFieldMove()
+    if mode == "dismount" then
+      ow:stopSurfing()
+      return true
+    elseif mode == "ok" then
+      local x, y = ow.player:facingCell()
+      ow:trySurf(x, y)
+      return true
+    end
   elseif id == "fish" then
     local rod = opts and opts.rod
     if not rod and #found.rods == 1 then rod = found.rods[1].id end
@@ -190,6 +230,13 @@ function WorldAPI:useFieldAction(id, opts)
       if choice.id == rod and ow:useFishingRod(rod) then return true end
     end
     return nil, "fishing rod unavailable"
+  elseif id == "strength" then
+    if ow:useStrengthFieldMove() then return true end
+  elseif id == "flash" then
+    if ow:useFlashFieldMove() then return true end
+  elseif id == "dig" or id == "teleport" then
+    ow:beginTeleportOut()
+    return true
   end
   return nil, "field action unavailable"
 end
