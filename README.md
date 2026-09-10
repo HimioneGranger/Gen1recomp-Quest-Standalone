@@ -204,9 +204,9 @@ OpenXR integration and Quest mod forks are maintained and tested here.
 - Upstream platform maintainers: the preserved Switch **CI vs release**
   contract remains documented in [switch-build.md](docs/switch-build.md)
 
-Development is coordinated through issues and pull requests so both partners
-can see decisions, reproduce builds, and take over work without relying on a
-private chat history.
+Development is coordinated through issues and pull requests so maintainers can
+see decisions, reproduce builds, and continue work without relying on a private
+chat history.
 
 ## Watch the latest update
 
@@ -227,5 +227,9 @@ worked with us on Quest compatibility, the testers putting real headset time
 into the project, and [pret](https://github.com/pret) and the
 [pokered](https://github.com/pret/pokered) contributors whose research makes
 accurate recreation possible.
+
+- [Bo Layer (`@BoLayerDev`)](https://github.com/BoLayerDev) - former
+  collaborator; contributed to Quest integration, build and launcher work, and
+  repository development.
 
 <p align="center"><a href="https://boisclub.games"><img src="https://raw.githubusercontent.com/bryanthaboi/gen1recomp/refs/heads/dev/assets/logo/bcg.png" alt="Bois Club Games"></a></p>
