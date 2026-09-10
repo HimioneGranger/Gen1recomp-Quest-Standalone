@@ -310,8 +310,7 @@ function EffectRegistry.runDamaging(battle, ctx, record)
   if record and record.afterDamage then
     record.afterDamage(ctx, totalDealt)
   elseif moveInst.struggle then
-    -- struggle recoils even when its effect id resolves to no record
-    local recoil = math.max(1, math.floor(dmg / 2))
+    local recoil = math.max(1, math.floor(totalDealt / 2))
     battle:sayNext(romText(battle.data, "_HitWithRecoilText", "%s's\nhit with recoil!", displayName(user)))
     battle:applyDamage(user, recoil)
   end

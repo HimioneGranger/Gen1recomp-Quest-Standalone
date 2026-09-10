@@ -107,6 +107,9 @@ public:
 	 */
 	virtual void vibrate(double seconds) const;
 
+	/** Returns the optional neutral Lua host adapter module name. */
+	virtual std::string getHostModule() const;
+
 	/**
 	 * Shows the platform's native "pick a file" UI, if one is available.
 	 * Android only for now; the result (if any) is not returned here -- see

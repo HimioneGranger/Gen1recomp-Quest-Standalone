@@ -182,6 +182,15 @@ void System::vibrate(double seconds) const
 #endif
 }
 
+std::string System::getHostModule() const
+{
+#ifdef LOVE_ANDROID
+	return love::android::getHostModule();
+#else
+	return "";
+#endif
+}
+
 bool System::pickFile(const char *kind) const
 {
 #ifdef LOVE_ANDROID

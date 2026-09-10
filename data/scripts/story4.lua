@@ -142,7 +142,7 @@ M.MT_MOON_POKECENTER = {
         local Commands = require("src.script.Commands")
         Commands.give_pokemon({ save = game.save, game = game, overworld = ow },
                               "MAGIKARP", 5)
-        push(game, ("%s got a\nMAGIKARP!"):format(game.save.player.name), done)
+        push(game, t._GotMonText or "{PLAYER} got\n{RAM:wNameBuffer}!", done)
       end)
     end,
   },
@@ -512,24 +512,29 @@ M.ROUTE_24 = {
       local flags = game.save.flags
       local function battleOrDone()
         if ow:trainerDefeated(npc) then
-          push(game, "I hate this!\nMy dreams of\nTEAM ROCKET...", done)
+          push(game, text(game)._Route24CooltrainerM1YouCouldBecomeATopLeaderText,
+            done)
         else
           ow:engageTrainer(npc, done)
         end
       end
       if not flags.EVENT_GOT_NUGGET then
-        push(game, "Congratulations!\nYou beat our 5\ncontest trainers!\f"
-          .. "You just earned a\nfabulous prize!", function()
+        local t = text(game)
+        push(game, t._Route24CooltrainerM1YouBeatOurContestText .. "\f"
+          .. t._Route24CooltrainerM1YouJustEarnedAPrizeText, function()
+          require("src.core.Sound").play(game.data, "Get_Item1")
+          if not require("src.inventory.Bag").add(game.save, "NUGGET", 1,
+              game.data) then
+            push(game, t._Route24CooltrainerM1NoRoomText, done)
+            return
+          end
           flags.EVENT_GOT_NUGGET = true
-          require("src.inventory.Bag").add(game.save, "NUGGET", 1)
-          push(game, ("%s received\na NUGGET!"):format(game.save.player.name),
-            function()
-              ask(game, "By the way, would\nyou like to join\nTEAM ROCKET?",
-                function()
-                  push(game, "Arrgh! You are\nnot convinced?\fThen I'll show\n"
-                    .. "you my power!", battleOrDone)
-                end)
-            end)
+          game.stringBuffer = game.data.items.NUGGET.name
+          push(game, t._Route24CooltrainerM1ReceivedNuggetText, function()
+            require("src.core.Sound").play(game.data, "Get_Item1")
+            push(game, t._Route24CooltrainerM1JoinTeamRocketText,
+              battleOrDone)
+          end)
         end)
         return
       end

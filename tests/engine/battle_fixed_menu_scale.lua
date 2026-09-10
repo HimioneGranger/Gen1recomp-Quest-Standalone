@@ -92,6 +92,11 @@ local menu = { isOpaque = true } -- PartyMenu / ListMenu
 local whiteBattle = setmetatable(
   { game = { save = { options = { battleBg = "white" } } } },
   { __index = BattleState })
+local wideWhiteBattle = setmetatable(
+  { game = { save = { options = {
+      battleBg = "white", battleLayout = "wide",
+  } } } },
+  { __index = BattleState })
 local function stack(...) return { states = { ... },
   visibleBase = function(self)
     for i = #self.states, 1, -1 do
@@ -111,7 +116,10 @@ T.eq(s2:visibleBase(), 1, "the battle alone already drew from the overworld")
 T.eq(Game.drawBaseInStack(s2, s2:visibleBase()), 1, "and still does")
 local s3 = stack(overworld, whiteBattle, menu)
 T.eq(Game.drawBaseInStack(s3, s3:visibleBase()), 3,
-  "a white-bg battle has no map to hold, so nothing moves")
+  "a classic white-bg battle has no presentation to hold, so nothing moves")
+local s3wide = stack(overworld, wideWhiteBattle, menu)
+T.eq(Game.drawBaseInStack(s3wide, s3wide:visibleBase()), 2,
+  "an opaque WIDE battle still draws beneath its classic menu")
 local s4 = stack(overworld, menu)
 T.eq(Game.drawBaseInStack(s4, s4:visibleBase()), 2,
   "and a menu outside a battle is untouched")

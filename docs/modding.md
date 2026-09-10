@@ -21,6 +21,74 @@ luajit tools/gen_registry_docs.lua
 luajit tools/gen_registry_docs.lua ../gen1recomp.wiki
 ```
 
+## Manifest specification (`manifest.json`)
+
+Every mod contains a root `manifest.json` that defines its metadata, supported
+games, and engine dependencies.
+
+```json
+{
+  "id": "my_mod",
+  "name": "My Cool Mod",
+  "version": "1.0.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "GAMEPLAY",
+  "games": ["gen1", "gen2"],
+  "game_version": ">=0.0.0-dev <2.0.0",
+  "priority": 100,
+  "dependencies": [
+    "helper_lib@^1.0.0",
+    { "id": "pokegear_cards", "games": ["gen2"], "range": "^1.0.0", "github": "1jamie/pokegear_cards" }
+  ],
+  "optional_dependencies": ["gen1_modern_ui"],
+  "conflicts": [],
+  "permissions": ["engine_internals"],
+  "description": "A brief description of the mod.",
+  "github": "author/my_mod"
+}
+```
+
+### Manifest fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | `string` | Unique lowercase identifier. |
+| `name` | `string` | Human-readable launcher title. |
+| `version` | `string` | Semantic version string. |
+| `api` | `integer` | Mod API level. |
+| `entry` | `string` | Entry Lua path relative to the mod root. |
+| `profile` | `string` | `content`, `overhaul`, or `total_conversion`. |
+| `category` | `string` | Launcher category chip. |
+| `games` | `array` | Supported game versions or generations. |
+| `game_version` | `string` | Required engine semantic-version range. |
+| `priority` | `integer` | Load priority; dependencies still load first. |
+| `dependencies` | `array` | Hard dependencies. |
+| `optional_dependencies` | `array` | Ordering-only soft dependencies. |
+| `conflicts` / `incompatible` | `array` | Mods that cannot run together. |
+| `permissions` | `array` | Requested sandbox capabilities. |
+| `github` | `string` | `owner/repo` used for update metadata. |
+
+### Declaring and scoping dependencies
+
+A dependency can be a simple ID, an ID with a semantic-version range, an ID
+with an `owner/repo` hint, or a structured object:
+
+```json
+{
+  "id": "mod_id",
+  "range": "^1.2.0",
+  "games": ["gen2"],
+  "github": "owner/repo"
+}
+```
+
+For a mod that supports multiple games, `games` on a dependency limits that
+dependency to the listed games or generations. For example, a `gen2` dependency
+does not block the parent mod on Red, Blue, or Yellow. Use
+`optional_dependencies` when the integration is optional on every game.
+
 ## Mods and Gold (Gen 2)
 
 The mod API is one API across both generations, but Gold runs its own battle
@@ -75,6 +143,22 @@ Companion UIs and alternate party screens can call
 `mod.world:reorderParty(fromSlot, toSlot)` with one-based party slots. The
 operation is accepted only during idle overworld play; menus, movement,
 scripts, battles, and transitions leave the party untouched.
+
+## Contextual field actions
+
+`mod.world:availableFieldActions()` returns the field items and moves that can
+start at the player's current position. Gen 1 exposes `bicycle`, `fish`, `cut`,
+`surf`, `strength`, `flash`, `dig`, and `teleport`. Fishing rows include the
+owned rods that are valid choices. The list is empty while the world is busy,
+and omits an action when its item, move, badge, terrain, or engine state
+forbids it.
+
+Call `mod.world:useFieldAction(id, opts)` to perform a listed action through
+the game's own field-item path. Fishing accepts `{ rod = "OLD_ROD" }` and
+chooses automatically when only one rod is available. Invalid, stale, and busy
+requests return `nil` plus a reason without changing game state. Mods do not
+need badge, terrain, bike, fishing, or field-move logic. Action lists are
+extensible; callers must ignore unknown IDs.
 
 ## Rendering pipelines
 
@@ -237,6 +321,25 @@ local keys, code, message = mod.storage:list(game, "history/quick")
 local deleted, code, message = mod.storage:delete(game, "history/quick/q0001")
 ```
 
+For independently generated binary data, use the opaque byte methods. They
+accept and return the exact Lua string of bytes, including NUL bytes and bytes
+that are not valid text:
+
+```lua
+local ok, code, message = mod.storage:writeBytes(
+  game, "cache/maps/pallet/terrain", encodedMesh)
+local encodedMesh, code, message = mod.storage:readBytes(
+  game, "cache/maps/pallet/terrain")
+```
+
+Opaque values are limited to 512 MiB per key. The engine stores them without
+decoding, compression, or an engine-defined file format, and never executes
+them. A consuming mod owns validation of its format, fingerprint, checksum,
+and compression metadata. Byte writes are staged and compared byte-for-byte
+before replacement, and reads can recover a valid backup after an interrupted
+write. Existing table values and opaque byte values use one shared logical key
+space; delete a key before changing its value from one type to the other.
+
 `context` returns `{ engineVersion, gameVersion, playthroughId }`. The engine
 version is compatibility metadata; physical launcher-slot and path identity stays
 private. A title-selected context may additionally contain `normalSavedAt`, the
@@ -245,19 +348,22 @@ progress or a slot/path handle.
 
 At the title screen only, `mod.storage:selected(game)` returns a bound storage
 facade for the launcher-selected existing playthrough, or `nil, code, message`.
-Resolving this facade is read-only: it never allocates an identity, adopts a
+Resolving this facade is non-allocating: it never allocates an identity, adopts a
 fresh New Game, or exposes a slot id/path. Its `context()`, `read(key)`,
-`write(key, value)`, `list(prefix)`, and `delete(key)` methods have the same
-data-only and transaction contract as `mod.storage`, but remain restricted to
-the calling mod's selected existing namespace. It is intended for title tools
-that need to browse or manage durable history before the first normal SAVE.
+`write(key, value)`, `readBytes(key)`, `writeBytes(key, bytes)`,
+`list(prefix)`, and `delete(key)` methods have the same scoped and
+transactional contract as `mod.storage`, but remain restricted to the calling
+mod's selected existing namespace. It is intended for title tools that need to
+browse or manage durable history before the first normal SAVE.
 
-Values must be tables containing serializable data only. Keys are conservative
-slash-separated segments (letters, digits, `_`, `-`); paths and filesystem
-handles are never exposed. Writes are staged and decode-verified, reads recover
-from a valid staged/backup generation, and methods return structured errors for
-normal data or I/O failures. The playthrough identity is allocated lazily on the
-first storage/checkpoint call, so an unused API changes no save bytes.
+Table values must contain serializable data only. Opaque values must be Lua
+strings. Keys are conservative slash-separated segments (letters, digits, `_`,
+`-`); paths and filesystem handles are never exposed. Table writes are staged
+and decode-verified; opaque writes are staged and byte-verified; reads recover
+from a valid staged/backup generation. Methods return structured errors for
+normal data, byte validation, and I/O failures. The playthrough identity is
+allocated lazily on the first storage/checkpoint call, so an unused API changes
+no save bytes.
 
 `mod.checkpoints` captures and reconstructs engine-owned semantic runtime state:
 
@@ -352,6 +458,38 @@ animation/messages, forced choices, and every phase that cannot safely be
 checkpointed remain excluded. Exceptions are contained by normal hook isolation
 and fall through without advancing a turn.
 
+Gen 1 trainer encounters also expose `trainer.before_battle` after the
+challenge text and immediately before battle construction. This lets a mod
+defer the encounter while it collects a player choice through a registered
+screen, then resume with a battle-local view of the save party:
+
+```lua
+mod.hooks:wrap("trainer.before_battle", function(next, game, context, continue)
+  mod.ui.push(game, "party_registration", {
+    onConfirm = function(indices)
+      continue({ playerPartyIndices = indices })
+    end,
+    onCancel = function()
+      continue({ cancel = true })
+    end,
+  })
+  return true
+end)
+```
+
+Return `true` only when retaining `continue` for a later callback.
+`continue({ cancel = true })` ends the encounter without constructing a battle.
+The normal encounter completion callback returns control to the overworld and
+no trainer-defeated state is written. A cancelled sight encounter is suppressed
+at the current player cell; moving one cell or talking to the trainer permits a
+new challenge. Calling `continue()` uses the full save party. Passing
+`{ playerPartyIndices = { 2, 4, 5 } }` uses those ordered, one-based party
+members for initial send, switching, forced replacement, exhaustion,
+experience traversal, and battle party displays. The continuation is one-shot.
+Invalid scopes safely fall back to the full party. The view references the
+original Pokémon records and never reorders or replaces `game.save.party`.
+Trainer battle checkpoints retain the selected indices. See RFC 0010.
+
 ## Developer console
 
 Boot with developer mode on to unlock the in-game console and hot-reload
@@ -388,11 +526,14 @@ the wrapper is visible during that same fixed step. The callback receives
 
 `input.pointer` delivers uncaptured gameplay pointer events -- touches and
 real mouse input alike. The callback receives `(next, game, ev)` where `ev`
-is `{ phase, source, id, x, y, dx, dy, pressure, button }`: `phase` is
+is `{ phase, source, id, x, y, gameX, gameY, insideGame, dx, dy, pressure,
+button }`: `phase` is
 `"pressed"`, `"moved"`, `"released"` or `"cancelled"`; `source` is `"touch"`
 or `"mouse"`; `id` is the LÖVE touch id or `"mouse"`; and the coordinates
-are LOVE window units, the same space `render.hud`'s viewport and the touch
-overlay lay out in. The on-screen touch controls keep first refusal: a
+`x` / `y` are LOVE window units, while `gameX` / `gameY` are local to the
+active game viewport and `insideGame` says whether the pointer is inside it.
+Without a custom viewport both coordinate pairs are identical. The on-screen
+touch controls keep first refusal: a
 pointer that begins on a virtual control belongs to the pad for its whole
 lifecycle and never reaches the hook, while one that begins outside stays
 visible even if it later crosses a control. A real mouse reaches the hook
@@ -425,6 +566,22 @@ composited and before touch controls draw. The window-space viewport contains
 and `dpiY`, so a tool can use the letterbox margins without drawing over the
 playfield or pushing an updating game state.
 
+`render.viewport` lets a layout mod reserve the window-space rectangle in which
+the game renders. It receives `(next, ctx)` with the full window's `width`,
+`height`, `pixelWidth`, `pixelHeight`, `dpiX`, `dpiY`, and `generation`, and
+returns `{ x, y, width, height }`. The engine clamps that rectangle to the
+window and makes game layout, safe-area calculations, and rendering use it as
+their display. Set `capture = true` to request a composition canvas even when
+the rectangle fills the window. With no subscriber, no canvas is allocated and
+the normal presentation path is unchanged.
+
+When a viewport is active, `render.window` receives `(next, game, ctx)` after
+the game frame has been captured. `ctx` contains its `canvas`, `x`, `y`,
+`width`, `height`, the full `windowWidth` / `windowHeight`, `dpiX`, `dpiY`, and
+`generation`. Calling `next(game, ctx)` draws the game at the requested origin;
+a wrapper may instead compose that canvas with its own UI. Touch controls remain
+full-size OS-window chrome and draw after this hook.
+
 `render.compose` wraps the whole-window composite in `Renderer:endFrame`. It
 receives `(next, renderer, ctx)`; returning `true` without calling `next` hands
 the mod full control of the window, while calling `next` runs the engine's
@@ -438,6 +595,19 @@ palette-correct blit of either canvas into an arbitrary screen rect, and the
 oldest queued event as `"action,x,y"` in submitted-frame coordinates, or `nil`.
 This is what lets a mod lay the two passes out as two stacked Game Boy screens,
 or push one onto a second screen, without the engine knowing the layout.
+
+`render.output_enabled` and `render.output` are the later, whole-window seam
+for mods that need the engine's normal composite rather than its separate
+layers. It runs after registered present pipelines and before GBCFX,
+`render.hud`, and touch controls. A mod wraps both hooks: the first returns
+`true` only while output ownership is needed, and the second receives
+`(next, ctx)` with `canvas`, `width`, `height`, `gameX`, `gameY`, `gameWidth`,
+`gameHeight`, `scale`, `dpiX`, `dpiY`, and `generation`. Returning `true` from
+`render.output` takes over the window; calling `next(ctx)` keeps the normal
+presentation. Both hooks default to `false`. Enabling the seam requires a
+full-window canvas for that frame. With no `render.output` subscriber, or while
+`render.output_enabled` is false, the existing presentation path is unchanged.
+`render.compose` takes precedence when it owns the frame.
 
 `render.frame_drawn` is an observation-only event emitted after the active
 editor, touch editor, launcher, or game has submitted its complete Lua draw,
@@ -555,3 +725,228 @@ local both = mod.datetime:dateTime(game, createdAt)
 The live `game` supplies only the current option context. Formatting never
 mutates the save, options, or timestamp, and invalid timestamps return
 `"----"`.
+
+## Device power information
+
+Sandboxed mods can read the host's battery state without receiving the rest
+of `love.system`:
+
+```lua
+local state, percent = mod.device:powerInfo()
+```
+
+`state` follows LÖVE's values: `"unknown"`, `"battery"`, `"nobattery"`,
+`"charging"`, or `"charged"`. `percent` is `0` through `100`, or `nil` when
+the platform cannot report it. The facade is read-only and does not expose
+URL launching, clipboard access, or other system operations.
+
+## Real-world steps
+
+On iOS and Android the game counts the player's real-world steps natively
+(HealthKit / the hardware step counter). A mod reaches that bridge through
+the `steps` permission in `manifest.json`, which the player sees in the
+mod manager like every other permission:
+
+```lua
+if mod.steps:available() then
+  mod.steps:sync()                -- async; OS consent sheet on first use
+end
+-- later, at a quiet moment:
+local walk = mod.steps:poll()     -- { steps = n, from = ?, to = ? } or nil
+```
+
+`available()` is `false` on builds without the bridge (desktop) and for
+mods without the permission, so a probe is always safe. `sync()` asks the
+platform to refresh its count and returns whether there was a bridge to
+ask. `poll()` returns the next delivery for this mod — the engine consumes
+the native side's pending file itself, each permissioned mod receives its
+own copy of a delivery, and steps are anchored natively so the same walk
+is never delivered twice. Without the permission, `sync` and `poll` raise
+an error naming it.
+
+## Background HTTP
+
+`mod.fetch` is how a mod does work off the main thread. It is behind the
+`network` permission in `manifest.json`, the same one that gates
+`require("socket")`, and the player sees it in the mod manager.
+
+```lua
+-- somewhere once
+local job = mod.fetch:get("https://example.com/data.json")
+
+-- in a hook or update, every frame -- poll never blocks
+if job then
+  local r = mod.fetch:poll(job)
+  if r.status ~= "pending" then
+    if r.status == "ok" then use(r.body) else warn(r.err) end
+    mod.fetch:release(job)
+    job = nil
+  end
+end
+```
+
+`get(url, opts)` returns an opaque handle, or `nil` plus a reason. `opts`
+takes `accept` (a request Accept header) and `maxSeconds` (clamped to 30).
+`poll(handle)` returns `{ status, body, err, progress }` where `status` is
+`"pending"`, `"ok"`, `"error"` or `"cancelled"`; it is a copy, and it never
+blocks, so calling it every frame is the intended use. `release(handle)`
+frees a finished job — do it, or you will hit the ceiling. `cancel(handle)`
+drops a result you no longer want. `available()` is `false` when the build
+has no transport and for mods without the permission, so a probe is safe.
+
+The rules worth knowing before you design around it:
+
+- **http and https only.** The underlying transport also speaks `file://`,
+  `ftp://` and `scp://`; those are refused, on the initial URL and on any
+  redirect. `mod.fetch` is not a way to read a local file.
+- **Four requests in flight per mod.** The worker pool is shared with the
+  launcher's own downloads, so one mod cannot fill it. Over the ceiling,
+  `get` returns `nil` and a reason until you release something.
+- **Handles are yours alone.** A handle from another mod, a fabricated
+  table, or a guessed number all poll as `"error"`.
+- **Your mod id is in the User-Agent**, so a server operator can see who is
+  calling and a mod cannot pose as the launcher.
+- Jobs are released when your mod unloads.
+
+This is deliberately not `love.thread`. A LÖVE thread is a fresh Lua state
+with a full standard library that the sandbox cannot reach, so handing one
+to a mod would undo every other rule; `mod.fetch`'s workers run engine
+code, so a mod gets asynchrony without gaining any new reach.
+
+## Log reporting
+
+`mod.postLog(body, opts)` is the one-way exception to the rule that a mod
+decides where it talks. It reports a debug/crash log to the https URL the
+manifest declares in `log_url`, and it is the only API that may not be
+pointed at a caller-chosen address:
+
+```json
+{
+  "permissions": ["network"],
+  "log_url": "https://logs.example.com/receive"
+}
+```
+
+The URL is validated at load: it must be `https://`, and declaring it
+without the `network` permission is a load violation for api 2 mods. The
+destination is reviewed when the mod ships, not chosen per call, so a mod
+cannot aim this at arbitrary hosts or read back anything a server replies.
+
+```lua
+-- fire and forget; poll() never blocks, same shape as mod.fetch
+local job = mod:postLog("session crashed at 0x1f3a\n" .. logText)
+```
+
+`postLog(body, opts)` returns the same opaque handle as `mod.fetch:get`,
+polled and released through `mod.fetch:poll` / `mod.fetch:release`. `opts`
+is a closed list with one switch: `format`, either `"text"` (the default)
+or `"json"`. `json` wraps the body in an envelope of `{ ts, mod, format,
+body }` so a server can attribute and sort reports; any other key or value
+is refused before a job is submitted. The body is capped at 512 KiB, the
+transfer is bounded by the same worker ceilings as `mod.fetch`, and the
+response body is never returned to the mod.
+
+## Background jobs
+
+`mod.fetch` covers work waiting on a server. `mod.job` covers work waiting on
+the CPU — generating a map, crunching a table, anything that would otherwise
+stall a frame. It is behind the `background` permission in `manifest.json`.
+
+Ship the job as its own file inside your mod:
+
+```lua
+-- mods/your_mod/jobs/crunch.lua
+local arg = ...
+local total = 0
+for i = 1, arg.n do total = total + i end
+return { total = total }
+```
+
+```lua
+-- in your entry file
+local job = mod.job:run("jobs/crunch.lua", { n = 1e6 })
+
+-- later, in a hook -- poll never blocks
+local r = mod.job:poll(job)
+if r.status == "ok" then
+  use(r.result.total)
+  mod.job:release(job)
+end
+```
+
+`run(script, arg, opts)` returns an opaque handle, or `nil` plus a reason.
+`opts.maxSeconds` sets the job's time budget (default 5, clamped to 30).
+`poll(handle)` returns `{ status, result, err }` with `status` one of
+`"pending"`, `"ok"`, `"error"` or `"cancelled"`. `release(handle)` frees it.
+`available()` is `false` on a host without threads and for mods without the
+permission, so a probe is always safe.
+
+**A job is pure compute.** This is the part to design around, not a detail:
+
+- **Plain data in, plain data out.** Numbers, strings, booleans and tables of
+  them. A function, userdata, a cycle or a table key that is not a string or
+  number is refused at your `run` call with a reason. Nothing is shared —
+  your argument is snapshotted, and mutating the original afterwards does not
+  reach the job.
+- **No engine API, no game state, no storage.** `require` is refused inside a
+  job, and there is no `mod` object. A job cannot read the party, write
+  `mod.storage`, or touch a registry. Get what it needs into the argument and
+  act on the result back on the main thread.
+- **Your script is a file in your mod folder.** The path goes through the same
+  rules as `mod:read`; `..`, absolute paths and drive letters are refused.
+- **Two jobs per mod, four on the machine.** Over the limit, `run` returns
+  `nil` and a reason until you release one.
+- **The budget bounds how long YOU wait, not how long the work runs.** Past
+  `maxSeconds`, `poll` reports an error and the result is dropped if it ever
+  arrives — but the thread runs to its own end. There is no way to stop a
+  LÖVE thread from outside, and every attempt to stop one from inside was
+  worse than the disease (a debug hook does not reliably interrupt LuaJIT,
+  and raising from one wedged the whole process). `cancel(handle)` is the
+  same deal: it drops the result, it does not stop the work.
+
+  So **write jobs that terminate.** A job with an infinite loop will keep one
+  core busy until the game closes. It will not freeze the game — the main
+  thread stays responsive and quitting still works — but nothing will reclaim
+  that core in the meantime.
+
+Your job script runs in the same sandbox your entry file does, so `io`, `os`,
+`debug`, `ffi`, `package` and `love.filesystem` are absent there too. That is
+the whole reason this exists rather than `love.thread`: a raw LÖVE thread is a
+fresh Lua state with a full standard library that the sandbox cannot reach, so
+handing one to a mod would undo every other rule. Here the worker builds your
+sandbox first and loads your chunk into it.
+
+## Pre-sandbox globals (compat)
+
+A mod written before the sandbox landed does not have to be updated to
+load. `io`, `package`, `dofile`, `loadfile`, `os.getenv`, `love.filesystem`,
+`love.system` and `love.event` are all present again as compat stand-ins
+(`src/mods/LegacyCompat.lua`), and assigning a LÖVE callback
+(`love.mousemoved = fn`) installs on the real table the way it always did.
+Every stand-in call logs one warning naming its replacement, and
+`loader:legacyReport(modId)` returns the same list with call counts, which
+is what a "needs updating" badge should read.
+
+The stand-ins are not the old globals. Paths are classified rather than
+passed through:
+
+- A path inside your own mod directory reads the file you shipped.
+- Anything else, including an absolute path, resolves into a private
+  per-mod overlay at `mod_compat/<your id>/` under the save directory.
+  Two mods naming the same path never see each other's bytes, and nothing
+  is written outside the game tree.
+- A read misses through the overlay to your shipped file, then to
+  `mod.storage`, so a half-migrated mod sees both.
+- A write over a path you shipped shadows it; the packaged file is never
+  modified, and `mod:read` still returns the packaged bytes.
+- `love.filesystem.getSaveDirectory()` and `os.getenv("HOME")` answer with
+  a virtual root, so a legacy mod that joins its own paths lands back in
+  the same overlay.
+
+`love.thread` stays refused. A LÖVE thread runs in a separate Lua state
+with the full standard library, which the sandbox in this state cannot
+reach, so a stand-in would be a hole rather than a reroute. The same goes
+for `ffi`, `debug`, `setfenv`, `os.execute`, `io.popen`, `love.run` and
+`love.errorhandler`. A mod that needs real background work needs an
+engine-owned facility, not a compat shim -- for HTTP that facility is
+[`mod.fetch`](#modfetch), which runs on the engine's own worker pool.

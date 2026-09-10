@@ -5,27 +5,26 @@ local Strings = require("src.core.Strings")
 local HostShell = require("src.core.HostShell")
 local Platform = require("src.core.Platform")
 local SafeArea = require("src.core.SafeArea")
+local ImportHost = require("src.core.ImportHost")
 
 local RomImporter = {}
 RomImporter.__index = RomImporter
 
--- love.system.pickFile is a NATIVE BRIDGE, not part of LÖVE: it exists only on
+-- The native picker is not part of LÖVE: it exists only on
 -- builds that compiled one (Android, and iOS builds patched by
 -- mobile/ios/patch_love_src.py). A build without it must fall back to the
 -- copy-it-into-the-save-folder flow that every caller below already has --
 -- calling the nil field instead took the whole app down the moment the player
 -- pressed Import ROM:
 --
---   src/import/RomImporter.lua: attempt to call field 'pickFile' (a nil value)
+--   src/import/RomImporter.lua: attempted to call a missing picker
 --
--- love.system.createFile was already guarded this way at its one call site;
+-- The native save picker was already guarded this way at its one call site;
 -- these three were not. Every caller here treats `false` as "no picker
 -- available" and shows its own notice, so a missing bridge now degrades to
 -- exactly the path a picker-less Android device has always taken.
-local function pickFile(...)
-  local fn = love.system.pickFile
-  if not fn then return false end
-  return fn(...) and true or false
+local function pickFile(kind)
+  return ImportHost.requestOpen(kind)
 end
 
 -- Cache generation tag; bump to force every imported version to re-extract.
@@ -1036,7 +1035,7 @@ local function chooseRom(promptName)
 end
 
 -- Open a native picker for a mod .zip (mirrors chooseRom's per-OS dialogs).
--- Returns the chosen absolute path or nil.  Android uses love.system.pickFile
+-- Returns the chosen absolute path or nil. Android uses the native picker
 -- ("mod") instead -- see RomImporter:chooseMod.
 local function chooseZip()
   local prompt = shellSafe(Strings("Choose a mod .zip"))
@@ -1077,7 +1076,7 @@ end
 
 -- Open a native picker for a raw .sav battery save (mirrors chooseZip's per-OS
 -- dialogs).  Returns the chosen absolute path or nil.  Android uses
--- love.system.pickFile("sav") instead -- see RomImporter:chooseSaveImport.
+-- the native picker instead -- see RomImporter:chooseSaveImport.
 local function chooseSav()
   local prompt = shellSafe(Strings("Choose a .sav save file"))
   local platform = love.system.getOS()
@@ -1160,7 +1159,7 @@ end
 function RomImporter.new(onComplete, opts)
   opts = opts or {}
   -- iOS rides the same mobile import flows as Android: the save-dir
-  -- pending-file scan plus love.system.pickFile / createFile, provided
+  -- pending-file scan plus the native open/save bridge, provided
   -- natively by the Swift GRPickerBridge (mobile/ios/native/).  The flag
   -- keeps its historical name so every Android call site stays untouched.
   -- NX uses a separate save-directory inbox (isNX / romImportMode) and must
@@ -1177,6 +1176,7 @@ function RomImporter.new(onComplete, opts)
     forceImport = opts.forceImport or false,
     onEditSave = opts.onEditSave,
     onEditTouchControls = opts.onEditTouchControls,
+    onOpenSkinStudio = opts.onOpenSkinStudio,
     isNX = isNX,
     romImportMode = romImportMode,
     mobileFileBridge = mobileFileBridge,
@@ -1628,7 +1628,12 @@ function RomImporter:filedropped(file)
   -- readDroppedFile does here.
   local name = file:getFilename() or ""
   if name:lower():match("%.zip$") then
-    self:_installMod(file)
+    -- On the SKINS tab a zip is a skin; everywhere else it is a mod archive.
+    if self.tab == "skins" then
+      self:_installSkinZip(file)
+    else
+      self:_installMod(file)
+    end
     return
   end
   -- A dropped .sav is a battery save: import it to a new slot for the active
@@ -1690,6 +1695,7 @@ end
 
 function RomImporter:_finishModWork(ok, text, done)
   self.modWorker, self.modProgress = nil, nil
+  self.safPickerActive = nil
   if ok then pcall(self._refreshMods, self) end
   self.modNotice = { ok = ok, text = text }
   if done then done(ok) end
@@ -1698,7 +1704,7 @@ end
 function RomImporter:_installModNow(source)
   if self.workState == "working" then return end
   self.tab = "mods"
-  local ok, installed, res = pcall(function()
+  local ok, installed, res, manifest = pcall(function()
     local LauncherMods = require("src.mods.LauncherMods")
     return LauncherMods.installZip(source)
   end)
@@ -1710,6 +1716,17 @@ function RomImporter:_installModNow(source)
   if installed then
     pcall(self._refreshMods, self)
     self.modNotice = { ok = true, text = "Installed " .. tostring(res) }
+    local LauncherMods = require("src.mods.LauncherMods")
+    local checkTarget = manifest
+    if not checkTarget and type(res) == "string" then
+      checkTarget = { id = res }
+    end
+    if checkTarget and LauncherMods.checkDependencies then
+      local depCheck = LauncherMods.checkDependencies(checkTarget)
+      if depCheck and depCheck.hasIssues then
+        self._modDepResolver = depCheck
+      end
+    end
   else
     -- A direct package keeps its existing install path.  Only an archive with
     -- no package manifest can become a bundle; prepareBundle performs every
@@ -1784,8 +1801,15 @@ function RomImporter:_installMod(source, done)
       self:_finishModWork(false, tostring(bundleErr), done)
       return
     end
-    local installed, res = LauncherMods._installZipInner(source, { progress = progress })
+    local installed, res, manifest = LauncherMods._installZipInner(source, { progress = progress })
     if installed then
+      local checkTarget = manifest or (type(res) == "string" and { id = res })
+      if checkTarget and LauncherMods.checkDependencies then
+        local depCheck = LauncherMods.checkDependencies(checkTarget)
+        if depCheck and depCheck.hasIssues then
+          self._modDepResolver = depCheck
+        end
+      end
       self:_finishModWork(true, "Installed " .. tostring(res), done)
     else
       self:_finishModWork(false, tostring(res), done)
@@ -1835,7 +1859,7 @@ end
 
 -- "Import mod .zip" button: open a native picker and install the pick.
 -- Android mirrors ROM import: scan for a pending .zip in the save dir (USB
--- or a fresh SAF drop), else love.system.pickFile("mod") -> picked_mod.zip
+-- or a fresh SAF drop), else the native picker stages picked_mod.zip
 -- which focus/Choose consumes on return.
 -- NX: no HostShell/desktop picker — rescan imports/mods/ inbox instead.
 function RomImporter:chooseMod()
@@ -1845,7 +1869,7 @@ function RomImporter:chooseMod()
     self:rescanModsAction()
     return
   end
-  if self.nativePicker and love.system.getPickedFile then
+  if self.nativePicker and ImportHost.capabilities().result then
     self.pickerPendingKind = "mod"
     if not pickFile("mod") then
       self.pickerPendingKind = nil
@@ -1861,12 +1885,17 @@ function RomImporter:chooseMod()
       end)
       return
     end
+    -- Arm this before opening DocumentsUI. Horizon OS can queue LÖVE's quit
+    -- event synchronously while pickFile is still on the stack; arming after
+    -- it returns leaves no opportunity for main.lua to preserve the app.
+    self.pickPending = true
+    self.safPickerActive = true
+    self.pickTimer = 0
     if not pickFile("mod") then
+      self.pickPending = nil
+      self.safPickerActive = nil
       self.modNotice = { ok = false,
         text = "Could not open the file picker. Copy a mod .zip via USB." }
-    else
-      self.pickPending = true
-      self.pickTimer = 0
     end
     return
   end
@@ -1931,7 +1960,7 @@ function RomImporter:_importSave(version, source, force)
 end
 
 -- "Import save" button: open a native .sav picker and import the pick.
--- Android mirrors ROM / mod import via love.system.pickFile("sav").
+-- Android mirrors ROM / mod import through the neutral native picker.
 -- NX: no HostShell/desktop picker — rescan imports/saves/ inbox instead.
 function RomImporter:chooseSaveImport(version)
   if self.workState == "working" then return end
@@ -1941,7 +1970,7 @@ function RomImporter:chooseSaveImport(version)
     self:rescanSavesAction(version)
     return
   end
-  if self.nativePicker and love.system.getPickedFile then
+  if self.nativePicker and ImportHost.capabilities().result then
     self.pickerPendingKind = "sav"
     self.pickerPendingVersion = version
     if not pickFile("sav") then
@@ -1978,7 +2007,7 @@ end
 -- "Export save" button: write the active slot back out to a raw .sav in the save
 -- directory's exports/ folder.  On desktop, show the path with an open-folder
 -- affordance.  On Android, stage pending_export.sav and open the system
--- create-document picker (love.system.createFile) so the player can save to
+-- create-document picker so the player can save to
 -- Downloads / Drive / etc. -- the app-private exports/ path is not useful there.
 -- NX: surface exports path + MTP hint; do not rely on openURL / open-folder.
 function RomImporter:exportSave(version)
@@ -2017,7 +2046,7 @@ function RomImporter:exportSave(version)
       return
     end
     self.androidPendingExportVersion = version
-    if love.system.createFile and love.system.createFile(suggested, love.filesystem.getSaveDirectory()) then
+    if ImportHost.requestSave(suggested, love.filesystem.getSaveDirectory()) then
       self.pickPending = true
       self.pickTimer = 0
       self.saveNotice[version] = { ok = true,
@@ -2074,7 +2103,7 @@ function RomImporter:choose(version)
     self:startData(data, baseRom.name)
     return
   end
-  if self.nativePicker and love.system.getPickedFile then
+  if self.nativePicker and ImportHost.capabilities().result then
     self.pickerPendingKind = "rom"
     if not pickFile("rom") then
       self.pickerPendingKind = nil
@@ -2195,6 +2224,17 @@ end
 
 function RomImporter:update(dt)
   self.pulse = self.pulse + dt
+  if self._questLaunch then
+    local LaunchProgress = require("src.import.QuestLaunchProgress")
+    if LaunchProgress.advance(self._questLaunch, dt) then
+      local version = self._questLaunch.version
+      self._questLaunch = nil
+      resetPointerCursor(self)
+      if self._flex then require("src.import.LauncherView").detach(self) end
+      if self.onComplete then self.onComplete(version) end
+      return
+    end
+  end
   self:_updatePadCursor(dt)
   self:_stepBaseRomScan()
   -- Pump the FlexLove view (input polling + the queued click actions).  The
@@ -2294,8 +2334,8 @@ function RomImporter:update(dt)
       end)
     end
   end
-  if self.nativePicker and love.system.getPickedFile and self.workState ~= "working" then
-    local path = love.system.getPickedFile()
+  if self.nativePicker and ImportHost.capabilities().result and self.workState ~= "working" then
+    local path = ImportHost.takeOpenResult()
     if path then
       local kind = self.pickerPendingKind or "rom"
       local version = self.pickerPendingVersion
@@ -2315,8 +2355,8 @@ function RomImporter:update(dt)
         self:startPath(path)
         if Platform.isUWP() then os.remove(path) end
       end
-    elseif love.system.getPickError then
-      local errorText = love.system.getPickError()
+    else
+      local errorText = ImportHost.takeOpenError()
       if errorText then
         local kind = self.pickerPendingKind or "rom"
         local version = self.pickerPendingVersion or self:_savedropTarget()
@@ -2336,14 +2376,25 @@ function RomImporter:update(dt)
   if self.modWorker then
     local started = love.timer.getTime()
     repeat
-      local ok, workerError = coroutine.resume(self.modWorker)
+      -- A successful mod worker can finish through _finishModWork, which
+      -- clears self.modWorker before control returns here. Keep the running
+      -- coroutine in a local variable so the completion path never calls
+      -- coroutine.status(nil) after an Android picker return.
+      local modWorker = self.modWorker
+      local ok, workerError = coroutine.resume(modWorker)
       if not ok then
-        print(debug.traceback(self.modWorker, tostring(workerError)))
+        print(debug.traceback(modWorker, tostring(workerError)))
         self.modWorker, self.modProgress = nil, nil
         self.modNotice = { ok = false, text = "Mod import failed: " .. tostring(workerError) }
         break
       end
-      if coroutine.status(self.modWorker) == "dead" then
+      -- _finishModWork may clear the field from inside the coroutine. Stop
+      -- this frame immediately in that case; another repeat would otherwise
+      -- resume nil after a successful install.
+      if self.modWorker ~= modWorker then
+        break
+      end
+      if coroutine.status(modWorker) == "dead" then
         self.modWorker = nil
         break
       end
@@ -2448,6 +2499,9 @@ end
 
 function RomImporter:_cycleTab(delta)
   local order = { "red", "blue", "yellow", "gold", "mods", "find" }
+  if not require("src.core.PlatformProfile").isQuestStandalone() then
+    order[#order + 1] = "skins"
+  end
   local idx = 1
   for i, id in ipairs(order) do
     if id == self.tab then idx = i; break end
@@ -2599,7 +2653,7 @@ end
 
 -- Player pressed Play on a game whose ROM is imported: hand off to boot.
 function RomImporter:play(version)
-  if self.workState == "working" then return end
+  if self.workState == "working" or self._handedOff then return end
   if not self.ready[version] then return end
   self._handedOff = true
   -- #835: remember the game being launched so the next launcher start opens on
@@ -2613,6 +2667,10 @@ function RomImporter:play(version)
     opts.lastVersion = version
     SaveData.saveOptions(opts)
   end)
+  local PlatformProfile = require("src.core.PlatformProfile")
+  self._questLaunch = require("src.import.QuestLaunchProgress").start(
+    version, PlatformProfile.isQuestStandalone())
+  if self._questLaunch then return end
   resetPointerCursor(self)
   -- The game draws with raw love.graphics from here on; drop the view's
   -- element tree and canvases before the handoff.
@@ -2790,12 +2848,81 @@ end
 -- the soft keyboard drop with the panel they belonged to; each tab's scroll
 -- offset persists inside the view's per-tab scroll container.
 function RomImporter:_switchTab(id)
+  if id == "skins"
+      and require("src.core.PlatformProfile").isQuestStandalone() then return end
   self.tab = id
   self._findSearchFocus = false
   self:_disarmTextInput()
+  -- the skins list is cheap and can change behind the launcher's back
+  -- (an export, a hand-dropped folder), so re-read it on every visit
+  if id == "skins" then self:_ensureSkins(true) end
   if GameVersion.VERSIONS[id] then
     self:_setModScope(id)
   end
+end
+
+-- ------- skins tab (touch skins + the desktop Skin Studio)
+
+function RomImporter:_ensureSkins(force)
+  if self._skins and not force then return self._skins end
+  local TouchSkin = require("src.core.TouchSkin")
+  local out = {}
+  for _, entry in ipairs(TouchSkin.list()) do
+    local skin = TouchSkin.load(entry.root, entry.id)
+    local page = skin and skin.pages[1]
+    local controls = 0
+    for _, ctl in ipairs(page and page.controls or {}) do
+      if not ctl.decorative then controls = controls + 1 end
+    end
+    out[#out + 1] = {
+      id = entry.id,
+      source = entry.source,
+      pages = skin and #skin.pages or 0,
+      controls = controls,
+      screen = page ~= nil and page.viewport ~= nil,
+      ok = skin ~= nil,
+    }
+  end
+  self._skins = out
+  return out
+end
+
+function RomImporter:_activeSkin()
+  local opts = require("src.core.SaveData").loadOptions()
+  local tc = type(opts.touchControls) == "table" and opts.touchControls or {}
+  return tc.skin
+end
+
+function RomImporter:_useSkin(id)
+  local SaveData = require("src.core.SaveData")
+  local opts = SaveData.loadOptions()
+  local tc = type(opts.touchControls) == "table" and opts.touchControls or {}
+  tc.enabled = true
+  tc.skin = id
+  opts.touchControls = tc
+  SaveData.saveOptions(opts)
+  self._skinNotice = {
+    ok = true,
+    text = id and ("Now using " .. id) or "Now using the built-in pad",
+  }
+end
+
+function RomImporter:_installSkinZip(file)
+  local TouchSkin = require("src.core.TouchSkin")
+  local name = file:getFilename() or ""
+  local data, readError = readDroppedFile(file)
+  if not data then
+    self._skinNotice = { ok = false,
+      text = "Could not read the dropped file: " .. tostring(readError) }
+    return
+  end
+  local id, err = TouchSkin.installArchive(name, data)
+  self:_ensureSkins(true)
+  if not id then
+    self._skinNotice = { ok = false, text = "Import failed: " .. tostring(err) }
+    return
+  end
+  self._skinNotice = { ok = true, text = "Imported " .. id }
 end
 
 function RomImporter:_toggleFindSearchFocus()
@@ -2822,6 +2949,13 @@ function RomImporter:_openSettings()
     hooks.editTouchControls = function()
       self:_closeSettings()
       self.onEditTouchControls(version)
+    end
+  end
+  if self.onOpenSkinStudio then
+    local version = self.tab
+    hooks.openSkinStudio = function(skinId)
+      self:_closeSettings()
+      self.onOpenSkinStudio(version, skinId)
     end
   end
   -- The tab the gear was opened on decides the row set: Gold reads a
@@ -2867,6 +3001,43 @@ function RomImporter:fileUrl(path)
 end
 
 function RomImporter:keypressed(key)
+  if self._profileSavePrompt then
+    if key == "backspace" then
+      self._profileSavePrompt.text = utf8Back(self._profileSavePrompt.text or "")
+    elseif key == "return" or key == "kpenter" then
+      local txt = self._profileSavePrompt and self._profileSavePrompt.text
+      if txt and txt ~= "" then
+        local LauncherMods = require("src.mods.LauncherMods")
+        LauncherMods.saveProfile(txt)
+        self._profileSavePrompt = nil
+        self:_disarmTextInput()
+        if self._refreshMods then self:_refreshMods() end
+      end
+    elseif key == "escape" then
+      self._profileSavePrompt = nil
+      self:_disarmTextInput()
+    end
+    return
+  end
+  if self._profileRenamePrompt then
+    if key == "backspace" then
+      self._profileRenamePrompt.text = utf8Back(self._profileRenamePrompt.text or "")
+    elseif key == "return" or key == "kpenter" then
+      local txt = self._profileRenamePrompt and self._profileRenamePrompt.text
+      local old = self._profileRenamePrompt and self._profileRenamePrompt.oldName
+      if txt and txt ~= "" and old then
+        local LauncherMods = require("src.mods.LauncherMods")
+        LauncherMods.renameProfile(old, txt)
+        self._profileRenamePrompt = nil
+        self:_disarmTextInput()
+        if self._refreshMods then self:_refreshMods() end
+      end
+    elseif key == "escape" then
+      self._profileRenamePrompt = nil
+      self:_disarmTextInput()
+    end
+    return
+  end
   if self._settingsText then
     if key == "backspace" then
       self._settingsText.text = utf8Back(self._settingsText.text)
@@ -3036,6 +3207,14 @@ function RomImporter:_commitRename()
 end
 
 function RomImporter:textinput(text)
+  if self._profileSavePrompt then
+    self._profileSavePrompt.text = utf8Cap((self._profileSavePrompt.text or "") .. text, MAX_SLOT_LABEL)
+    return
+  end
+  if self._profileRenamePrompt then
+    self._profileRenamePrompt.text = utf8Cap((self._profileRenamePrompt.text or "") .. text, MAX_SLOT_LABEL)
+    return
+  end
   if self._settingsText then
     local st = self._settingsText
     st.text = utf8Cap(st.text .. text, st.maxLen or MAX_SLOT_LABEL)
@@ -3127,7 +3306,6 @@ function RomImporter:_refreshMods()
     end
     self.mods = kept
   end
-  self:_syncModUpdateInfo(false)
 end
 
 -- Point the MODS panel at one game (or nil for all of them) and relist, so
@@ -3141,10 +3319,13 @@ function RomImporter:_ensureMods()
   if not self.mods then self:_refreshMods() end
 end
 
--- Resolve cached (or freshly fetched) GitHub status for every mod that
--- declares a github field. force=true bypasses the 6h cache on every repo.
--- Results live on self.modUpdateInfo[id] = { status, latest, best, releases }.
--- ASYNC (was synchronous).  This runs on every _refreshMods -- boot, and any
+-- Resolve cached (or freshly fetched) GitHub status for every installed mod
+-- that declares a github field. This is deliberately opt-in: only the
+-- explicit "Updates" action calls it. Opening, paging, toggling, or relisting
+-- MODS must not start update work. force=true bypasses the 6h cache on every
+-- repo. Results live on self.modUpdateInfo[id] = { status, latest, best,
+-- releases }. ASYNC (was synchronous). This used to run on every _refreshMods
+-- -- boot, and any
 -- toggle or install -- and used to make one blocking curl call per mod with a
 -- github field, in a loop, on the render thread.  A handful of mods was a
 -- multi-second freeze of the whole launcher.  Now each mod gets a handle and
@@ -3230,15 +3411,19 @@ function RomImporter:_modUpdateInfo(id)
   return self.modUpdateInfo and self.modUpdateInfo[id] or nil
 end
 
--- Flip a mod's enabled flag (persisted via LauncherMods.setEnabled) and relist
--- so the toggle, count, and every status chip reflect the new resolution.
--- Enabling an experimental mod arms a confirm first.
-function RomImporter:_toggleMod(id, confirmed)
+-- Flip one game's mod flag (persisted via LauncherMods.setEnabled) and relist
+-- so that game's checkbox and status chips reflect the new resolution.
+-- Enabling an experimental mod arms a confirmation for that same game.
+function RomImporter:_toggleMod(id, confirmed, version)
   local LauncherMods = require("src.mods.LauncherMods")
   local cur, experimental = false, false
   for _, m in ipairs(self.mods or {}) do
     if m.id == id then
-      cur = m.enabled
+      if version and m.enabledByVersion then
+        cur = m.enabledByVersion[version] == true
+      else
+        cur = m.enabled
+      end
       experimental = m.experimental == true
       break
     end
@@ -3246,7 +3431,7 @@ function RomImporter:_toggleMod(id, confirmed)
   local want = not cur
   if want and experimental and not confirmed then
     self._modConfirm = {
-      kind = "experimental", id = id,
+      kind = "experimental", id = id, version = version,
       title = "Experimental mod",
       yesLabel = "Enable",
       lines = {
@@ -3258,7 +3443,7 @@ function RomImporter:_toggleMod(id, confirmed)
     return
   end
   self._modConfirm = nil
-  LauncherMods.setEnabled(id, want, self.modScope)
+  LauncherMods.setEnabled(id, want, version or self.modScope)
   self:_refreshMods()
 end
 
@@ -3517,6 +3702,76 @@ function RomImporter:_pumpModInstall()
     self.findNotice = { ok = true, text = text }
   else
     self.modNotice = { ok = true, text = text }
+  end
+  local LauncherMods = require("src.mods.LauncherMods")
+  local depCheck = LauncherMods.checkDependencies({ id = spec.modId })
+  if depCheck and depCheck.hasIssues then
+    self._modDepResolver = depCheck
+  end
+end
+
+-- Start an async pull for a single dependency
+function RomImporter:_startDepPull(dep)
+  if not dep or not dep.github then return end
+  self._depPullState = self._depPullState or {}
+  local hFetch = require("src.mods.ModUpdate").beginFetchReleases(dep.github, dep.id, { force = true })
+  self._depPullState[dep.id] = {
+    dep = dep,
+    stage = "fetching",
+    fetchHandle = hFetch,
+  }
+end
+
+-- Pump all in-flight dependency pulls
+function RomImporter:_pumpDepPulls()
+  if not self._depPullState then return end
+  local ModUpdate = require("src.mods.ModUpdate")
+  local LauncherMods = require("src.mods.LauncherMods")
+
+  for depId, state in pairs(self._depPullState) do
+    if state.stage == "fetching" then
+      local done, releases, err = ModUpdate.pumpFetchReleases(state.fetchHandle)
+      if done then
+        if err or not releases or #releases == 0 then
+          state.stage = "error"
+          state.err = err or "No downloadable releases found on GitHub"
+        else
+          local rel = releases[1]
+          if not rel or not rel.zip or not rel.zip.url then
+            state.stage = "error"
+            state.err = "Latest release has no downloadable .zip asset"
+          else
+            local tmpName = ("dep_%s_%s.zip"):format(depId, tostring(rel.version or os.time()))
+            state.dlHandle = ModUpdate.beginDownloadZip(rel.zip.url, tmpName, rel.zip.size)
+            state.stage = "downloading"
+            state.targetVersion = rel.version
+          end
+        end
+      end
+    elseif state.stage == "downloading" then
+      local done, localPath, err, progress = ModUpdate.pumpDownloadZip(state.dlHandle)
+      state.progress = progress
+      if done then
+        if err or not localPath then
+          state.stage = "error"
+          state.err = err or "Download failed"
+        else
+          state.stage = "installing"
+          local okInst, versionRes = LauncherMods.installDownloadedZip(depId, localPath, state.targetVersion)
+          if okInst then
+            state.stage = "done"
+            pcall(self._refreshMods, self)
+            if self._modDepResolver and self._modDepResolver.targetMod then
+              local updated = LauncherMods.checkDependencies(self._modDepResolver.targetMod)
+              self._modDepResolver = updated
+            end
+          else
+            state.stage = "error"
+            state.err = tostring(versionRes or "Installation failed")
+          end
+        end
+      end
+    end
   end
 end
 
@@ -3785,25 +4040,12 @@ function RomImporter:_findRows()
     category = self.findCategory,
   })
   if self.modScope then
+    local ModTargets = require("src.mods.ModTargets")
     local gen = GameVersion.generation(self.modScope)
     local kept = {}
     for _, entry in ipairs(rows) do
-      local has1, has2 = false, false
-      local function note(s)
-        s = tostring(s or ""):lower()
-        if s == "gen1" or s == "gen 1" or s == "red" or s == "blue"
-            or s == "yellow" then
-          has1 = true
-        end
-        if s == "gen2" or s == "gen 2" or s == "gold" then
-          has2 = true
-        end
-      end
-      for _, cat in ipairs(entry.categories or {}) do note(cat) end
-      for _, tag in ipairs(entry.tags or {}) do note(tag) end
-      if (not has1 and not has2)
-          or (gen == 2 and has2)
-          or (gen ~= 2 and has1) then
+      local versions = ModTargets.normalize(entry.games)
+      if #versions == 0 or ModTargets.covers(versions, gen) then
         kept[#kept + 1] = entry
       end
     end
@@ -3896,9 +4138,14 @@ function RomImporter:_findStats(entry)
     end
     self._findStatsCache[entry.id] = nil  -- retry window open, refetch
   end
-  if entry.downloads ~= nil or entry.first_release or entry.last_release then
-    cached = { total = entry.downloads, first = entry.first_release,
-               latest = entry.last_release, done = true }
+  local ModIndex = require("src.mods.ModIndex")
+  local dl = ModIndex.downloadStats(entry)
+  local dates = ModIndex.releaseDates(entry)
+  if dl or dates then
+    cached = { total = dl and dl.total, recent = dl and dl.recent,
+               windowDays = dl and dl.window_days, asOf = dl and dl.as_of,
+               first = dates and dates.first, latest = dates and dates.latest,
+               done = true }
     self._findStatsCache[entry.id] = cached
     return cached
   end

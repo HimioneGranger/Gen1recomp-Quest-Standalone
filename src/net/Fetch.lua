@@ -132,6 +132,17 @@ function Fetch.get(url, opts)
     accept = opts.accept, maxSeconds = opts.maxSeconds })
 end
 
+-- POST a body to a URL, one-way.  The result carries no body: postLog
+-- reporting never trusts a server's reply, so the worker surfaces only
+-- ok/error and the transport's complaint.
+-- opts: { userAgent, contentType, maxSeconds }
+function Fetch.post(url, body, opts)
+  opts = opts or {}
+  return submit({ kind = "post", url = url, body = body,
+    userAgent = opts.userAgent or "gen1recomp",
+    contentType = opts.contentType, maxSeconds = opts.maxSeconds })
+end
+
 -- Download a URL to `saveRel`, a path relative to the LOVE save directory.
 -- Progress is reported as a 0..1 fraction when `size` is known.
 function Fetch.download(url, saveRel, opts)

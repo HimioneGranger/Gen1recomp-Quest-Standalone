@@ -6,6 +6,7 @@ local FixedStep = require("src.core.FixedStep")
 local Input = require("src.core.Input")
 local Logger = require("src.core.Logger")
 local Renderer = require("src.render.Renderer")
+local GameViewport = require("src.render.GameViewport")
 local SaveData = require("src.core.SaveData")
 local StateStack = require("src.core.StateStack")
 local TouchControls = require("src.core.TouchControls")
@@ -13,6 +14,7 @@ local GamepadMap = require("src.core.GamepadMap")
 local ModLoader = require("src.mods.Loader")
 local ModRuntime = require("src.mods.Runtime")
 local Screens = require("src.ui.Screens")
+local PlatformProfile = require("src.core.PlatformProfile")
 
 local Game = {}
 
@@ -58,6 +60,9 @@ function Game:load()
 
   self.touchControls = TouchControls
   TouchControls:init()
+  TouchControls:setHotkeyHandler(function(action, pressed)
+    self:touchSkinHotkey(action, pressed)
+  end)
 
   self.renderer = Renderer
   Renderer:init()
@@ -184,6 +189,60 @@ function Game:returnToTitle()
   self.stack:push(self:makeTitleState())
 end
 
+function Game:breakLink(err)
+  Logger.error("link: torn down after an error\n%s", tostring(err))
+  self.linkSession = nil
+  local net = self.linkNet
+  self.linkNet = nil
+  if net then pcall(net.close, net) end
+  pcall(ModRuntime.emit, "link.ended", { reason = "error" })
+  local stack = self.stack
+  local guard = 0
+  while #stack.states > 1 and stack:top() ~= self.overworld and guard < 64 do
+    guard = guard + 1
+    pcall(stack.pop, stack)
+  end
+  pcall(function()
+    local Strings = require("src.core.Strings")
+    local TextBox = require("src.render.TextBox")
+    stack:push(TextBox.new(self, Strings("The link was\nbroken.")))
+  end)
+end
+
+Game.SKIN_FAST_FORWARD = 4
+
+function Game:touchSkinHotkey(action, pressed)
+  if action == "fast_forward_hold" then
+    if pressed then
+      self.skinSpeedSaved = self.speedOverride
+      self.speedOverride = Game.SKIN_FAST_FORWARD
+    else
+      self.speedOverride = self.skinSpeedSaved
+      self.skinSpeedSaved = nil
+    end
+  elseif action == "fast_forward_toggle" then
+    if pressed then self:_cycleSpeed(1) end
+  elseif action == "soft_reset" then
+    if pressed then
+      Input:reset()
+      TouchControls:reset()
+      self:returnToTitle()
+    end
+  elseif action == "menu" then
+    if pressed then
+      local Screens = require("src.ui.Screens")
+      local top = self.stack and self.stack:top()
+      if top and not top.isTouchSkinMenu then
+        local state = Screens.build(self, "OptionsMenu")
+        if state then
+          state.isTouchSkinMenu = true
+          self.stack:push(state)
+        end
+      end
+    end
+  end
+end
+
 function Game:step(dt)
   -- Tool mods (autoplay, accessibility drivers, input visualizers) act on
   -- the same fixed-step boundary as a physical controller.  Run them before
@@ -211,9 +270,22 @@ function Game:step(dt)
   -- stall just because PartyMenu/ChoiceBox/NamingScreen is temporarily
   -- on top of BattleState (see LinkBattle.new)
   if self.linkNet and not self.linkNet.closed then
-    self.linkNet:update()
+    local ok, err = pcall(self.linkNet.update, self.linkNet)
+    if not ok then
+      self:breakLink(err)
+      return
+    end
   end
-  self.stack:update(dt)
+  if self.linkSession or self.linkNet then
+    local ok, err = xpcall(function() self.stack:update(dt) end,
+      function(e) return debug.traceback(tostring(e), 2) end)
+    if not ok then
+      self:breakLink(err)
+      return
+    end
+  else
+    self.stack:update(dt)
+  end
   -- play time for the trainer card / save screen
   self.save.playTime = (self.save.playTime or 0) + dt
   -- Music.update is NOT serviced here: it decrements fade counters and
@@ -250,6 +322,9 @@ function Game:logicSpeed()
   -- either player set this to -- checked here, before the core.logic_speed
   -- hook ever runs, so a mod cannot defeat it either.
   if self.linkSession or (self.linkNet and not self.linkNet.closed) then
+    return 1
+  end
+  if Game.isFixedSpeedInStack and Game.isFixedSpeedInStack(self.stack) then
     return 1
   end
   if self.speedOverride then return GameSpeed.clamp(self.speedOverride) end
@@ -305,10 +380,30 @@ function Game.worldBgBattleDim(stack)
   for i = #(stack and stack.states or {}), 1, -1 do
     local state = stack.states[i]
     if state and state.bgMode and state:bgMode() == "world" then
+      -- The extended fixed HUD intentionally exposes the live world across
+      -- the whole physical window.  Keep this as a world-backed battle (zero
+      -- is non-nil, so scaling and overlay holds remain active), but do not
+      -- paint the standard dim veil around the native battle rectangle.
+      if state.extendedWorldHUD and state:extendedWorldHUD() then
+        return 0
+      end
       return state.BG_WORLD_DIM or 0.55
     end
   end
   return nil
+end
+
+-- Does the stack contain the opt-in fixed Extended WORLD battle?  Renderer
+-- uses this separately from battleDim: the world remains the surround, while
+-- the native-width battle field receives a paper backing from top to bottom.
+function Game.extendedWorldHUDInStack(stack)
+  for i = #(stack and stack.states or {}), 1, -1 do
+    local state = stack.states[i]
+    if state and state.extendedWorldHUD and state:extendedWorldHUD() then
+      return true
+    end
+  end
+  return false
 end
 
 -- Is a BATTLE BG "world" battle composing itself over the live map right now?
@@ -380,6 +475,15 @@ function Game.speedCategoryInStack(stack)
   return "menu"
 end
 
+function Game.isFixedSpeedInStack(stack)
+  local states = stack and stack.states
+  for i = #(states or {}), 1, -1 do
+    local state = states[i]
+    if state and (state.isFixedSpeed or state.isMinigame) then return true end
+  end
+  return false
+end
+
 -- Whether a state on the stack composes its own screen and so wants the
 -- edge anchors held off (BattleState.holdsUIAnchors).  Whole-stack, like
 -- everything else here: the text box and YES/NO a battle puts up are states
@@ -403,13 +507,13 @@ function Game.uiAnchorsHeldInStack(stack)
 end
 
 -- Where Game:draw starts drawing this frame.  Normally the topmost opaque
--- state (StateStack:visibleBase) -- but BATTLE BG "world" composes the battle
--- over the LIVE map, and an opaque state pushed on top of it (the party menu,
--- the bag) becomes that base, cutting the overworld -- and with it the world
--- pass -- out of the frame entirely.  The backdrop the battle established
--- then collapses to endFrame's flat black clear for as long as the menu is
--- up.  So a world-bg battle keeps the frame starting from underneath itself
--- until it leaves the stack, the same hold uiFill and the dim already use.
+-- state (StateStack:visibleBase) -- but an opaque menu pushed over a WIDE
+-- battle must not prevent that battle from drawing.  Native WIDE battles own
+-- the 304x144 surround around a centred classic menu, while external arena
+-- providers establish their window-sized scene from BattleState:draw.  If the
+-- menu becomes the draw base, neither owner runs and the menu's white field
+-- replaces the whole presentation.  BATTLE BG "world" additionally needs the
+-- overworld below the battle, as before.
 --
 -- Only the START of the draw moves.  The clear stays keyed to the real
 -- visibleBase, so the menu still gets its opaque canvas and draws exactly as
@@ -420,9 +524,13 @@ function Game.drawBaseInStack(stack, visibleBase)
   local states = stack and stack.states or {}
   for i = visibleBase - 1, 1, -1 do
     local state = states[i]
-    if state and state.bgMode and state:bgMode() == "world" then
+    local worldBattle = state and state.bgMode and state:bgMode() == "world"
+    local wideBattle = state and state.isWideBattleLayout
+      and state:isWideBattleLayout()
+    if worldBattle or wideBattle then
       -- restart the search from under the battle: the highest opaque state at
-      -- or below it (the overworld), not the menu sitting over it
+      -- or below it (the battle itself for white/black WIDE, the overworld for
+      -- a non-opaque world-backed battle), not the menu sitting over it
       for j = i, 1, -1 do
         if states[j].isOpaque then return j end
       end
@@ -430,6 +538,14 @@ function Game.drawBaseInStack(stack, visibleBase)
     end
   end
   return visibleBase
+end
+
+-- A classic overlay above the approved world-backed extended HUD paints only
+-- its centred area. Keep the wider owner surface transparent so its margins
+-- continue to reveal the world instead of becoming an opaque white sheet.
+function Game.uiCanvasTransparent(worldBelow, worldDrawn, wideBattle)
+  return worldBelow or (worldDrawn and wideBattle ~= nil
+    and wideBattle.extendedHUD and wideBattle:extendedHUD())
 end
 
 -- Shift classic SGB zones to the centred UI. A full-width base zone extends
@@ -452,6 +568,7 @@ local function centerClassicZones(zones, offset)
 end
 
 function Game:draw()
+  GameViewport.begin(1)
   -- the UI canvas clears transparent when the overworld's world pass
   -- shows through beneath it; opaque full-screen states get the classic
   -- white clear
@@ -485,6 +602,7 @@ function Game:draw()
   -- the stack for the same reason as uiFill above -- a prompt opened during
   -- the battle must not drop the dim for a frame.
   Renderer.battleDim = Game.worldBgBattleDim(self.stack)
+  Renderer.extendedWorldBand = Game.extendedWorldHUDInStack(self.stack)
   -- ...and for the same reason the UI's own scale has to know the world is
   -- still the backdrop while an opaque menu covers it.  Renderer:uiScale
   -- steps the UI down with the survey zoom only while a world is behind it,
@@ -502,7 +620,8 @@ function Game:draw()
   -- menu to its top right, and the whole UI steps down with the zoom.
   Renderer.uiCentered = not Game.dynamicUI(self.save)
   Renderer.uiAnchorHold = Game.uiAnchorsHeldInStack(self.stack)
-  Renderer:beginFrame(worldBelow)
+  Renderer:beginFrame(Game.uiCanvasTransparent(
+    worldBelow, worldDrawn, wideBattle))
   for i = drawFrom, #self.stack.states do
     local state = self.stack.states[i]
     local wideState = state and state.isWideBattleLayout
@@ -563,7 +682,9 @@ function Game:draw()
   if ModRuntime.wantsHook("render.hud") then
     ModRuntime.call("render.hud", function() end, self, viewport)
   end
-  -- on-screen mobile controls: pure screen-space, over the finished frame
+  GameViewport.finish(self)
+  -- OS-window chrome: keep the pad full-size and above any composed companion
+  -- view instead of capturing and shrinking it with the game viewport.
   TouchControls:draw()
 end
 
@@ -939,8 +1060,10 @@ local function pointerUnclaimed() return false end
 -- coordinates are LOVE window units, the same space render.hud's viewport
 -- and the touch overlay lay out in
 function Game:pointerEvent(phase, source, id, x, y, dx, dy, pressure, button)
+  local gameX, gameY, insideGame = GameViewport.toLocal(x, y)
   return ModRuntime.call("input.pointer", pointerUnclaimed, self, {
     phase = phase, source = source, id = id, x = x, y = y,
+    gameX = gameX, gameY = gameY, insideGame = insideGame,
     dx = dx or 0, dy = dy or 0, pressure = pressure, button = button,
   })
 end
@@ -1170,7 +1293,7 @@ function Game:restoreSave(loaded, recovered, opts)
                   loaded.player.x, loaded.player.y, loaded.player.facing,
                   { via = "boot", freshBoot = opts and opts.freshBoot })
   self.saveReport = report
-  if not SaveData.emptyReport(report) then
+  if SaveData.shouldShowLoadReport(report, PlatformProfile.isQuestStandalone()) then
     -- the report screen is a Screens id so mods (or the ui milestone) own
     -- its looks; until one exists the log keeps a quarantine from being
     -- silent

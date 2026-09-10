@@ -99,6 +99,20 @@ local function doDownload(job)
   post({ id = job.id, ok = true, path = rel, done = true })
 end
 
+local function doPost(job)
+  if not HostShell then
+    post({ id = job.id, ok = false, err = "no transport" })
+    return
+  end
+  local ok, err = HostShell.httpPost(job.url, job.body, job.contentType,
+    job.userAgent, tonumber(job.maxSeconds) or GET_MAX_SECONDS)
+  if not ok then
+    post({ id = job.id, ok = false, err = err or "post failed" })
+    return
+  end
+  post({ id = job.id, ok = true, done = true })
+end
+
 while true do
   local job = cmdCh:demand()
   -- The flag is checked before the job's KIND, so a worker woken by a
@@ -113,6 +127,9 @@ while true do
       break
     elseif job.kind == "get" then
       local ok, err = pcall(doGet, job)
+      if not ok then post({ id = job.id, ok = false, err = tostring(err) }) end
+    elseif job.kind == "post" then
+      local ok, err = pcall(doPost, job)
       if not ok then post({ id = job.id, ok = false, err = tostring(err) }) end
     elseif job.kind == "download" then
       local ok, err = pcall(doDownload, job)

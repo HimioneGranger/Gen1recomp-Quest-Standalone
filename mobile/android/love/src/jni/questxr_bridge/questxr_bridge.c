@@ -30,6 +30,8 @@ static atomic_int questxr_bootstrap_started;
 static int questxr_bootstrap_joinable;
 static atomic_int questxr_bootstrap_shutdown_requested;
 static atomic_int questxr_bootstrap_stopped = 1;
+// 0 none, 1 launcher/gameplay handoff, 2 Android activity destruction.
+static atomic_int questxr_bootstrap_shutdown_reason;
 // Incremented by the Quest activity for every result from Android DocumentsUI.
 // It carries no file name, path, or content; the native thread uses it only to
 // bound post-return action/pose diagnostics.
@@ -275,6 +277,7 @@ static void *questxr_native_bootstrap(void *unused) {
     GLuint panel_vbo = 0;
     uint64_t uploaded_panel_generation = 0;
     int running = 0;
+    XrSessionState last_session_state = XR_SESSION_STATE_UNKNOWN;
     int white_environment_enabled = 0;
     int white_environment_eligible = 0;
     int white_environment_wait_logged = 0;
@@ -293,6 +296,8 @@ static void *questxr_native_bootstrap(void *unused) {
     PFN_xrEnumerateViewConfigurationViews xrEnumerateViewConfigurationViews = NULL;
     PFN_xrGetOpenGLESGraphicsRequirementsKHR xrGetOpenGLESGraphicsRequirementsKHR = NULL;
     PFN_xrCreateSession xrCreateSession = NULL;
+    PFN_xrEnumerateReferenceSpaces xrEnumerateReferenceSpaces = NULL;
+    PFN_xrGetReferenceSpaceBoundsRect xrGetReferenceSpaceBoundsRect = NULL;
     PFN_xrCreateReferenceSpace xrCreateReferenceSpace = NULL;
     PFN_xrLocateSpace xrLocateSpace = NULL;
     PFN_xrLocateViews xrLocateViews = NULL;
@@ -428,6 +433,8 @@ static void *questxr_native_bootstrap(void *unused) {
     XR_PROC(instance, xrEnumerateViewConfigurationViews);
     XR_PROC(instance, xrGetOpenGLESGraphicsRequirementsKHR);
     XR_PROC(instance, xrCreateSession);
+    XR_PROC(instance, xrEnumerateReferenceSpaces);
+    XR_PROC(instance, xrGetReferenceSpaceBoundsRect);
     XR_PROC(instance, xrCreateReferenceSpace);
     XR_PROC(instance, xrLocateSpace);
     XR_PROC(instance, xrLocateViews);
@@ -600,6 +607,31 @@ static void *questxr_native_bootstrap(void *unused) {
     attach_info.actionSets = &action_set;
     if (XR_FAILED(xrAttachSessionActionSets(session, &attach_info)))
         XR_FAIL("xrAttachSessionActionSets");
+
+    // Boundary mode belongs to Quest Guardian. This app does not request a
+    // Stationary or Roomscale transition. Record what the runtime exposes and
+    // its current STAGE bounds so a device log can distinguish an OS Guardian
+    // transition from an app-owned reference-space choice.
+    uint32_t reference_space_count = 0;
+    if (XR_SUCCEEDED(xrEnumerateReferenceSpaces(
+            session, 0, &reference_space_count, NULL)) &&
+            reference_space_count > 0) {
+        XrReferenceSpaceType *reference_spaces = (XrReferenceSpaceType *)
+            calloc(reference_space_count, sizeof(XrReferenceSpaceType));
+        if (reference_spaces && XR_SUCCEEDED(xrEnumerateReferenceSpaces(
+                session, reference_space_count, &reference_space_count,
+                reference_spaces))) {
+            for (uint32_t i = 0; i < reference_space_count; i++)
+                XR_LOG("boundary diagnostic supported reference-space type=%d",
+                    (int) reference_spaces[i]);
+        }
+        free(reference_spaces);
+    }
+    XrExtent2Df stage_bounds = {0};
+    XrResult stage_bounds_result = xrGetReferenceSpaceBoundsRect(
+        session, XR_REFERENCE_SPACE_TYPE_STAGE, &stage_bounds);
+    XR_LOG("boundary diagnostic app-space=LOCAL stage-result=%d stage-width=%.3f stage-height=%.3f",
+        (int) stage_bounds_result, stage_bounds.width, stage_bounds.height);
     XrActionSpaceCreateInfo pointer_space_info = {
         XR_TYPE_ACTION_SPACE_CREATE_INFO
     };
@@ -804,14 +836,12 @@ static void *questxr_native_bootstrap(void *unused) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(panel_vertices), panel_vertices, GL_STATIC_DRAW);
     XR_LOG("native bootstrap session created");
 
-    // The panel height is 1.1625 m. Moving its center down by one sixth of
-    // that height puts a forward gaze in its upper third, rather than its
-    // center. Apply this to the shared room panel pose, so launcher, loading,
-    // and game content stay aligned.
-    const float launcher_panel_gaze_top_third_offset_m = -0.19375f;
+    // Put forward gaze at 35 percent from the top of the 1.1625 m panel.
+    // Moving its former center down by 15 percent gives -0.174375 m.
+    const float launcher_panel_vertical_offset_m = -0.174375f;
     XrPosef panel_pose = {0};
     panel_pose.orientation.w = 1.0f;
-    panel_pose.position.y = launcher_panel_gaze_top_third_offset_m;
+    panel_pose.position.y = launcher_panel_vertical_offset_m;
     panel_pose.position.z = -1.35f;
     int panel_anchored = 0;
     const int room_anchor_enabled = 1;
@@ -874,6 +904,10 @@ static void *questxr_native_bootstrap(void *unused) {
             if (event.type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED) {
                 XrEventDataSessionStateChanged *changed =
                     (XrEventDataSessionStateChanged *) &event;
+                XR_LOG("boundary diagnostic session-state old=%d new=%d shutdown-reason=%d",
+                    (int) last_session_state, (int) changed->state,
+                    atomic_load(&questxr_bootstrap_shutdown_reason));
+                last_session_state = changed->state;
                 if (changed->state == XR_SESSION_STATE_READY && !running) {
                     XrSessionBeginInfo begin = { XR_TYPE_SESSION_BEGIN_INFO };
                     begin.primaryViewConfigurationType =
@@ -898,11 +932,24 @@ static void *questxr_native_bootstrap(void *unused) {
                 }
             } else if (event.type ==
                        XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING) {
+                XrEventDataReferenceSpaceChangePending *space_change =
+                    (XrEventDataReferenceSpaceChangePending *) &event;
                 // Quest emits this after a Meta-button recenter. Reacquire the
                 // settled pose in the new LOCAL space rather than preserving
                 // the old room anchor.
                 panel_anchored = 0;
                 anchor_after_frame = submitted_frames + 30;
+                XrExtent2Df changed_stage_bounds = {0};
+                XrResult changed_stage_result = xrGetReferenceSpaceBoundsRect(
+                    session, XR_REFERENCE_SPACE_TYPE_STAGE,
+                    &changed_stage_bounds);
+                XR_LOG("boundary diagnostic reference-space change type=%d change-time=%lld pose-valid=%d stage-result=%d stage-width=%.3f stage-height=%.3f",
+                    (int) space_change->referenceSpaceType,
+                    (long long) space_change->changeTime,
+                    space_change->poseValid,
+                    (int) changed_stage_result,
+                    changed_stage_bounds.width,
+                    changed_stage_bounds.height);
                 XR_LOG("launcher recenter requested by reference-space change");
             }
             event.type = XR_TYPE_EVENT_DATA_BUFFER;
@@ -1020,8 +1067,7 @@ static void *questxr_native_bootstrap(void *unused) {
                 panel_pose.position.x += offset.x;
                 panel_pose.position.y += offset.y;
                 panel_pose.position.z += offset.z;
-                panel_pose.position.y +=
-                    launcher_panel_gaze_top_third_offset_m;
+                panel_pose.position.y += launcher_panel_vertical_offset_m;
                 panel_anchored = 1;
                 XR_LOG("launcher panel anchored in local space");
             }
@@ -1421,6 +1467,16 @@ static void *questxr_native_bootstrap(void *unused) {
     }
 
 done:
+    if (session != XR_NULL_HANDLE && xrGetReferenceSpaceBoundsRect) {
+        XrExtent2Df final_stage_bounds = {0};
+        XrResult final_stage_result = xrGetReferenceSpaceBoundsRect(
+            session, XR_REFERENCE_SPACE_TYPE_STAGE, &final_stage_bounds);
+        XR_LOG("boundary diagnostic shutdown reason=%d last-session-state=%d running=%d exit-requested=%d stage-result=%d stage-width=%.3f stage-height=%.3f",
+            atomic_load(&questxr_bootstrap_shutdown_reason),
+            (int) last_session_state, running, exit_requested,
+            (int) final_stage_result,
+            final_stage_bounds.width, final_stage_bounds.height);
+    }
     if (panel_vbo) glDeleteBuffers(1, &panel_vbo);
     if (panel_program) glDeleteProgram(panel_program);
     if (panel_texture) glDeleteTextures(1, &panel_texture);
@@ -1482,7 +1538,9 @@ QUESTXR_EXPORT unsigned int questxr_poll_saf_generation(void) {
 }
 
 QUESTXR_EXPORT void questxr_request_launcher_shutdown(void) {
+    questxr_bootstrap_shutdown_reason = 1;
     questxr_bootstrap_shutdown_requested = 1;
+    XR_LOG("boundary diagnostic shutdown source=launcher-handoff");
 }
 
 QUESTXR_EXPORT int questxr_launcher_stopped(void) {
@@ -1742,6 +1800,7 @@ Java_org_love2d_android_QuestGameActivity_nativeQuestXrStartBootstrap(
     (void) clazz;
     if (questxr_bootstrap_started) return;
     questxr_bootstrap_shutdown_requested = 0;
+    questxr_bootstrap_shutdown_reason = 0;
     questxr_bootstrap_started = 1;
     if (pthread_create(&questxr_bootstrap_thread, NULL,
                        questxr_native_bootstrap, NULL) != 0) {
@@ -1767,7 +1826,11 @@ JNIEXPORT void JNICALL
 Java_org_love2d_android_QuestGameActivity_nativeQuestXrDestroy(
     JNIEnv *env, jclass clazz) {
     (void) clazz;
+    if (atomic_load(&questxr_bootstrap_shutdown_reason) == 0)
+        questxr_bootstrap_shutdown_reason = 2;
     questxr_bootstrap_shutdown_requested = 1;
+    XR_LOG("boundary diagnostic shutdown source=activity-destroy reason=%d",
+        atomic_load(&questxr_bootstrap_shutdown_reason));
     if (questxr_bootstrap_joinable) {
         pthread_join(questxr_bootstrap_thread, NULL);
         questxr_bootstrap_joinable = 0;

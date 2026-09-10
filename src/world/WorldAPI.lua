@@ -7,6 +7,8 @@
 
 local Logger = require("src.core.Logger")
 local Assets = require("src.render.Assets")
+local FieldDefaults = require("src.world.FieldDefaults")
+local Map = require("src.world.Map")
 local MapLoader = require("src.world.MapLoader")
 local Party = require("src.pokemon.Party")
 local Runtime = require("src.mods.Runtime")
@@ -15,6 +17,9 @@ local WorldAPI = {}
 WorldAPI.__index = WorldAPI
 
 local NO_OVERWORLD = "no overworld"
+local DIG_TILESETS = { FOREST = true, CEMETERY = true, CAVERN = true,
+                       FACILITY = true, INTERIOR = true }
+local RODS = { "OLD_ROD", "GOOD_ROD", "SUPER_ROD" }
 local overviewShades = {}
 
 Assets.register(function() overviewShades = {} end)
@@ -137,6 +142,103 @@ function WorldAPI:reorderParty(fromSlot, toSlot)
     require("src.core.Sound").play(game.data, "Swap")
   end
   return true
+end
+
+-- Contextual field-item shortcuts. Only actions that can start immediately
+-- are listed; callers receive copied labels and never inspect world internals.
+function WorldAPI:availableFieldActions()
+  local game, ow, out = self.game, self:overworld(), {}
+  if not (game and game.save and ow and ow.map and ow.player)
+      or not acceptsMenuInput(game, ow) then return out end
+  local save, inventory = game.save, game.save.inventory or {}
+  local items = game.data and game.data.items or {}
+
+  if (inventory.BICYCLE or 0) > 0 and not ow.player.surfing
+      and not (save.onBike and save.forcedBike)
+      and (save.onBike or ow:bikeAllowed(ow.map.id)) then
+    out[#out + 1] = { id = "bicycle",
+      label = save.onBike and "BIKE OFF" or "BICYCLE" }
+  end
+
+  if not ow.player.surfing and ow:facingIsShoreOrWater() then
+    local rods = {}
+    for _, id in ipairs(RODS) do
+      if (inventory[id] or 0) > 0 then
+        local def = items[id]
+        rods[#rods + 1] = { id = id, label = def and def.name or id }
+      end
+    end
+    if #rods > 0 then
+      out[#out + 1] = { id = "fish", label = "FISH", rods = rods }
+    end
+  end
+
+  if ow:useCutFieldMove() == "ok" then
+    out[#out + 1] = { id = "cut", label = "CUT" }
+  end
+  local surf = ow:useSurfFieldMove()
+  if surf == "ok" or surf == "dismount" then
+    out[#out + 1] = { id = "surf",
+      label = surf == "dismount" and "LEAVE WATER" or "SURF" }
+  end
+  if not ow.strengthActive and ow:partyKnows("STRENGTH") then
+    out[#out + 1] = { id = "strength", label = "STRENGTH" }
+  end
+  if ow.dark and ow:partyKnows("FLASH") then
+    out[#out + 1] = { id = "flash", label = "FLASH" }
+  end
+  if DIG_TILESETS[ow.map.def.tileset] and ow.map.id ~= "AGATHAS_ROOM"
+      and ow:partyKnows("DIG") then
+    out[#out + 1] = { id = "dig", label = "DIG" }
+  end
+  if ow:partyKnows("TELEPORT") and Map.isOutside(ow.map.def,
+      FieldDefaults.field(game.data, "outsideTilesets")) then
+    out[#out + 1] = { id = "teleport", label = "TELEPORT" }
+  end
+  return out
+end
+
+function WorldAPI:useFieldAction(id, opts)
+  local game, ow = self.game, self:overworld()
+  if not ow then return nil, NO_OVERWORLD end
+  if not acceptsMenuInput(game, ow) then return nil, "world is busy" end
+  local found
+  for _, action in ipairs(self:availableFieldActions()) do
+    if action.id == id then found = action break end
+  end
+  if not found then return nil, "field action unavailable" end
+
+  if id == "bicycle" then
+    if ow:useBicycle() then return true end
+  elseif id == "cut" then
+    local x, y = ow.player:facingCell()
+    if ow:tryCut(x, y) then return true end
+  elseif id == "surf" then
+    local mode = ow:useSurfFieldMove()
+    if mode == "dismount" then
+      ow:stopSurfing()
+      return true
+    elseif mode == "ok" then
+      local x, y = ow.player:facingCell()
+      ow:trySurf(x, y)
+      return true
+    end
+  elseif id == "fish" then
+    local rod = opts and opts.rod
+    if not rod and #found.rods == 1 then rod = found.rods[1].id end
+    for _, choice in ipairs(found.rods) do
+      if choice.id == rod and ow:useFishingRod(rod) then return true end
+    end
+    return nil, "fishing rod unavailable"
+  elseif id == "strength" then
+    if ow:useStrengthFieldMove() then return true end
+  elseif id == "flash" then
+    if ow:useFlashFieldMove() then return true end
+  elseif id == "dig" or id == "teleport" then
+    ow:beginTeleportOut()
+    return true
+  end
+  return nil, "field action unavailable"
 end
 
 -- A compact, read-only view of the active map for minimaps and companion UIs.

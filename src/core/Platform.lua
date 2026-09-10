@@ -1,5 +1,7 @@
 -- Platform capability detection for console, mobile and desktop builds.
 
+local ImportHost = require("src.core.ImportHost")
+
 local Platform = {}
 
 local cached
@@ -10,8 +12,7 @@ local function compute()
   local nx = osName == "NX"
   local uwp = osName == "UWP"
   local mobile = osName == "Android" or osName == "iOS"
-  local nativePicker = love and love.system
-    and type(love.system.pickFile) == "function"
+  local nativePicker = ImportHost.capabilities().open
   local nativeHttp = love and love.system
     and type(love.system.httpDownload) == "function"
   return {

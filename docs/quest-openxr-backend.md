@@ -7,8 +7,13 @@ The desktop and stock Android variants neither compile nor package this host.
 
 ## Boundaries
 
-- `src/core/HostDisplay.lua` remains a generic no-op interface unless a
-  packaged backend is detected.
+- `HostBootstrap`, `HostDisplay`, `HostLifecycle`, and `ImportHost` are neutral,
+  versioned API v1 boundaries. They contain no Quest or OpenXR policy.
+- A packaged Android flavor can return one exact Lua adapter name through
+  `love.system.getHostModule()`. Standard Android returns an empty name.
+- `src/core/HostDisplay.lua` remains a generic no-op interface unless a host
+  adapter installs a backend. The older packaged-display detector remains as
+  a temporary rollback fallback until physical verification passes.
 - `src/host/android/QuestOpenXRDisplay.lua` converts Quest Touch input into the
   launcher's existing virtual-pointer and button paths, and submits completed
   launcher-frame metadata to the native host.
@@ -24,6 +29,34 @@ The compositor pointer is launcher-only. Lua explicitly enables it for a
 launcher frame; live native ray tracking may update coordinates only while
 that visibility flag is enabled. This prevents the launcher selector from
 appearing over a game frame or a mod-owned preparation card.
+
+## Accepted-baseline sync gate
+
+Do not classify a Quest/core integration branch as merge-ready until it passes
+the non-device accepted-baseline gate:
+
+```sh
+scripts/verify_accepted_baseline.sh <accepted-baseline-ref>
+```
+
+The caller must explicitly supply the latest accepted Unplugged baseline as a
+local branch, tag, or commit. The script resolves that value and `HEAD` to
+commits, then uses Git ancestry to verify that the baseline is contained in
+the candidate. It exits `1` when the candidate is stale or has diverged. It
+exits `2` when the ref is missing, invalid, or cannot be resolved.
+
+The verifier does not fetch or select a baseline. Fetch the trusted baseline
+first when its local ref may be stale. CI must use a full-history checkout or
+fetch the explicitly selected commit before it runs the command. For example:
+
+```sh
+git fetch origin <accepted-baseline-ref>
+scripts/verify_accepted_baseline.sh FETCH_HEAD
+```
+
+`scripts/test.sh` runs the verifier's ROM-free functional suite, but that suite
+does not select the accepted product baseline. The explicit command above is
+the required merge-readiness gate.
 
 ## Physical validation — 2026-08-12
 

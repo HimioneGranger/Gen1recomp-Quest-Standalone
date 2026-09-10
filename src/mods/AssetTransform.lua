@@ -16,6 +16,7 @@
 
 local Logger = require("src.core.Logger")
 local Runtime = require("src.mods.Runtime")
+local SafePath = require("src.mods.SafePath")
 
 local unpack = table.unpack or unpack
 local loadstring = loadstring or load
@@ -31,25 +32,8 @@ AssetTransform.SOURCE_ROOT = SOURCE_ROOT
 AssetTransform.DERIVED_ROOT = DERIVED_ROOT
 
 -- ------- path sandbox
-
--- a relative path that cannot climb out of the root it is joined to
-local function safeRelative(rel)
-  if type(rel) ~= "string" or rel == "" then return nil end
-  if rel:sub(1, 1) == "/" then return nil end
-  if rel:find("\\", 1, true) then return nil end
-  for segment in rel:gmatch("[^/]+") do
-    if segment == ".." or segment == "." then return nil end
-  end
-  return rel
-end
-
-local function requireRelative(rel, what)
-  local safe = safeRelative(rel)
-  if not safe then
-    error(("%s must stay inside its root, got %q"):format(what, tostring(rel)), 0)
-  end
-  return safe
-end
+-- shared with mod:read and the manifest's own paths (src/mods/SafePath.lua)
+local requireRelative = SafePath.require
 
 -- ------- the restricted context
 

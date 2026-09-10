@@ -3,13 +3,16 @@
 -- that need to stat a file, this owns shape, vocabulary and range grammar.
 local Logger = require("src.core.Logger")
 local ModTargets = require("src.mods.ModTargets")
+local SafePath = require("src.mods.SafePath")
 local Semver = require("src.mods.Semver")
 local Version = require("src.core.Version")
 
 local Manifest = {}
 
 Manifest.PROFILES = { content = true, overhaul = true, total_conversion = true }
-Manifest.PERMISSIONS = { network = true, filesystem = true, engine_internals = true }
+Manifest.PERMISSIONS = { network = true, filesystem = true,
+                         engine_internals = true, steps = true,
+                         background = true, compute = true }
 
 -- link-relevant registries; a mod that writes into one of these while
 -- declaring affects_link = false gets an attributed warning from the loader
@@ -29,26 +32,6 @@ end
 local function violation(strict, id, message)
   if strict then error(message, 0) end
   Logger.warn("[%s] %s", tostring(id), message)
-end
-
--- "id" or "id@<range>"; a malformed id or range fails for every api level
--- because there is no sane fallback reading for it
-local function parseSpecs(list, field)
-  local specs = {}
-  for _, entry in ipairs(list) do
-    assert(type(entry) == "string" and entry ~= "",
-      field .. " entries must be non-empty strings")
-    local id, range = entry:match("^([%w_%-]+)@(.+)$")
-    if not id then
-      id = entry:match("^([%w_%-]+)$")
-      assert(id, ("malformed %s entry %q"):format(field, entry))
-      range = nil
-    end
-    local ok, err = Semver.validRange(range)
-    assert(ok, ("malformed %s range in %q: %s"):format(field, entry, tostring(err)))
-    specs[#specs + 1] = { id = id, range = range }
-  end
-  return specs
 end
 
 -- Optional GitHub repo for launcher auto-update / other-versions.
@@ -71,6 +54,71 @@ function Manifest.parseGithub(value)
     "github must be owner/repo or a github.com URL")
   repo = repo:gsub("%.git$", "")
   return owner .. "/" .. repo
+end
+
+-- "id", "id@<range>", "id@<range>#<github>", "id#<github>", or table entry
+local function parseSpecs(list, field, sources)
+  local specs = {}
+  sources = type(sources) == "table" and sources or {}
+  for _, entry in ipairs(list) do
+    local id, range, ghHint, gamesRaw, gameVersion
+    if type(entry) == "table" then
+      id = entry.id
+      range = entry.range or entry.version
+      ghHint = entry.github or entry.repo
+      gamesRaw = entry.games or entry.game
+      gameVersion = entry.game_version
+    elseif type(entry) == "string" and entry ~= "" then
+      local main, hashRepo = entry:match("^([^#]+)#(.*)$")
+      if main then
+        entry = main
+        ghHint = hashRepo
+      end
+      id, range = entry:match("^([%w_%-]+)@(.+)$")
+      if not id then
+        id = entry:match("^([%w_%-]+)$")
+        assert(id, ("malformed %s entry %q"):format(field, entry))
+        range = nil
+      end
+    else
+      error(field .. " entries must be non-empty strings or tables")
+    end
+    assert(id, ("malformed %s entry"):format(field))
+    local ok, err = Semver.validRange(range)
+    assert(ok, ("malformed %s range in %q: %s"):format(field, tostring(entry), tostring(err)))
+
+    if gameVersion then
+      local okV, errV = Semver.validRange(gameVersion)
+      assert(okV, ("malformed %s game_version range in %q: %s")
+        :format(field, tostring(entry), tostring(errV)))
+    end
+
+    local parsedGames = nil
+    if gamesRaw ~= nil then
+      if type(gamesRaw) == "string" then gamesRaw = { gamesRaw } end
+      assert(type(gamesRaw) == "table", "dependency games must be a string or table")
+      local normalized, unknown = ModTargets.normalize(gamesRaw)
+      assert(#unknown == 0,
+        ("unknown game in %s: %s"):format(field, table.concat(unknown, ", ")))
+      parsedGames = normalized
+    end
+
+    local parsedGh = nil
+    local rawGh = ghHint or sources[id]
+    if rawGh then
+      local okGh, cleanGh = pcall(Manifest.parseGithub, rawGh)
+      if okGh and cleanGh then parsedGh = cleanGh end
+    end
+
+    specs[#specs + 1] = {
+      id = id,
+      range = range,
+      github = parsedGh,
+      games = parsedGames,
+      game_version = gameVersion,
+    }
+  end
+  return specs
 end
 
 -- conflicts + incompatible (alias) merged, first-wins on duplicate ids
@@ -144,6 +192,9 @@ function Manifest.validate(raw, path)
   assert(type(raw.name) == "string" and raw.name ~= "", "manifest name is required")
   assert(type(raw.version) == "string" and raw.version ~= "", "manifest version is required")
   assert(type(raw.entry) == "string" and raw.entry ~= "", "manifest entry is required")
+  -- every manifest path is joined to the mod's own directory, so none of them
+  -- may climb out of it (src/mods/SafePath.lua)
+  local entry = SafePath.require(raw.entry, "manifest entry")
 
   -- absent means 1: full v1 compat, schema violations downgrade to warnings
   assert(raw.api == nil or tonumber(raw.api) ~= nil, "manifest api must be a number")
@@ -174,6 +225,24 @@ function Manifest.validate(raw, path)
     :format(tostring(raw.game_version), tostring(gameVersionErr)))
 
   local github = Manifest.parseGithub(raw.github)
+
+  -- log_url: the mod's one-way crash-log reporting destination.  https-only,
+  -- declared in the manifest so the engine reviews the target at load instead
+  -- of trusting per-call URLs from gameplay code, and gated on the `network`
+  -- permission the mod must also declare.  api 1 mods never carry it: it is a
+  -- load violation, not a warning, because a postLog-capable mod that does not
+  -- opt in to networking is a bug in the manifest itself.
+  local logUrl = nil
+  if raw.log_url ~= nil then
+    if strict and not permissionSet.network then
+      violation(strict, raw.id, "log_url requires the network permission")
+    elseif strict and (type(raw.log_url) ~= "string"
+        or not raw.log_url:match("^https://")) then
+      violation(strict, raw.id, "log_url must be an https:// URL")
+    elseif strict then
+      logUrl = raw.log_url
+    end
+  end
 
   assert(raw.experimental == nil or type(raw.experimental) == "boolean",
     "experimental must be a boolean")
@@ -229,10 +298,15 @@ function Manifest.validate(raw, path)
   local affectsLink = profile ~= "content" and not language
   if type(raw.affects_link) == "boolean" then affectsLink = raw.affects_link end
 
-  local function optionalFile(value, field)
+  local function optionalString(value, field)
     if value == nil then return nil end
     assert(type(value) == "string" and value ~= "", field .. " must be a file path")
     return value
+  end
+
+  local function optionalFile(value, field)
+    local text = optionalString(value, field)
+    return text and SafePath.require(text, field)
   end
 
   local conflicts = mergeConflictLists(raw.conflicts, raw.incompatible)
@@ -241,15 +315,15 @@ function Manifest.validate(raw, path)
     id = raw.id,
     name = raw.name,
     version = raw.version,
-    entry = raw.entry,
+    entry = entry,
     api = api,
     priority = tonumber(raw.priority) or 0,
     dependencies = array(raw.dependencies),
     optional_dependencies = array(raw.optional_dependencies),
     conflicts = conflicts,
     incompatible = array(raw.incompatible),
-    dependencySpecs = parseSpecs(array(raw.dependencies), "dependencies"),
-    optionalSpecs = parseSpecs(array(raw.optional_dependencies), "optional_dependencies"),
+    dependencySpecs = parseSpecs(array(raw.dependencies), "dependencies", raw.dependency_sources),
+    optionalSpecs = parseSpecs(array(raw.optional_dependencies), "optional_dependencies", raw.dependency_sources),
     conflictSpecs = parseSpecs(conflicts, "conflicts"),
     category = raw.category or "OTHER",
     game_version = raw.game_version,
@@ -263,9 +337,11 @@ function Manifest.validate(raw, path)
     affects_link = affectsLink,
     permissions = permissions,
     permissionSet = permissionSet,
+    log_url = logUrl,
     options_schema = optionalFile(raw.options_schema, "options_schema"),
     assets_transforms = optionalFile(raw.assets_transforms, "assets_transforms"),
-    force_enable_env = optionalFile(raw.force_enable_env, "force_enable_env"),
+    -- an env var name, not a path, so it keeps the plain string check
+    force_enable_env = optionalString(raw.force_enable_env, "force_enable_env"),
     path = path,
     raw = raw,
   }

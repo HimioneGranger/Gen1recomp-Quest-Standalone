@@ -18,6 +18,7 @@ local Theme = require("src.ui.Theme")
 local FieldDefaults = require("src.world.FieldDefaults")
 local Map = require("src.world.Map")
 local Strings = require("src.core.Strings")
+local Status = require("src.battle.Status")
 
 local PartyMenu = {}
 PartyMenu.__index = PartyMenu
@@ -71,6 +72,21 @@ function PartyMenu:sgbPalettes(game)
 end
 
 local function sameItems(_, items) return items end
+
+local function followerUnavailable(game, mon)
+  local ow = game.overworld
+  local Follower = require("src.world.PikachuFollower")
+  return Follower.isFollowingDisabled(ow)
+    and Follower.isStarterPikachu(game.save, mon)
+end
+
+local function refuseUnavailable(self)
+  self.swapFrom = nil
+  local TextBox = require("src.render.TextBox")
+  local t = self.game.data and self.game.data.text or {}
+  self.game.stack:push(TextBox.new(self.game,
+    t._SleepingPikachuText1 or Strings("There isn't any\nresponse...")))
+end
 
 -- where DIG escapes work: escape_rope_tilesets.asm (Agatha's room is
 -- excluded by map id in ItemUseEscapeRope)
@@ -265,6 +281,7 @@ function PartyMenu.new(game, opts)
   opts = opts or {}
   local self = setmetatable({}, PartyMenu)
   self.game = game
+  local party = opts.party or (opts.battle and opts.battle.playerParty)
   -- PartyMenuInit (home/pokemon.asm) seeds the cursor from
   -- wPartyAndBillsPCSavedMenuItem rather than from zero, and
   -- HandlePartyMenuInput writes wCurrentMenuItem back into it on every
@@ -273,7 +290,7 @@ function PartyMenu.new(game, opts)
   -- both zero the byte, which BattleState mirrors.  The clamp covers a
   -- party that shrank (deposit / release) while the saved index was
   -- pointing past the end. #768
-  local count = #(opts.party or (game.save and game.save.party) or {})
+  local count = #(party or (game.save and game.save.party) or {})
   self.index = math.min(math.max(1, game.partyMenuSavedIndex or 1),
                         math.max(1, count))
   self.onSwitch = opts.onSwitch
@@ -290,7 +307,7 @@ function PartyMenu.new(game, opts)
   self.tmhm = opts.tmhm
   self.forceSwitch = opts.forceSwitch
   self.battle = opts.battle
-  self.party = opts.party -- link battles pass their clamped copies
+  self.party = party -- link/scoped battles pass their local party view
   self.swapFrom = nil
   self.submenu = nil
   self.subIndex = 1
@@ -367,6 +384,10 @@ function PartyMenu:update(dt)
       self.submenu = nil
     elseif input:wasPressed("a") then
       local mon = party[self.index]
+      if followerUnavailable(self.game, mon) then
+        refuseUnavailable(self)
+        return
+      end
       local entry = self.subItems[self.subIndex]
       local action = entry.action
       if not action and entry.onSelect then
@@ -404,26 +425,7 @@ function PartyMenu:update(dt)
         -- over the menu, and the cave is lit when the blink hands the
         -- screen back, never under the text (#385).
         local ow = self.game.overworld
-        local TextBox = require("src.render.TextBox")
-        local Transition = require("src.render.Transition")
-        self.game.save.flashLit = true
-        self.game.stack:push(TextBox.new(self.game,
-          self.game.data.text._FlashLightsAreaText
-          or Strings("A blinding FLASH\nlights the area!"), function()
-            self:close()
-            -- setDark, not a bare field write: ADVANCED carries the darkness
-            -- in a baked atlas, so lighting the cave drops every resident map
-            -- and rebakes this one (#383).  It runs HERE, before the blink,
-            -- because start_sub_menus.asm .flash clears wMapPalOffset before
-            -- PrintText and blinks last of all: the cave is already lit by the
-            -- time GBPalWhiteOutWithDelay3 runs.  Hanging the rebuild off the
-            -- blink's completion instead left that rebuild's whole cost --
-            -- seconds of per-pixel atlas baking on a phone -- on screen as a
-            -- solid white frame with nothing under it, which reads as a
-            -- lockup (#610).
-            ow:setDark(false)
-            self.game.stack:push(Transition.whiteFlash(self.game))
-          end))
+        ow:useFlashFieldMove(function() self:close() end)
         return
       elseif action == "surf" then
         -- start_sub_menus.asm .surf: SOULBADGE-gated (checked at list time
@@ -435,7 +437,6 @@ function PartyMenu:update(dt)
         -- submenu.  useSurfFieldMove reports which; trySurf does the mount.
         local ow = self.game.overworld
         local reason = ow:useSurfFieldMove()
-        local Transition = require("src.render.Transition")
         if reason == "ok" then
           -- UseItem prints _SurfingGotOnText with the party menu still up;
           -- GBPalWhiteOutWithDelay3 + jp .goBackToMap only follow it, so
@@ -451,12 +452,7 @@ function PartyMenu:update(dt)
           -- GBPalWhiteOutWithDelay3 blink, and the simulated pad press
           -- steps the player forward onto land (or across a connection
           -- strip when the shore is the next map's edge)
-          self.game.stack:pop()
-          ow.player.surfing = false
-          require("src.core.Music").setSurfing(self.game.data, false)
-          self.game.stack:push(Transition.whiteFlash(self.game, nil, function()
-            ow:stepForwardOrCrossEdge(ow.player.facing)
-          end))
+          ow:stopSurfing(function() self.game.stack:pop() end)
           return
         end
         local TextBox = require("src.render.TextBox")
@@ -513,26 +509,7 @@ function PartyMenu:update(dt)
         -- .strength, GBPalWhiteOutWithDelay3 blinks the screen white
         -- before CloseTextDisplay returns to the map.
         local ow = self.game.overworld
-        local TextBox = require("src.render.TextBox")
-        local Transition = require("src.render.Transition")
-        local def = self.game.data.pokemon[mon.species]
-        local name = mon.nickname or def.name
-        ow.strengthActive = true
-        local t1 = (self.game.data.text._UsedStrengthText
-          or Strings("{RAM:wNameBuffer} used\nSTRENGTH.")):gsub("{RAM:wNameBuffer}", name)
-        local t2 = (self.game.data.text._CanMoveBouldersText
-          or Strings("{RAM:wNameBuffer} can\nmove boulders.")):gsub("{RAM:wNameBuffer}", name)
-        -- like surf (#320, #385): both texts print with the party menu
-        -- still on screen, and the blink IS the menu closing afterwards,
-        -- not a flashbang on the empty map
-        self.game.stack:push(TextBox.new(self.game, t1, function()
-          self.game.stack:push(TextBox.new(self.game, t2, function()
-            self:close()
-            self.game.stack:push(Transition.whiteFlash(self.game))
-          end))
-        end, { auto = { sound = function()
-          return require("src.core.Sound").playCry(self.game.data, mon.species)
-        end } }))
+        ow:useStrengthFieldMove(mon, function() self:close() end)
         return
       elseif action == "softboiled" then
         -- field SOFTBOILED (StartMenu_Pokemon .softboiled): transfer
@@ -577,6 +554,10 @@ function PartyMenu:update(dt)
     if self.onCancel then self.onCancel() end
   elseif input:wasPressed("a") and #party > 0 then
     local mon = party[self.index]
+    if followerUnavailable(self.game, mon) then
+      refuseUnavailable(self)
+      return
+    end
     if self.softboiledFrom then
       local user = party[self.softboiledFrom]
       local heal = math.floor(user.stats.hp / 5)
@@ -781,7 +762,7 @@ function PartyMenu:draw()
       if mon.hp <= 0 then
         Font.draw(Strings("FNT"), 136, y)
       elseif mon.status then
-        Font.draw(mon.status, 136, y)
+        Font.draw(Status.hudLabelFor(self.game.data.statuses, mon.status), 136, y)
       end
       -- the tile HP bar (DrawHP2 + SetPartyMenuHPBarColor).  grayFill:
       -- tinting the fill AND running it through the row's zone

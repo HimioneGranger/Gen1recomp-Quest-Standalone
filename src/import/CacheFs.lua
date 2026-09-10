@@ -116,6 +116,8 @@ local physfsMountFn = nil
 local function resolveMount()
   if physfsMountFn ~= nil then return physfsMountFn end
   physfsMountFn = false
+  if Platform.isUWP() then return physfsMountFn end
+  if love and love.filesystem and love.filesystem._mounts then return physfsMountFn end
   local ok, ffi = pcall(require, "ffi")
   if not ok then return physfsMountFn end
   pcall(ffi.cdef,
@@ -159,6 +161,8 @@ local physfsUnmountFn = nil
 local function resolveUnmount()
   if physfsUnmountFn ~= nil then return physfsUnmountFn end
   physfsUnmountFn = false
+  if Platform.isUWP() then return physfsUnmountFn end
+  if love and love.filesystem and love.filesystem._mounts then return physfsUnmountFn end
   local ok, ffi = pcall(require, "ffi")
   if not ok then return physfsUnmountFn end
   pcall(ffi.cdef, "int PHYSFS_unmount(const char *oldDir);")

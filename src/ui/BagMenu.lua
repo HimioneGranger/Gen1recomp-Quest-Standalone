@@ -4,6 +4,7 @@
 
 local ItemEffects = require("src.inventory.ItemEffects")
 local ListMenu = require("src.ui.ListMenu")
+local Runtime = require("src.mods.Runtime")
 local TextBox = require("src.render.TextBox")
 
 local BagMenu = {}
@@ -46,7 +47,16 @@ end
 -- the stack, so every exit that prints has to close it afterwards.  For
 -- every other item the picker popped itself first and closePicker's identity
 -- check makes it a no-op (#252).
-local function useOn(game, battle, id, target, list, moveIndex, picker)
+--
+-- Every result string used to fall through to this one unconditional
+-- function with no seam around it: a mod could not suppress a message,
+-- delay it behind a screen of its own, or replace the outcome for one item
+-- id.  The "item.use" hook wraps the whole dispatch (not a name per
+-- result -- a mod deciding what a Poké Doll or a stone does needs the
+-- SAME reach a vanilla `if result == ...` branch has, not a narrower one),
+-- the way "battle.overlay" and "ui.party.submenu" already wrap a
+-- screen's own default behavior elsewhere in src/ui.
+local function vanillaUseOn(game, battle, id, target, list, moveIndex, picker)
   local result, payload, extra = ItemEffects.use(game.data, game.save, id, target,
                                                  battle, moveIndex, game.overworld)
   local function closePicker()
@@ -57,6 +67,14 @@ local function useOn(game, battle, id, target, list, moveIndex, picker)
   if result == "flute_field" then
     require("src.core.Sound").play(game.data, "Pokeflute")
     showMessages(game, payload)
+    return
+  end
+
+  if result == "flute_wake_pikachu" then
+    require("src.core.Sound").play(game.data, "Pokeflute")
+    showMessages(game, payload, function()
+      game.overworld.pikachuPewterSleepScene = nil
+    end)
     return
   end
 
@@ -142,12 +160,9 @@ local function useOn(game, battle, id, target, list, moveIndex, picker)
     list:close()
     local ow = game.overworld
     local p = ow and ow.player
-    if ow and p then
-      local fx, fy = p:facingCell()
-      if ow.map:inBounds(fx, fy) and ow.map:isWaterCell(fx, fy) then
-        ow:goFishing(id)
-        return
-      end
+    if ow and p and ow:facingIsShoreOrWater() then
+      ow:goFishing(id)
+      return
     end
     showMessages(game, { Strings("No good! It's not\neven near water.") })
     return
@@ -176,19 +191,25 @@ local function useOn(game, battle, id, target, list, moveIndex, picker)
       end
       if #target.moves < 4 then
         table.insert(target.moves, { id = moveId, pp = mdef.pp })
+        require("src.core.Sound").play(game.data, "Get_Item1")
         showMessages(game, { Strings("%s learned\n%s!", target.nickname or
           game.data.pokemon[target.species].name, mdef.name) })
         if result == "learn" then consume(game, id) end
+        list.items = buildItems(game)
+        list.index = math.min(list.index, math.max(1, #list.items))
         taught()
       else
         require("src.ui.Screens").push(game, "MoveLearnMenu", target, moveId,
           function(learned)
             if learned and result == "learn" then consume(game, id) end
+            if learned then
+              list.items = buildItems(game)
+              list.index = math.min(list.index, math.max(1, #list.items))
+            end
             if learned then taught() end
           end)
       end
     end
-    list:close()
     teach()
     return
   end
@@ -322,6 +343,7 @@ local function useOn(game, battle, id, target, list, moveIndex, picker)
             local mdef = game.data.moves[moveId]
             if #target.moves < 4 then
               table.insert(target.moves, { id = moveId, pp = mdef.pp })
+              require("src.core.Sound").play(game.data, "Get_Item1")
               local name = target.nickname or def.name
               showMessages(game, { Strings("%s learned\n%s!", name, mdef.name) },
                            nextStep)
@@ -362,6 +384,11 @@ local function useOn(game, battle, id, target, list, moveIndex, picker)
   showMessages(game, payload, closePicker) -- failed
 end
 
+local function useOn(game, battle, id, target, list, moveIndex, picker)
+  return Runtime.call("item.use", vanillaUseOn,
+    game, battle, id, target, list, moveIndex, picker)
+end
+
 local function pickTargetAndUse(game, battle, id, list)
   -- pick a target from the party
   -- the ETHERs and PP UP open the move menu after picking a mon
@@ -370,6 +397,7 @@ local function pickTargetAndUse(game, battle, id, list)
   local def = game.data.items[id]
   local opts = {
     pickOnly = true,
+    battle = battle,
     -- HP medicine animates its bar with the picker still up (#252).  Only
     -- out of battle: the in-battle tail closes the bag list underneath
     -- first, which needs the picker already gone.

@@ -102,20 +102,19 @@ if not headlessOk then error(headlessErr) end
 love = love or require("tests.love_stub")
 
 -- ------- discovery, dependency order, merge
--- "addon" sorts before "base" so only the dependency edge can order them
-_G.MOD_TEST_ORDER = {}
+-- "addon" sorts before "base" so only the dependency edge can order them.
+-- loader.order is the engine's own record of what ran when; a mod cannot
+-- append to a shared global any more (src/mods/Sandbox.lua).
 local files = {
   ["mods/addon/manifest.json"] = manifestJson("addon", '["base"]'),
   ["mods/addon/main.lua"] = [[
 return function(mod)
-  _G.MOD_TEST_ORDER[#_G.MOD_TEST_ORDER + 1] = "addon"
   mod.content.pokemon:override("MODMON", { name = "ADDONMON" })
 end
 ]],
   ["mods/base/manifest.json"] = manifestJson("base"),
   ["mods/base/main.lua"] = [[
 return function(mod)
-  _G.MOD_TEST_ORDER[#_G.MOD_TEST_ORDER + 1] = "base"
   mod.content.pokemon:register("MODMON", { name = "BASEMON" })
   mod.content.music:register("MOD_SONG", { file = "song.ogg" })
 end
@@ -126,7 +125,7 @@ local loader = Loader.new({ fs = memfs(files) })
 check(loader:load(data) == true, "headless load succeeds with injected fs")
 check(loader.mods.addon ~= nil and loader.mods.base ~= nil,
   "discovery finds both mods")
-check(_G.MOD_TEST_ORDER[1] == "base" and _G.MOD_TEST_ORDER[2] == "addon",
+check(loader.order[1] == "base" and loader.order[2] == "addon",
   "topo-sort runs the dependency before its dependent")
 check(data.pokemon.MODMON ~= nil and data.pokemon.MODMON.name == "ADDONMON",
   "registered content merges into data")
@@ -411,6 +410,5 @@ local StateStack = require("src.core.StateStack")
 while StateStack:top() do StateStack:pop() end
 require("src.core.Music").stop()
 Runtime.install(savedEvents, savedHooks)
-_G.MOD_TEST_ORDER = nil
 
 S.finish()

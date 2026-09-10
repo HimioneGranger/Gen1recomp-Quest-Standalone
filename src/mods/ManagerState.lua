@@ -8,6 +8,8 @@ local Font = require("src.render.Font")
 local GameVersion = require("src.core.GameVersion")
 local ModTargets = require("src.mods.ModTargets")
 local Runtime = require("src.mods.Runtime")
+local SafePath = require("src.mods.SafePath")
+local Sandbox = require("src.mods.Sandbox")
 local SaveData = require("src.core.SaveData")
 local Semver = require("src.mods.Semver")
 local Version = require("src.core.Version")
@@ -735,8 +737,7 @@ function ManagerState:toggleGen2Force(m)
   }, apply)
 end
 
--- Where the loader persisted an enable flag: this game's slot once it keeps
--- them per game, the shared flag until then (SaveData.modScope).
+-- Where the loader persists an enable flag: this running game's slot.
 function ManagerState:enableScope()
   return SaveData.modScope((self:targetGame()))
 end
@@ -936,13 +937,18 @@ function ManagerState:schemaFor(m)
   local schema = loader.optionSchemas and loader.optionSchemas[m.id]
   if schema == nil and m.options_schema and m.path
       and loader.fs and loader.fs.load then
-    local chunk = loader.fs.load(m.path .. "/" .. m.options_schema)
-    if chunk then
-      local ok, rows = pcall(chunk)
-      if ok and type(rows) == "table" then
-        schema = rows
-        if loader.optionSchemas then loader.optionSchemas[m.id] = schema end
-      end
+    -- mod-authored code, so it runs in the same sandbox the entry chunk does
+    local ok, rows = pcall(function()
+      local path = SafePath.join(m.path, m.options_schema, "options_schema")
+      local mod = loader.mods and loader.mods[m.id]
+      local env = mod and loader._modEnv and loader:_modEnv(mod)
+        or Sandbox.envFor()
+      local chunk = Sandbox.loadFile(loader.fs, path, env)
+      return chunk and chunk()
+    end)
+    if ok and type(rows) == "table" then
+      schema = rows
+      if loader.optionSchemas then loader.optionSchemas[m.id] = schema end
     end
   end
   return schema
@@ -980,12 +986,15 @@ end
 function ManagerState:buildOptionRows(m, schema)
   local rows = {}
   local modId = m.id
+  local PlatformProfile = require("src.core.PlatformProfile")
   for _, row in ipairs(schema) do
     if type(row) ~= "table" or type(row.key) ~= "string" or row.key == ""
         or not OPTION_TYPES[row.type] then
       -- malformed rows are skipped, reported where the errors screen reads
       Runtime.reportError(modId, "options row skipped: "
         .. tostring(type(row) == "table" and (row.key or row.type) or row))
+    elseif not PlatformProfile.optionRowSupported(row) then
+      -- Hidden only: do not rewrite a saved desktop choice.
     elseif row.type == "toggle" then
       rows[#rows + 1] = { id = row.key, label = row.label or row.key,
         value = function()
@@ -1249,6 +1258,7 @@ function ManagerState:drawOverlay()
   love.graphics.rectangle("fill", 2 * 8, ty * 8, 16 * 8, th * 8)
   love.graphics.setColor(1, 1, 1, 1)
   Font.drawBox(2, ty, 16, th)
+  love.graphics.setColor(0, 0, 0, 1)
   for i, line in ipairs(lines) do
     drawTruncated(line, 4 * 8, (ty + i) * 8, 14)
   end
@@ -1277,6 +1287,7 @@ function ManagerState:draw()
   love.graphics.rectangle("fill", 0, 0, 160, 144)
   love.graphics.setColor(1, 1, 1, 1)
   Font.drawBox(0, 0, 20, 18)
+  love.graphics.setColor(0, 0, 0, 1)
   Font.draw(self.banner or Strings("MOD MANAGER"), 16, 8)
   if self.screen == "list" then
     self:drawList()

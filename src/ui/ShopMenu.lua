@@ -13,6 +13,7 @@ local ListMenu = require("src.ui.ListMenu")
 local Menu = require("src.ui.Menu")
 local QuantityBox = require("src.ui.QuantityBox")
 local Strings = require("src.core.Strings")
+local romText = require("src.core.RomText")
 
 local ShopMenu = {}
 
@@ -57,7 +58,8 @@ local function buy(game, stock)
           end
           local cost = qty * def.price
           -- _PokemartTellBuyPriceText + yes/no confirm
-          list.footer = Strings("%s?\nThat will be\n¥%d. OK?", def.name, cost)
+          list.footer = romText(game.data, "_PokemartTellBuyPriceText",
+            "%s?\nThat will be\n¥%d. OK?", def.name, cost)
           game.stack:push(ChoiceBox.new(game, function(yes)
             if not yes then
               list.footer = greet
@@ -104,6 +106,27 @@ local function sell(game)
     dialogue = true,
     money = function() return game.save.money end,
     footer = greet,
+    onSelectKey = function(item, l)
+      if not item then return end
+      if not l.swapIndex then
+        l.swapIndex = l.index
+        return
+      end
+      local order = Bag.order(game.save)
+      order[l.swapIndex], order[l.index] = order[l.index], order[l.swapIndex]
+      l.swapIndex = nil
+      require("src.core.Sound").play(game.data, "Swap")
+      local rebuilt = {}
+      for _, id in ipairs(order) do
+        local def = game.data.items[id]
+        rebuilt[#rebuilt + 1] = {
+          value = id,
+          label = def and def.name or id,
+          right = "x" .. game.save.inventory[id],
+        }
+      end
+      l.items = rebuilt
+    end,
     onChoose = function(item)
       local def = game.data.items[item.value]
       -- only key items and HMs are unsellable (pokemart.asm IsKeyItem /
@@ -126,7 +149,8 @@ local function sell(game)
             return
           end
           -- _PokemartTellSellPriceText + yes/no confirm
-          list.footer = Strings("I can pay you\n¥%d for that.", unit * qty)
+          list.footer = romText(game.data, "_PokemartTellSellPriceText",
+            "I can pay you\n¥%d for that.", unit * qty)
           game.stack:push(ChoiceBox.new(game, function(yes)
             if not yes then
               list.footer = greet

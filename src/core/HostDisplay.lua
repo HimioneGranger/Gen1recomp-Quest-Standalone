@@ -12,7 +12,7 @@
 --
 -- `kind` is "editor", "touch_editor", "launcher", or "game". `subject` is
 -- the object whose existing draw method runs between beginFrame and endFrame.
-local HostDisplay = {}
+local HostDisplay = { API_VERSION = 1 }
 
 local backend
 
@@ -32,6 +32,9 @@ function HostDisplay.setBackend(value)
   if value ~= nil and type(value) ~= "table" then
     error("host display backend must be a table or nil", 2)
   end
+  if value and value.apiVersion ~= HostDisplay.API_VERSION then
+    error("unsupported host display API version", 2)
+  end
   backend = value
 end
 
@@ -48,6 +51,35 @@ end
 function HostDisplay.endFrame(kind, subject)
   local fn = backend and backend.endFrame
   if fn then return fn(backend, kind, subject) end
+end
+
+function HostDisplay.cancelFrame(kind, subject, reason)
+  local fn = backend and backend.cancelFrame
+  if fn then return fn(backend, kind, subject, reason) end
+end
+
+-- Bracket one draw with exactly one end-or-cancel callback. A backend that
+-- starts native work and then throws is still offered the cleanup path.
+function HostDisplay.render(kind, subject, draw)
+  if type(draw) ~= "function" then
+    error("host display draw must be a function", 2)
+  end
+  local ok, result = xpcall(function()
+    HostDisplay.beginFrame(kind, subject)
+    return draw()
+  end, debug.traceback)
+  if not ok then
+    pcall(HostDisplay.cancelFrame, kind, subject, result)
+    error(result, 0)
+  end
+  local ended, endResult = xpcall(function()
+    return HostDisplay.endFrame(kind, subject)
+  end, debug.traceback)
+  if not ended then
+    pcall(HostDisplay.cancelFrame, kind, subject, endResult)
+    error(endResult, 0)
+  end
+  return result
 end
 
 return HostDisplay

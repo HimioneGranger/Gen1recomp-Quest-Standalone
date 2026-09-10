@@ -33,6 +33,15 @@ end
 local HEAL_AMOUNT = { POTION = 20, SUPER_POTION = 50, HYPER_POTION = 200 }
 local X_STAT = { X_ATTACK = "attack", X_DEFEND = "defense", X_SPEED = "speed" }
 
+-- Strings.source, not Strings: harvested at require time so the catalog
+-- generator can see the literal, same pattern as MoveEffects.lua's
+-- STAT_LABEL (#811) -- Strings(stat:upper()) alone is a dynamic argument
+-- the harvester can't discover.
+local STAT_LABEL = {
+  attack = Strings.source("ATTACK"), defense = Strings.source("DEFENSE"),
+  speed = Strings.source("SPEED"),
+}
+
 -- The trainer's ai_classes record from the merged registry; the direct
 -- require covers battles built without a loader.  A trainer record's
 -- aiClass field picks a record other than its own id.
@@ -124,7 +133,7 @@ function TrainerAI.useItem(battle, item)
   elseif X_STAT[item] then
     local stat = X_STAT[item]
     enemy.stages[stat] = math.min(6, (enemy.stages[stat] or 0) + 1)
-    table.insert(msgs, Strings("%s's\n%s rose!", displayName(enemy), stat:upper()))
+    table.insert(msgs, Strings("%s's\n%s rose!", displayName(enemy), Strings(STAT_LABEL[stat])))
   elseif item == "GUARD_SPEC" then
     enemy.mist = true
     table.insert(msgs, Strings("%s's\nprotected against\nstat changes!", displayName(enemy)))

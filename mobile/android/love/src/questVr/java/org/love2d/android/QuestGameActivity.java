@@ -18,6 +18,11 @@ public class QuestGameActivity extends GameActivity {
     }
 
     @Override
+    protected String getHostModule() {
+        return "src.quest.compat.HostAdapterV1";
+    }
+
+    @Override
     protected void onHostCreateAfterSDL(Bundle savedInstanceState) {
         nativeQuestXrSetActivity(this);
         nativeQuestXrStartBootstrap();

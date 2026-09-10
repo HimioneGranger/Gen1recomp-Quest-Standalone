@@ -22,6 +22,7 @@ local Chrome = require("src.ui.gen2.Chrome")
 local Logger = require("src.core.Logger")
 local Runtime = require("src.mods.Runtime")
 local Save = require("src.core.gen2.Save")
+local PlatformProfile = require("src.core.PlatformProfile")
 
 local OptionsMenu = {}
 OptionsMenu.__index = OptionsMenu
@@ -258,6 +259,13 @@ function OptionsMenu.new(game, opts)
   else
     Logger.error("ui.options.rows returned %s; keeping the vanilla rows",
                  type(hooked))
+  end
+  if PlatformProfile.isQuestStandalone() then
+    local filtered = {}
+    for _, row in ipairs(rows) do
+      if PlatformProfile.optionRowSupported(row) then filtered[#filtered + 1] = row end
+    end
+    rows = filtered
   end
   self.rows = rows
   self.options = opts.options or Save.defaultOptions()

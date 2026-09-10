@@ -139,10 +139,11 @@ local files = {
   ["mods/probe/manifest.json"] =
     '{"id":"probe","name":"probe","version":"1.0.0",'
       .. '"entry":"main.lua","api":2,"profile":"content"}',
+  -- mod.exports, not _G: a mod's globals are its own (src/mods/Sandbox.lua)
   ["mods/probe/main.lua"] = [[
 return function(mod)
-  _G.MOD_CHECKPOINTS = mod.checkpoints
-  _G.MOD_HOOKS = mod.hooks
+  mod.exports.checkpoints = mod.checkpoints
+  mod.exports.hooks = mod.hooks
 end
 ]],
 }
@@ -150,12 +151,14 @@ local game, ow = makeGame()
 local loader = Loader.new({ fs = memfs(files) })
 loader.game = game
 T.check(loader:load({}) == true, "checkpoint fixture mod loads")
-local checkpoints = _G.MOD_CHECKPOINTS
+local checkpoints = (loader.exports.probe or {}).checkpoints
+local hooks = (loader.exports.probe or {}).hooks
 T.check(type(checkpoints) == "table",
   "Loader exposes mod.checkpoints through the public mod object")
+T.check(type(hooks) == "table",
+  "Loader exposes mod.hooks through the sandboxed public exports")
 if type(checkpoints) ~= "table" then
   Runtime.events, Runtime.hooks = savedEvents, savedHooks
-  _G.MOD_CHECKPOINTS = nil
   T.finish()
 end
 
@@ -357,11 +360,13 @@ T.same(checkpoints:capture(game), beforeFailure,
 -- The same public facade must carry a real battle checkpoint end to end. The
 -- engine-side fixture is deliberately constructed outside the probe mod; the
 -- mod sees and calls only mod.checkpoints.
-local function makeBattleGame()
+local function makeBattleGame(kind)
   local data = Fixtures.fresh()
   local save = SaveData.newGame()
   save.meta.playthroughId = "public-battle-playthrough"
-  save.party = { Pokemon.new(data, "FIXMON_A", 20) }
+  save.party = { Pokemon.new(data, "FIXMON_A", 20),
+    Pokemon.new(data, "FIXMON_B", 19),
+    Pokemon.new(data, "FIXMON_C", 18) }
   -- The tiny fixture registry intentionally omits several full-game defaults.
   -- Normalize those once, then place the save on its fixture map.
   SaveData.validate(save, data)
@@ -386,7 +391,8 @@ local function makeBattleGame()
     self.player = { cellX = x, cellY = y, facing = facing, surfing = false }
   end
   function battleOw:restoreBattleContinuation(restoredBattle, origin)
-    if origin.kind ~= "wild_encounter" or origin.map ~= self.map.id then
+    local expected = kind == "trainer" and "trainer_encounter" or "wild_encounter"
+    if origin.kind ~= expected or origin.map ~= self.map.id then
       return false
     end
     restoredBattle.onFinish = function() end
@@ -396,9 +402,19 @@ local function makeBattleGame()
     data = data, save = save, stack = stack, overworld = battleOw,
   }, { __index = GameMethods })
   stack.states[1] = battleOw
-  local battle = BattleState.newWild(battleGame, "FIXMON_B", 12)
+  local battle
+  if kind == "trainer" then
+    battle = BattleState.newTrainer(battleGame, "OPP_FIX_YOUNGSTER", 1, {
+      playerPartyIndices = { 2, 3 },
+    })
+  else
+    battle = BattleState.newWild(battleGame, "FIXMON_B", 12)
+  end
   battle.phase, battle.queue = "menu", {}
-  battle.checkpointOrigin = { kind = "wild_encounter", map = "FIX_TOWN" }
+  battle.checkpointOrigin = kind == "trainer"
+    and { kind = "trainer_encounter", map = "FIX_TOWN", npcId = "TRAINER_1",
+      trainerClass = "OPP_FIX_YOUNGSTER", partyIndex = 1 }
+    or { kind = "wild_encounter", map = "FIX_TOWN" }
   battle.musicKind = battle:computeMusicKind()
   battle.onFinish = function() end
   stack.states[2] = battle
@@ -436,11 +452,68 @@ if battleSnapshot then
     "public battle capture/restore/capture is a normalized differential roundtrip")
 end
 
+checkpointRngState = "scoped-trainer-rng-A"
+local scopedGame = makeBattleGame("trainer")
+local scopedSnapshot, scopedCaptureCode = checkpoints:capture(scopedGame)
+T.check(scopedSnapshot ~= nil,
+  "public checkpoints capture a scoped trainer battle: "
+    .. tostring(scopedCaptureCode))
+if scopedSnapshot then
+  T.same(scopedSnapshot.runtime.battle.playerPartyIndices, { 2, 3 },
+    "capture stores the battle-local save-party index scope")
+  local scopedRestored, code, message = checkpoints:restore(scopedGame,
+    scopedSnapshot)
+  T.check(scopedRestored == true,
+    "public checkpoints restore a scoped trainer battle: "
+      .. tostring(code) .. " / " .. tostring(message))
+  local restoredScoped = scopedGame.stack:top()
+  T.same(restoredScoped.playerPartyIndices, { 2, 3 },
+    "restore reconstructs the same ordered party scope")
+  T.check(restoredScoped.playerParty[1] == scopedGame.save.party[2]
+      and restoredScoped.playerParty[2] == scopedGame.save.party[3],
+    "restored scope points at authoritative save-party records")
+
+  scopedSnapshot.runtime.battle.playerPartyIndices = nil
+  local oldRestored, oldCode = checkpoints:restore(scopedGame, scopedSnapshot)
+  T.check(oldRestored == true,
+    "an old checkpoint without party scope remains compatible: "
+      .. tostring(oldCode))
+  T.eq(scopedGame.stack:top().playerParty, nil,
+    "an old checkpoint restores the vanilla full-party view")
+end
+
+local function scopedCheckpoint()
+  local freshGame = makeBattleGame("trainer")
+  local snapshot = assert(checkpoints:capture(freshGame))
+  return freshGame, snapshot
+end
+
+local excludedGame, excludedSnapshot = scopedCheckpoint()
+excludedSnapshot.runtime.battle.player.index = 1
+local excludedRestored, excludedCode = checkpoints:restore(excludedGame,
+  excludedSnapshot)
+T.check(excludedRestored == false and excludedCode == "invalid_checkpoint",
+  "a scoped checkpoint rejects an active battler outside the eligible view")
+
+local malformedGame, malformedSnapshot = scopedCheckpoint()
+malformedSnapshot.runtime.battle.playerPartyIndices.extra = 3
+local malformedRestored, malformedCode = checkpoints:restore(malformedGame,
+  malformedSnapshot)
+T.check(malformedRestored == false and malformedCode == "invalid_checkpoint",
+  "a scoped checkpoint rejects non-array scope members instead of failing open")
+
+local participantGame, participantSnapshot = scopedCheckpoint()
+participantSnapshot.runtime.battle.participants = { 1 }
+local participantRestored, participantCode = checkpoints:restore(
+  participantGame, participantSnapshot)
+T.check(participantRestored == false and participantCode == "invalid_checkpoint",
+  "a scoped checkpoint rejects excluded participant references")
+
 -- The mod receives the normal public hook facade, never BattleState. START
 -- at the restored safe decision reaches its semantic auxiliary action without
 -- selecting a native command.
 local auxiliaryCalls = 0
-_G.MOD_HOOKS:wrap("battle.menu_auxiliary", function(nextFn, liveGame, context)
+hooks:wrap("battle.menu_auxiliary", function(nextFn, liveGame, context)
   auxiliaryCalls = auxiliaryCalls + 1
   T.check(liveGame == battleGame, "public battle auxiliary action receives the game")
   T.same(context, { kind = "wild" }, "public auxiliary context is data-only")
@@ -456,8 +529,6 @@ T.eq(boundary.menuIndex, originalMenuIndex, "public auxiliary hook preserves cur
 
 Runtime.events, Runtime.hooks = savedEvents, savedHooks
 Runtime.currentMod = nil
-_G.MOD_CHECKPOINTS = nil
-_G.MOD_HOOKS = nil
 love.math.getRandomState = oldGetRandomState
 love.math.setRandomState = oldSetRandomState
 

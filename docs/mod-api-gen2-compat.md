@@ -96,14 +96,14 @@ The launcher asks the same question of a mod's dependencies: one whose hard
 dependency does not run on the selected game reads `Needs <id> (not for Gold)`,
 matching the loader's contagious skip.
 
-A separate overlay, `options.modsByVersion[version][id]`, is where a per-game
-enable flag will live. It is a preview: `SaveData.PER_VERSION_MODS` is `false`,
-so `SaveData.modScope` answers nil for every caller and the launcher panel, the
-in-game manager and the loader all read *and* write the one shared
-`options.mods` flag. Nothing consults the overlay for enablement until that
-flips, which is deliberate: the overlay is plantable from an imported
-`.g1rmodlist`, and a reader scoped differently from the writers would show a
-mod set no boot would honour.
+A separate overlay, `options.modsByVersion[version][id]`, holds each game's
+enable flag. The launcher shows a coloured Red / Blue / Yellow / Gold checkbox
+for every installed mod, and the loader and in-game manager read the same
+game-specific answer on the next boot. On the first launch after this feature,
+the existing shared state is copied to every game, so a mod that was enabled
+remains enabled everywhere; after that, changing one checkbox affects only
+that game. New mods still default to enabled on every game (experimental mods
+retain their explicit opt-in default).
 
 That is deliberate. Gold reimplements the battle engine, the overworld, the
 script VM and the save format, so a Gen 1 mod dropped into a Gold boot would

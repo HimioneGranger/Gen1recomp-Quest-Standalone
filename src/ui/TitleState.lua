@@ -9,6 +9,7 @@ local GameVersion = require("src.core.GameVersion")
 local Strings = require("src.core.Strings")
 local Runtime = require("src.mods.Runtime")
 local Logger = require("src.core.Logger")
+local PlatformProfile = require("src.core.PlatformProfile")
 
 local TitleState = {}
 TitleState.__index = TitleState
@@ -43,6 +44,28 @@ local function withWhiteOf(pal, ref)
   return { ref[1], pal[2], pal[3], pal[4] }
 end
 
+-- Every drawn box, not just the topmost state's: DisplayContinueGameInfo
+-- leaves the menu box up behind the info window (main_menu.asm:36-39), so both
+-- are on screen and both need the overlay below.
+local function titleUiBoxes(game)
+  local stack = game and game.stack
+  local states = stack and stack.states
+  if not states then
+    local top = stack and stack.top and stack:top()
+    local box = top and top.titleUiBox
+    return box and { box } or {}
+  end
+  local boxes = {}
+  for i = (stack.visibleBase and stack:visibleBase() or 1), #states do
+    local state = states[i]
+    local shown = not stack.renderVisible or stack:renderVisible(state)
+    if shown and state and state.titleUiBox then
+      boxes[#boxes + 1] = state.titleUiBox
+    end
+  end
+  return boxes
+end
+
 function TitleState:sgbPalettes(game)
   local P = require("src.render.PaletteFX")
   local z
@@ -65,16 +88,14 @@ function TitleState:sgbPalettes(game)
       P.zone(P.pal(game.data, "MEWMON"), 0, 10, 19, 17),
     }
   end
-  local top = game.stack and game.stack:top()
-  local box = top and top.titleUiBox
-  if box then
-    -- A DMG-grays zone, not the trueColor opt-out: through the shade-remap
-    -- shader GRAYS is the identity for the box's four shades, so SGB /
-    -- ADVANCED / OG modes keep #133's white paper and black ink exactly,
-    -- while effectiveColors still substitutes the mono and inverted display
-    -- modes -- a trueColor rect skipped the shader entirely, leaving the
-    -- main menu and CONTINUE info box a raw white hole over a CLASSIC
-    -- pea-green title instead of matching it like the START menu does (#870).
+  -- A DMG-grays zone, not the trueColor opt-out: through the shade-remap
+  -- shader GRAYS is the identity for the box's four shades, so SGB /
+  -- ADVANCED / OG modes keep #133's white paper and black ink exactly,
+  -- while effectiveColors still substitutes the mono and inverted display
+  -- modes -- a trueColor rect skipped the shader entirely, leaving the
+  -- main menu and CONTINUE info box a raw white hole over a CLASSIC
+  -- pea-green title instead of matching it like the START menu does (#870).
+  for _, box in ipairs(titleUiBoxes(game)) do
     z[#z + 1] = P.zone(P.GRAYS, box[1], box[2], box[3], box[4])
   end
   return z[3] and z or nil
@@ -175,6 +196,8 @@ function TitleState.new(game, opts)
   opts = opts or {}
   local self = setmetatable({}, TitleState)
   self.game = game
+  self.letterboxWhite = PlatformProfile.isQuestStandalone()
+  self.questLetterboxWhite = self.letterboxWhite
   self.onNewGame = opts.onNewGame
   self.onContinue = opts.onContinue
   -- branding comes from field.title with the shipped art as fallback, so
@@ -200,8 +223,9 @@ function TitleState.new(game, opts)
   self.versionFull = imagePath(title.versionRibbon) ~= nil
   self.version = tryImage(imagePath(title.versionRibbon or title.version)
                           or "assets/generated/title/red_version.png")
-  self.player = tryImage(imagePath(title.player)
-                         or "assets/generated/title/player.png")
+  self.playerPath = imagePath(title.player)
+                    or "assets/generated/title/player.png"
+  self.player = tryImage(self.playerPath)
   -- ..(engine/movie/title2.asm ln 85)
   if self.player then
     local pw, ph = self.player:getDimensions()
@@ -597,6 +621,12 @@ end
 
 -- ..(engine/movie/title.asm ln 28)
 function TitleState:draw()
+  local PaletteFX = require("src.render.PaletteFX")
+  local playerImage = self.player
+  if playerImage and PaletteFX.usesSpriteObp() then
+    playerImage = require("src.render.SpriteRenderer").obpImage(
+      self.playerPath, PaletteFX.ogObj())
+  end
   love.graphics.setColor(1, 1, 1, 1)
   love.graphics.rectangle("fill", 0, 0, 160, 144)
   local scrollY = -(self.scy or 0)
@@ -660,8 +690,8 @@ function TitleState:draw()
       -- layout has no cycling mon and no Red art (title_yellow.asm).
       if spriteTrueColor then
         local cover
-        if self.player then
-          local pw, ph = self.player:getDimensions()
+        if playerImage then
+          local pw, ph = playerImage:getDimensions()
           cover = { 82, 80, pw, ph }
         end
         markVisibleTrueColor(x, y, w, h, cover)
@@ -670,11 +700,11 @@ function TitleState:draw()
     -- Red is OAM in the original: he draws over the mon's box edge
     if self.playerQuads then
       for _, part in ipairs(self.playerQuads) do
-        love.graphics.draw(self.player, part[1], 82 + part[2], 80 + part[3])
+        love.graphics.draw(playerImage, part[1], 82 + part[2], 80 + part[3])
       end
-      love.graphics.draw(self.player, self.ballQuad, 82, self.ballY)
-    elseif self.player then
-      love.graphics.draw(self.player, 82, 80)
+      love.graphics.draw(playerImage, self.ballQuad, 82, self.ballY)
+    elseif playerImage then
+      love.graphics.draw(playerImage, 82, 80)
     end
   end
   self:drawCopyright(136 + (preRibbon and 0 or scrollY))

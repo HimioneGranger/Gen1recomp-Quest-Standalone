@@ -9,6 +9,7 @@ local Collision = require("src.world.Collision")
 local Encounter = require("src.world.Encounter")
 local FieldDefaults = require("src.world.FieldDefaults")
 local GameVersion = require("src.core.GameVersion")
+local GameViewport = require("src.render.GameViewport")
 local Logger = require("src.core.Logger")
 local Map = require("src.world.Map")
 local MapLoader = require("src.world.MapLoader")
@@ -230,6 +231,7 @@ function OverworldState:enter(mapId, x, y, facing, opts)
   -- a fresh entry, or a stale flag can freeze player input forever
   self.engaging = false
   self.emote = nil
+  self.cancelledTrainerSight = nil
   -- volatile WRAM state in pokered; never serialize across save/load
   self.wildEncounterGraceSteps = 0
   -- survives save/load: a loaded game may start inside a building whose
@@ -326,6 +328,10 @@ function OverworldState:setMap(mapId, x, y, facing, opts)
     MapLoader.invalidateAll()
   end
   self.map = MapLoader.load(Game.data, mapId)
+  -- EnterMap -> ClearVariablesOnEnterMap zeroes wStepCounter
+  -- (engine/overworld/clear_variables.asm:7), but a connection crossing
+  -- never reaches EnterMap (home/overworld.asm:675 .loadNewMap)
+  if not (opts and opts.seamless) then Game.save.poisonSteps = 0 end
   -- STRENGTH deactivates on every real map load (home/overworld.asm
   -- EnterMap -> ResetUsingStrengthOutOfBattleBit clears BIT_STRENGTH_ACTIVE
   -- of wStatusFlags1).  setMap is the single choke point for every map-id
@@ -753,6 +759,68 @@ function OverworldState:bikeAllowed(mapId)
   return false
 end
 
+-- Field-item entry points keep presentation and state transitions in the
+-- owning world instead of asking a public facade to reproduce either one.
+function OverworldState:useBicycle()
+  local name = Game.save.player.name
+  if Game.save.onBike then
+    if Game.save.forcedBike then return false end
+    Game.save.onBike = false
+    require("src.core.Music").playMap(Game.data, self.map.id, false)
+    Game.stack:push(TextBox.new(Game,
+      Strings("%s got off\nthe BICYCLE.", name)))
+  elseif self:bikeAllowed(self.map.id) and not self.player.surfing then
+    Game.save.onBike = true
+    require("src.core.Music").playMap(Game.data, self.map.id, true)
+    Game.stack:push(TextBox.new(Game,
+      Strings("%s got on\nthe BICYCLE!", name)))
+  else
+    return false
+  end
+  return true
+end
+
+-- Field-move entry points keep presentation and state transitions in the
+-- overworld. The party menu and supported mod facade both call these, so a
+-- shortcut cannot drift from the game's own move flow.
+function OverworldState:useFlashFieldMove(onClose)
+  -- A FLASH used in daylight must not carry into the next dark map. Lighting
+  -- also happens before the blink: setDark can rebuild an ADVANCED atlas.
+  local wasDark = self.dark
+  if wasDark then Game.save.flashLit = true end
+  Game.stack:push(TextBox.new(Game,
+    Game.data.text._FlashLightsAreaText
+      or Strings("A blinding FLASH\nlights the area!"), function()
+      if onClose then onClose() end
+      if wasDark then self:setDark(false) end
+      Game.stack:push(Transition.whiteFlash(Game))
+    end))
+  return true
+end
+
+function OverworldState:useStrengthFieldMove(mon, onClose)
+  mon = mon or self:partyKnows("STRENGTH")
+  if not mon then return false end
+  local def = Game.data.pokemon[mon.species]
+  local name = mon.nickname or def.name
+  self.strengthActive = true
+  local first = (Game.data.text._UsedStrengthText
+    or Strings("{RAM:wNameBuffer} used\nSTRENGTH."))
+    :gsub("{RAM:wNameBuffer}", name)
+  local second = (Game.data.text._CanMoveBouldersText
+    or Strings("{RAM:wNameBuffer} can\nmove boulders."))
+    :gsub("{RAM:wNameBuffer}", name)
+  Game.stack:push(TextBox.new(Game, first, function()
+    Game.stack:push(TextBox.new(Game, second, function()
+      if onClose then onClose() end
+      Game.stack:push(Transition.whiteFlash(Game))
+    end))
+  end, { auto = { sound = function()
+    return require("src.core.Sound").playCry(Game.data, mon.species)
+  end } }))
+  return true
+end
+
 -- The battle transition's dungeon wipe uses the explicit map lists in
 -- data/maps/dungeon_maps.asm (field.dungeonTransitionMaps): singles plus
 -- inclusive map-id ranges -- faithful to the original's omissions
@@ -1087,6 +1155,7 @@ function OverworldState:update(dt)
   -- the player lands on desk Oak.
   local scripted = self.runner:isRunning() or #self.scriptMoves > 0
                    or self.engaging or self.emote or self.teleportOut
+                   or self.flyAnim or self.flyArrive
   if not scripted and not self.transitioning then
     self:checkTrainerSight()
     -- CheckFightingMapTrainers (home/trainers.asm) zeroes hJoyHeld and
@@ -1095,6 +1164,7 @@ function OverworldState:update(dt)
     -- the player can never start another step after being spotted.
     scripted = self.runner:isRunning() or #self.scriptMoves > 0
                or self.engaging or self.emote or self.teleportOut
+               or self.flyAnim or self.flyArrive
   end
   if not scripted and not self.transitioning then
     self:handleInput()
@@ -1664,6 +1734,10 @@ end
 -- Goldeen/Poliwag L10; Super Rod uses the map's extracted fishing group
 -- (no group means "Not even a nibble!").
 function OverworldState:goFishing(rod)
+  if GameVersion.isYellow() then
+    Game.save.pikachuEmotionModifier = 2
+    Game.save.pikachuMood = 0x81
+  end
   local pool, always = fishingPool(Game.data, rod, self.map.id)
   local enc
   if Runtime.wantsHook("encounter.fishing") then
@@ -1708,6 +1782,12 @@ function OverworldState:goFishing(rod)
       self:pushBattle(battle)
     end))
   end))
+end
+
+function OverworldState:useFishingRod(rod)
+  if self.player.surfing or not self:facingIsShoreOrWater() then return false end
+  self:goFishing(rod)
+  return true
 end
 
 -- Fly to a visited town (called from the party menu).
@@ -1973,7 +2053,8 @@ function OverworldState:tryHiddenObject(fx, fy)
         -- leaves the spot unfound; _CantCarryMoreText is the Toss line (#872)
         local name = Game.data.items[h.item] and Game.data.items[h.item].name or h.item
         Game.stack:push(TextBox.new(Game,
-          Strings("%s found\n%s!", save.player.name, name) .. "\f"
+          romText(Game.data, "_FoundHiddenItemText", "%s found\n%s!",
+            save.player.name, name) .. "\f"
           .. romText(Game.data, "_HiddenItemBagFullText",
                      "But, {PLAYER} has\nno more room for\vother items!")))
         return true
@@ -1983,7 +2064,8 @@ function OverworldState:tryHiddenObject(fx, fy)
       -- hidden items always play SFX_GET_ITEM_2 (hidden_items.asm)
       require("src.core.Sound").play(Game.data, "Get_Item2")
       Game.stack:push(TextBox.new(Game,
-        Strings("%s found\n%s!", save.player.name, name)))
+        romText(Game.data, "_FoundHiddenItemText", "%s found\n%s!",
+          save.player.name, name)))
       return true
     end
   end
@@ -2455,6 +2537,15 @@ function OverworldState:trySurf(fx, fy, onClose)
   end))
 end
 
+function OverworldState:stopSurfing(onClose)
+  if onClose then onClose() end
+  self.player.surfing = false
+  require("src.core.Music").setSurfing(Game.data, false)
+  Game.stack:push(Transition.whiteFlash(Game, nil, function()
+    self:stepForwardOrCrossEdge(self.player.facing)
+  end))
+end
+
 function OverworldState:tryCut(fx, fy)
   -- UsedCut (engine/overworld/cut.asm) gates on the TILESET before
   -- anything else: only OVERWORLD (tree tile $3d) and GYM (plant tile
@@ -2628,8 +2719,8 @@ function OverworldState:talkTo(npc)
         "No more room for\nitems!")
       if GameVersion.isYellow() then
         local name = Game.data.items[d.item] and Game.data.items[d.item].name or d.item
-        noRoom = Strings("%s found\n%s!", Game.save.player.name, name)
-                 .. "\f" .. noRoom
+        noRoom = romText(Game.data, "_FoundItemText", "%s found\n%s!",
+                   Game.save.player.name, name) .. "\f" .. noRoom
       end
       Game.stack:push(TextBox.new(Game, noRoom))
       return
@@ -2647,7 +2738,8 @@ function OverworldState:talkTo(npc)
     require("src.core.Sound").play(Game.data,
       (ddef and ddef.keyItem) and "Get_Key_Item" or "Get_Item1")
     Game.stack:push(TextBox.new(Game,
-      Strings("%s found\n%s!", Game.save.player.name, name)))
+      romText(Game.data, "_FoundItemText", "%s found\n%s!",
+        Game.save.player.name, name)))
     return
   end
 
@@ -2905,6 +2997,11 @@ end
 -- POKéMON" and "fighting fit".
 function OverworldState:nurseHeal(onDone, npc)
   local t = Game.data.text
+  if self.map.id == "PEWTER_POKECENTER" and self.pikachuPewterSleepScene then
+    Game.stack:push(TextBox.new(Game,
+      t._LooksContentText or Strings("PIKACHU looks\ncontent."), onDone))
+    return
+  end
   local bye = t._PokemonCenterFarewellText or romText(Game.data, "_PokemonCenterFarewellText", "We hope to see\nyou again!")
   local hello = t._PokemonCenterWelcomeText
                 or Strings("Welcome to our\nPOKéMON CENTER!")
@@ -2978,9 +3075,13 @@ function OverworldState:finishNurseHeal(bye, onDone, npc)
       end))
     end
     if not npc then farewell() return end
-    npc.facing = "up"
+    npc.frameOverride = 3
     -- bubble = false is the silent world hold, this port's DelayFrames
-    self.emote = { npc = npc, frames = 20, bubble = false, onDone = farewell }
+    self.emote = { npc = npc, frames = 20, bubble = false, onDone = function()
+      npc.frameOverride = nil
+      npc:facePlayer(self.player)
+      farewell()
+    end }
   end))
 end
 
@@ -2992,6 +3093,11 @@ end
 -- for the original serial handshake; declining prints "Please come again!"
 function OverworldState:cableClubReceptionist(onDone)
   local t = Game.data.text
+  if self.map.id == "PEWTER_POKECENTER" and self.pikachuPewterSleepScene then
+    Game.stack:push(TextBox.new(Game,
+      t._LooksContentText or Strings("PIKACHU looks\ncontent."), onDone))
+    return
+  end
   local welcome = t._CableClubNPCWelcomeText or romText(Game.data, "_CableClubNPCWelcomeText", "Welcome to the\nCable Club!")
   if not Game.save.flags.EVENT_GOT_POKEDEX then
     -- CableClubNPC .didNotConnect path before the pokedex
@@ -3060,6 +3166,32 @@ local function meetTrainerTheme(cls)
          or "Music_MeetMaleTrainer"
 end
 
+-- Public pre-trainer gate. A mod may retain continueBattle while a registered
+-- preparation screen is on top, then resume once with an optional ordered
+-- save-party index scope. The hook is cold on a no-mod boot.
+function OverworldState.prepareTrainerBattle(game, context, startBattle,
+    cancelBattle)
+  if not Runtime.wantsHook("trainer.before_battle") then
+    startBattle()
+    return false
+  end
+  local started = false
+  local function continueBattle(options)
+    if started then return false end
+    started = true
+    if type(options) == "table" and options.cancel == true then
+      if cancelBattle then cancelBattle() end
+    else
+      startBattle(options)
+    end
+    return true
+  end
+  local deferred = Runtime.call("trainer.before_battle",
+    function() return false end, game, context, continueBattle)
+  if deferred ~= true and not started then continueBattle() end
+  return deferred == true
+end
+
 -- Run the pre-battle text -> battle -> won text -> flags sequence.
 -- skipBattleText is for map scripts shaped like SilphCo11FDefaultScript
 -- (scripts/SilphCo11F.asm), which DisplayTextID the challenge line BEFORE
@@ -3087,7 +3219,8 @@ function OverworldState:engageTrainer(npc, onDone, endBattleText, skipBattleText
                   or (header and header.won and Game.data.text[header.won])
 
   local BattleState = require("src.battle.BattleState")
-  local function startBattle()
+  local function startBattle(options)
+    self.cancelledTrainerSight = nil
     -- TalkToTrainer (home/trainers.asm:88) prints the before-battle text
     -- FIRST and only then runs `call EngageMapTrainer` / `jp
     -- StartTrainerBattle`, so a trainer challenged on foot gets the sting
@@ -3102,7 +3235,8 @@ function OverworldState:engageTrainer(npc, onDone, endBattleText, skipBattleText
       local theme = meetTrainerTheme(d.trainerClass)
       if theme then require("src.core.Music").play(Game.data, theme) end
     end
-    local battle = BattleState.newTrainer(Game, d.trainerClass, d.trainerParty)
+    local battle = BattleState.newTrainer(Game, d.trainerClass, d.trainerParty,
+      options)
     battle.checkpointOrigin = {
       kind = "trainer_encounter",
       map = self.map.id,
@@ -3139,10 +3273,31 @@ function OverworldState:engageTrainer(npc, onDone, endBattleText, skipBattleText
     end
     self:pushBattle(battle)
   end
+  local function prepareBattle()
+    if not Runtime.wantsHook("trainer.before_battle") then
+      startBattle()
+      return
+    end
+    OverworldState.prepareTrainerBattle(Game, {
+      trainerClass = d.trainerClass,
+      partyIndex = d.trainerParty or 1,
+      mapId = self.map.id,
+      npcId = npc.id,
+    }, startBattle, function()
+      if self.player then
+        self.cancelledTrainerSight = {
+          npcId = npc.id,
+          playerX = self.player.cellX,
+          playerY = self.player.cellY,
+        }
+      end
+      if onDone then onDone() end
+    end)
+  end
   if skipBattleText then
-    startBattle()
+    prepareBattle()
   else
-    Game.stack:push(TextBox.new(Game, battleText, startBattle))
+    Game.stack:push(TextBox.new(Game, battleText, prepareBattle))
   end
 end
 
@@ -3311,11 +3466,18 @@ function OverworldState:checkTrainerSight()
   if self.player.moving or self.engaging then return end
   if Game.stack:top() ~= self then return end
   local p = self.player
+  local cancelled = self.cancelledTrainerSight
+  if cancelled and (cancelled.playerX ~= p.cellX
+      or cancelled.playerY ~= p.cellY) then
+    self.cancelledTrainerSight = nil
+    cancelled = nil
+  end
   for _, npc in ipairs(self.npcs) do
     local d = npc.def
     -- CheckFightingMapTrainers engages ANY aligned trainer sprite,
     -- walkers included (they sight between steps)
     if d.trainerClass and not npc.moving
+       and not (cancelled and cancelled.npcId == npc.id)
        and not self:trainerDefeated(npc)
        and not mapScripts.talkScript(self.map.id, d.text)
        and trainerSpriteOnScreen(npc, p) then
@@ -3459,7 +3621,8 @@ function OverworldState:applyFieldPoison()
   local queue = {}
   for _, mon in ipairs(fainted) do
     local name = mon.nickname or Game.data.pokemon[mon.species].name
-    table.insert(queue, Strings("%s\nfainted!", name))
+    table.insert(queue,
+      romText(Game.data, "_PokemonFaintedText", "%s\nfainted!", name))
   end
   local alive = false
   for _, mon in ipairs(save.party) do
@@ -4033,6 +4196,9 @@ end
 -- battle is optional; when given, Oak's Lab OPP_RIVAL1 losses skip the
 -- blackout (pret HandlePlayerBlackOut) so the map script can HealParty.
 function OverworldState:afterBattle(result, battle)
+  -- .battleOccurred tail-jumps to EnterMap (home/overworld.asm:353), so
+  -- ClearVariablesOnEnterMap zeroes wStepCounter on every battle return
+  Game.save.poisonSteps = 0
   if battle and battle.kind == "wild" then
     self.wildEncounterGraceSteps = WILD_ENCOUNTER_GRACE_STEPS
   end
@@ -4921,7 +5087,7 @@ function OverworldState:drawWorld()
     -- point projects under the pipeline's own camera.  That is the direct
     -- analogue of what :billboard does for tilt, and it keeps exactly one
     -- copy of every effect: the closures above are the ones that run.
-    local pw, ph = love.graphics.getDimensions()
+    local pw, ph = GameViewport.dimensions()
     local pscale = Zoom.scale(Game.renderer:fitScale())
     local ctx = {
       state = self, cam = cam, vw = vw, vh = vh, bgY = bgY,
@@ -5028,24 +5194,15 @@ function OverworldState:drawWorld()
       if not ((self.flyAnim or self.flyArrive or self.playerHidden)
               and e == self.player) then
         e:draw(cam.x, cam.y)
-        -- tall grass overdraws the sprite's feet (GB sprite priority);
-        -- the overdraw is BG tiles, so it rides the shake offset too
-        love.graphics.setColor(1, 1, 1, 1)
-        if self.map:isGrassCell(e.cellX, e.cellY) then
-          self.map.renderer:drawCellBottom(e.cellX, e.cellY, cam.x, bgY)
-          if grassColors then
-            self.map.renderer:markCellBottomRedraw(e.cellX, e.cellY,
-                                                   cam.x, bgY, grassColors)
-          end
-        end
-        if e.targetX and self.map:isGrassCell(e.targetX, e.targetY) then
-          self.map.renderer:drawCellBottom(e.targetX, e.targetY, cam.x, bgY)
-          if grassColors then
-            self.map.renderer:markCellBottomRedraw(e.targetX, e.targetY,
-                                                   cam.x, bgY, grassColors)
-          end
-        end
       end
+    end
+    -- tall grass overdraws every visible grass cell's feet row after all
+    -- sprites (GB sprite-priority parity).  One pass regardless of how many
+    -- entities are on screen -- see TileRenderer:drawGrassOverdraw.
+    love.graphics.setColor(1, 1, 1, 1)
+    self.map.renderer:drawGrassOverdraw(cam.x, bgY)
+    if grassColors then
+      self.map.renderer:markGrassOverdrawRedraw(cam.x, bgY, grassColors)
     end
     fxHeal()
     fxDust()
@@ -5082,6 +5239,18 @@ function OverworldState:drawWorld()
         items[#items + 1] = { y = e.py + 16, kind = "entity", e = e }
       end
     end
+    -- Inject grass-cell overdraw items into the same depth-sorted queue so
+    -- they occlude entities at lower y correctly (back-to-front by cell foot).
+    -- Each cell's foot y = cy*16 + 16 in world pixels (bottom of its two rows).
+    local grassCells = self.map.renderer.grassCells
+    if grassCells then
+      for _, c in ipairs(grassCells) do
+        local cx, cy = c[1], c[2]
+        -- world-pixel foot of the grass cell's bottom tile row
+        local cellFootY = (cy * 2 + 2) * 8 -- == cy*16+16
+        items[#items + 1] = { y = cellFootY, kind = "grass", cx = cx, cy = cy }
+      end
+    end
     table.sort(items, function(a, b) return a.y < b.y end)
 
     for _, it in ipairs(items) do
@@ -5093,6 +5262,20 @@ function OverworldState:drawWorld()
         local fy = g.npc.py - cam.y + g.oy + 16
         self:billboard(fx, fy, vw, vh, zoneColorsAt(zones, fx, fy), false,
                        function() g.npc:draw(cam.x - g.ox, cam.y - g.oy) end)
+      elseif it.kind == "grass" then
+        -- tall-grass bottom-row overdraw: billboarded at the cell's foot so
+        -- it depth-sorts correctly against any entity in the same y column.
+        -- bgY keeps the elevator-shake offset; drawCellBottomRaw lets the
+        -- billboard own the shader (color-0 keying baked into the keyed image
+        -- on GBC, or applied by drawCellBottom's shader on DMG/SGB).
+        local cx, cy = it.cx, it.cy
+        local fx = cx * 16 - cam.x + 8  -- horizontal centre of the cell
+        local fy = (cy * 2 + 2) * 8 - cam.y  -- foot of the bottom tile row
+        local colors = zoneColorsAt(zones, fx, fy)
+        self:billboard(fx, fy, vw, vh, colors, true, function()
+          love.graphics.setColor(1, 1, 1, 1)
+          self.map.renderer:drawCellBottomRaw(cx, cy, cam.x, bgY)
+        end)
       else
         local e = it.e
         local fx = e.px - cam.x + 8
@@ -5100,22 +5283,6 @@ function OverworldState:drawWorld()
         local colors = zoneColorsAt(zones, fx, fy)
         self:billboard(fx, fy, vw, vh, colors, false,
                        function() e:draw(cam.x, cam.y) end)
-        -- tall-grass feet overdraw glued to the sprite: same anchor + depth
-        -- so it keeps hiding the feet, color-0-keyed palette so its white
-        -- gaps still show the sprite through (drawCellBottomRaw lets the
-        -- billboard own the shader; bgY keeps the elevator-shake offset).
-        if self.map:isGrassCell(e.cellX, e.cellY) then
-          self:billboard(fx, fy, vw, vh, colors, true, function()
-            love.graphics.setColor(1, 1, 1, 1)
-            self.map.renderer:drawCellBottomRaw(e.cellX, e.cellY, cam.x, bgY)
-          end)
-        end
-        if e.targetX and self.map:isGrassCell(e.targetX, e.targetY) then
-          self:billboard(fx, fy, vw, vh, colors, true, function()
-            love.graphics.setColor(1, 1, 1, 1)
-            self.map.renderer:drawCellBottomRaw(e.targetX, e.targetY, cam.x, bgY)
-          end)
-        end
       end
     end
 

@@ -13,6 +13,8 @@ package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local T = require("tests.modkit")
 local OW = require("src.world.OverworldController")
+local Hooks = require("src.mods.Hooks")
+local Runtime = require("src.mods.Runtime")
 
 local function setUpvalue(fn, name, val)
   local i = 1
@@ -95,6 +97,84 @@ T.eq(rivalCount, 0, "rival classes play no encounter sting here")
 -- talk path from restarting it
 local _, seenCount = stingFor("OPP_LASS", true)
 T.eq(seenCount, 0, "self.engaging suppresses a second sting")
+
+-- Cancellation suppresses immediate sight re-entry at the current cell.
+local oldEvents, oldHooks, oldErrors = Runtime.events, Runtime.hooks,
+  Runtime.errors
+local cancelHooks = Hooks.new()
+Runtime.install(oldEvents, cancelHooks, oldErrors)
+cancelHooks:wrap("trainer.before_battle", function(_, _, _, continue)
+  continue({ cancel = true })
+  return true
+end, 0, "cancel_probe")
+local cancelNpc = { id = "npc#cancel", cellX = 0, cellY = -1,
+  facing = "down", moving = false, def = { trainerClass = "OPP_LASS",
+    trainerParty = 1, index = 1 } }
+fakeSelf.player = { cellX = 0, cellY = 0, moving = false }
+fakeSelf.map.id = "FIX_ROUTE"
+fakeSelf.engaging = false
+pushed, plays = {}, {}
+local completed = 0
+fakeSelf:engageTrainer(cancelNpc, function() completed = completed + 1 end)
+pushed[1].onDone()
+T.eq(completed, 1, "cancel completes the deferred encounter without a battle")
+T.same(fakeSelf.cancelledTrainerSight, {
+  npcId = "npc#cancel", playerX = 0, playerY = 0,
+}, "cancel suppresses immediate sight re-entry at the current player cell")
+
+local approaches = 0
+fakeSelf.npcs = { cancelNpc }
+fakeSelf.trainerDefeated = function() return false end
+fakeSelf.startTrainerApproach = function() approaches = approaches + 1 end
+fakeGame.stack.top = function() return fakeSelf end
+fakeGame.data.trainerHeader = function() return { range = 2 } end
+T.check(setUpvalue(OW.checkTrainerSight, "mapScripts", {
+  talkScript = function() return nil end,
+}), "mapScripts upvalue on checkTrainerSight")
+fakeSelf:checkTrainerSight()
+T.eq(approaches, 0,
+  "a cancelled adjacent trainer cannot reacquire the stationary player")
+fakeSelf.player.cellX = 1
+fakeSelf:checkTrainerSight()
+T.eq(fakeSelf.cancelledTrainerSight, nil,
+  "moving one cell releases the cancelled sight latch")
+fakeSelf.player.cellX = 0
+fakeSelf:checkTrainerSight()
+T.eq(approaches, 1,
+  "returning to the sight line permits a fresh trainer challenge")
+Runtime.install(oldEvents, oldHooks, oldErrors)
+
+-- A new overworld session must clear the volatile sight latch.
+local Camera = require("src.render.Camera")
+local Collision = require("src.world.Collision")
+local Encounter = require("src.world.Encounter")
+local ScriptRunner = require("src.script.ScriptRunner")
+local oldCameraNew, oldCollisionLoad = Camera.new, Collision.load
+local oldEncounterLoad, oldRunnerNew = Encounter.load, ScriptRunner.new
+local oldGameModule = package.loaded["src.core.Game"]
+local oldScriptsModule = package.loaded["data.scripts.init"]
+Camera.new = function() return {} end
+Collision.load = function() end
+Encounter.load = function() end
+ScriptRunner.new = function() return {} end
+package.loaded["src.core.Game"] = {
+  data = {}, save = { lastOutdoor = "FIX_ROUTE" },
+}
+package.loaded["data.scripts.init"] = {}
+local lifecycle = setmetatable({
+  cancelledTrainerSight = {
+    npcId = "FIX_ROUTE_obj_1", playerX = 0, playerY = 0,
+  },
+  setMap = function() end,
+  refreshStandingOnWarp = function() end,
+}, { __index = OW })
+lifecycle:enter("FIX_ROUTE", 0, 0, "down", { via = "boot" })
+T.eq(lifecycle.cancelledTrainerSight, nil,
+  "fresh overworld entry clears a cancelled trainer sight latch")
+Camera.new, Collision.load = oldCameraNew, oldCollisionLoad
+Encounter.load, ScriptRunner.new = oldEncounterLoad, oldRunnerNew
+package.loaded["src.core.Game"] = oldGameModule
+package.loaded["data.scripts.init"] = oldScriptsModule
 
 if realMusic ~= nil then package.loaded["src.core.Music"] = realMusic
 else package.loaded["src.core.Music"] = nil end

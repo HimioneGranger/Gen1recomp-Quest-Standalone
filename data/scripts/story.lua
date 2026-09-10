@@ -142,20 +142,23 @@ M.VIRIDIAN_CITY = {
 M.BLUES_HOUSE = {
   talk = {
     TEXT_BLUESHOUSE_DAISY_SITTING = {
-      { "face_player" },                                     -- 1
-      { "check_flag", "EVENT_GOT_TOWN_MAP" },                -- 2
-      { "jump_if_true", 10 },                                -- 3
-      { "check_flag", "EVENT_GOT_STARTER" },                 -- 4
-      { "jump_if_false", 12 },                               -- 5
-      { "show_text", "_BluesHouseDaisyOfferMapText" },       -- 6
+      { "face_player" },
+      { "check_flag", "EVENT_GOT_TOWN_MAP" },
+      { "jump_if_true", "got_map" },
+      { "check_flag", "EVENT_GOT_POKEDEX" },
+      { "jump_if_false", "too_early" },
+      { "show_text", "_BluesHouseDaisyOfferMapText" },
       -- _GotMapText: "{PLAYER} got a\n{RAM:wStringBuffer}!" -- the
       -- buffer supplies "TOWN MAP" (scripts/BluesHouse.asm GotMapText)
-      { "give_item", "TOWN_MAP", 1, "_GotMapText" },         -- 7
-      { "set_flag", "EVENT_GOT_TOWN_MAP" },                  -- 8
-      { "jump", 13 },                                        -- 9
-      { "show_text", "_BluesHouseDaisyUseMapText" },         -- 10
-      { "jump", 13 },                                        -- 11
-      { "show_text", "_BluesHouseDaisyRivalAtLabText" },     -- 12
+      { "give_item", "TOWN_MAP", 1, "_GotMapText" },
+      { "hide_object", "BLUES_HOUSE", "BLUESHOUSE_TOWN_MAP" },
+      { "set_flag", "EVENT_GOT_TOWN_MAP" },
+      { "jump", "end" },
+      { "label", "got_map" },
+      { "show_text", "_BluesHouseDaisyUseMapText" },
+      { "jump", "end" },
+      { "label", "too_early" },
+      { "show_text", "_BluesHouseDaisyRivalAtLabText" },
     },
   },
 }
@@ -1058,6 +1061,7 @@ local championsRoomRivalScript = {
   -- OakCongratulatesPlayerScript: rival faces left, Oak faces down
   { "face_object", 1, "left" },                             -- 17
   { "face_object", 2, "down" },                             -- 18
+  { "load_player_starter_name" },
   { "show_text", "_ChampionsRoomOakCongratulatesPlayerText" }, -- 19
   -- OakDisappointedWithRivalScript: Oak turns to the rival (right)
   { "face_object", 2, "right" },                            -- 20
@@ -1067,13 +1071,8 @@ local championsRoomRivalScript = {
   { "show_text", "_ChampionsRoomOakComeWithMeText" },       -- 23
   { "move_npc", 2, "up", 2 },                               -- 24 OakExitChampionsRoomMovement
   { "hide_object", "CHAMPIONS_ROOM", "CHAMPIONSROOM_OAK" },  -- 25
-  -- ChampionsRoomPlayerFollowsOakScript / WalkToHallOfFame_RLEMovement.
-  -- The player walks out after Oak instead of the screen just fading on the
-  -- spot (#704).  Route one tile right before walking north so the player
-  -- reaches the north-wall HALL_OF_FAME warp without sharing the rival's
-  -- (4,2) cell.  The original simulated movement bypasses entity collision,
-  -- but this scene should not visibly walk through the defeated rival.
-  { "move_player", "right", 1 },                            -- 26
+  -- scripts/ChampionsRoom.asm WalkToHallOfFame_RLEMovement
+  { "move_player", "left", 1 },
   { "move_player", "up", 3 },                               -- 27
   -- hand the induction off to the HALL_OF_FAME room (consumed by its
   -- onEnter), then warp up into it (destWarp 1 lands at (4,7) facing up)
@@ -1238,6 +1237,7 @@ local function pokemonTower2FRivalScript(playerX)
     { "jump_if_false", "end" },                                   -- 6 loss: stay
     { "set_flag", "EVENT_BEAT_POKEMON_TOWER_RIVAL" },             -- 7
     { "show_text", "_PokemonTower2FRivalDefeatedText" },          -- 8
+    { "play_music", "Music_MeetRival", { start = "rival" } },
     { "walk_npc", 1, exitDirs },                                  -- 9
     { "hide_object", "POKEMON_TOWER_2F", "POKEMONTOWER2F_RIVAL" }, -- 10
     { "jump", "end" },                                            -- 11

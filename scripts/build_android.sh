@@ -13,8 +13,8 @@
 #   - JDK 17
 #
 # Output (after gradle):
-#   dist/android/debug/*.apk (convenience copy)
-#   mobile/android/app/build/outputs/apk/embedNoRecord/debug/*.apk
+#   dist/android/debug/<variant>/gen1recomp-unplugged-<variant>-*.apk
+#   mobile/android/app/build/outputs/apk/questVrNoRecord/debug/*.apk
 
 set -euo pipefail
 
@@ -23,7 +23,7 @@ ANDROID_DIR="$ROOT/mobile/android"
 EMBED_ASSETS="$ANDROID_DIR/app/src/embed/assets"
 LOVE_FILE="$EMBED_ASSETS/game.love"
 DIST="$ROOT/dist/android"
-APP_NAME="Gen 1 Recomp Unplugged"
+DISPLAY_NAME_OVERRIDE=""
 APPLICATION_ID="com.theboisclub.pokemonred"
 LOVE_ANDROID_VERSION="11.5a"
 NDK_VERSION="25.2.9519653"
@@ -58,11 +58,11 @@ done
 case "$BUILD_VARIANT" in
   normal) ;;
   test)
-    APP_NAME="Gen 1 Recomp Unplugged Test"
+    DISPLAY_NAME_OVERRIDE="Gen1Recomp Test"
     APPLICATION_ID+=".test"
     ;;
   diagnostic)
-    APP_NAME="Gen 1 Recomp Unplugged Diagnostic"
+    DISPLAY_NAME_OVERRIDE="Gen1Recomp Diagnostic"
     APPLICATION_ID+=".diagnostic"
     DIAGNOSTIC=true
     ;;
@@ -196,11 +196,16 @@ ensure_gold_manifest() {
 }
 
 # --------------------------------------------------------------- branding
-# Build variants pass their label and diagnostic setting directly to Gradle.
-# The script must not rewrite tracked launcher configuration, because that
-# made a local test build look like a source change and let variants drift.
+# Test and Diagnostic pass only their label override and diagnostic setting
+# directly to Gradle. Normal keeps the tracked gradle.properties label. The
+# script must not rewrite tracked launcher configuration, because that made a
+# local test build look like a source change and let variants drift.
 apply_android_branding() {
-  say "using build-time Android label: $APP_NAME"
+  if [ -n "$DISPLAY_NAME_OVERRIDE" ]; then
+    say "using build-time Android label: $DISPLAY_NAME_OVERRIDE"
+  else
+    say "using tracked Android label from gradle.properties"
+  fi
 }
 
 # --------------------------------------------------------------- game.love
@@ -219,7 +224,10 @@ pack_game_love() {
   # The launcher UI kit lives at src/ui/kit (inside src/, packed wholesale);
   # the vendored libs/flexlove tree it replaced is gone.
   if command -v zip >/dev/null 2>&1; then
-    (cd "$ROOT" && zip -q -9 -r "$LOVE_FILE" \
+    # Strip host-specific extra fields. In particular, Info-ZIP otherwise
+    # records access times that change while the first archive is being read,
+    # which makes two packages from the same tree byte-different.
+    (cd "$ROOT" && zip -q -X -9 -r "$LOVE_FILE" \
       main.lua conf.lua src data assets tools/save-editor \
       tools/rom_manifest.json tools/rom_manifest_blue.json \
       tools/rom_manifest_yellow.json tools/rom_manifest_gold.json \
@@ -252,8 +260,9 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive
         if path.is_file():
             archive.write(path, path.relative_to(root).as_posix())
         else:
-            for current, _, names in os.walk(path):
-                for name in names:
+            for current, dirs, names in os.walk(path):
+                dirs.sort()
+                for name in sorted(names):
                     candidate = pathlib.Path(current) / name
                     rel = candidate.relative_to(root)
                     if include(rel):
@@ -303,8 +312,11 @@ PY
     mkdir -p "$stamp_dir/src/core"
     sed -E "s/(engine[[:space:]]*=[[:space:]]*\")[^\"]*(\")/\1$VERSION\2/" \
       "$ROOT/src/core/Version.lua" > "$stamp_dir/src/core/Version.lua"
+    # Keep the replacement entry byte-identical across independent builds.
+    # ZIP stores this file's modification time even when -X removes extras.
+    touch -t 202608210000.00 "$stamp_dir/src/core/Version.lua"
     if command -v zip >/dev/null 2>&1; then
-      (cd "$stamp_dir" && zip -q "$LOVE_FILE" src/core/Version.lua)
+      (cd "$stamp_dir" && zip -q -X "$LOVE_FILE" src/core/Version.lua)
     else
       python3 - "$LOVE_FILE" "$stamp_dir/src/core/Version.lua" <<'PY'
 import sys, zipfile
@@ -404,9 +416,11 @@ run_gradle() {
   if ! (
     cd "$build_dir"
     gradle_args=(--no-daemon "$task" \
-      "-Papp.display_name=$APP_NAME" \
       "-Papp.application_id=$APPLICATION_ID" \
       "-Papp.diagnostic=$DIAGNOSTIC")
+    if [ -n "$DISPLAY_NAME_OVERRIDE" ]; then
+      gradle_args+=("-Papp.display_name=$DISPLAY_NAME_OVERRIDE")
+    fi
     if [ -n "$VERSION" ]; then
       gradle_args+=("-Papp.version_name=$VERSION" \
         "-Papp.version_code=$VERSION_CODE")
@@ -426,10 +440,17 @@ run_gradle() {
     say "APK output:"
     find "$out_dir" -name '*.apk' -exec ls -lh {} \;
 
-    local dist_dir="$DIST/debug"
+    # Keep every app identity. Normal, Test, and Diagnostic are built one at
+    # a time from the same Gradle output path, so copying all three into one
+    # directory used to delete the previous variant on every run.
+    local dist_dir="$DIST/debug/$BUILD_VARIANT"
     rm -rf "$dist_dir"
     mkdir -p "$dist_dir"
-    find "$out_dir" -name '*.apk' -exec cp {} "$dist_dir/" \;
+    while IFS= read -r -d '' apk; do
+      local apk_name
+      apk_name="$(basename "$apk")"
+      cp "$apk" "$dist_dir/gen1recomp-unplugged-$BUILD_VARIANT-$apk_name"
+    done < <(find "$out_dir" -name '*.apk' -print0)
     say "copied to $dist_dir/"
   else
     warn "gradle finished but no APK dir at $out_dir,  check gradle logs above"

@@ -28,7 +28,9 @@ local LinkBattle = {}
 -- Deterministic Park-Miller PRNG: both sides must roll identical
 -- streams, so love.math.random can't be used.
 local function makeRng(seed)
-  local s = seed % 2147483647
+  local s = tonumber(seed) or 1
+  if s ~= s or s == math.huge or s == -math.huge then s = 1 end
+  s = math.floor(s) % 2147483647
   if s <= 0 then s = s + 2147483646 end
   return function(a, b)
     s = (s * 16807) % 2147483647
@@ -257,7 +259,8 @@ function LinkBattle.new(game, net, opts)
   self.enemyParty = theirParty
   self.playerParty = myParty -- intro ball row uses the clamped copies
   self.opponentName = theirName
-  self.introText = Strings("%s wants\nto battle!", theirName)
+  self.introText = self:romText("_TrainerWantsToFightText",
+    "%s wants\nto battle!", theirName)
   self.remoteHashes = {}
   self.localHashes = {}
   self.remoteParts = {}

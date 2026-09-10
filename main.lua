@@ -15,6 +15,8 @@ local LaunchOptions = require("src.core.LaunchOptions")
 local NxDisplay = require("src.core.NxDisplay")
 local PlatformHooks = require("src.core.PlatformHooks")
 local HostDisplay = require("src.core.HostDisplay")
+local GameViewport = require("src.render.GameViewport")
+local HostLifecycle = require("src.core.HostLifecycle")
 
 -- Lua errors: persist a redacted trace in the save dir and surface a hint.
 do
@@ -30,7 +32,7 @@ do
   end
 end
 
-local Game, EditorApp, Importer, TouchEditor
+local Game, EditorApp, Importer, TouchEditor, Studio
 
 -- #887: quit-to-launcher state, shared by love.load and love.quit (both need
 -- it, so it is declared here rather than next to love.quit).
@@ -180,6 +182,18 @@ function closeEditor()
     require("src.import.CacheFs").unmountVersion(version)
     require("src.core.Data"):unloadGenerated()
   end
+  -- The editor uses flat module names. Remove them after an embedded session
+  -- so the next slot gets a clean editor and does not reuse stale state.
+  local editorModules = {
+    App = true, Kit = true, State = true, Catalog = true, SaveIO = true,
+    Ops = true, MonOps = true, ItemOps = true, PadInput = true, Theme = true,
+  }
+  for name in pairs(package.loaded) do
+    if type(name) == "string"
+        and (name:find("save%-editor") or editorModules[name]) then
+      package.loaded[name] = nil
+    end
+  end
   editorVersion = nil
   restoreWindow()
   Importer = editorHost
@@ -223,7 +237,43 @@ function closeTouchControlsEditor()
   end
 end
 
-local function bootGame(version)
+-- ------------------------------------------------------------ skin studio
+local studioHost
+local closeSkinStudio
+local bootGame
+
+local function openSkinStudio(version, skinId)
+  local SkinStudio = require("src.ui.SkinStudio")
+  if not SkinStudio.available_desktop() then return end
+  studioHost = Importer
+  if Importer and Importer.prepareOverlayHandoff then
+    Importer:prepareOverlayHandoff()
+  end
+  Importer = nil
+  Studio = SkinStudio
+  Studio.load({
+    version = version,
+    skinId = skinId,
+    onClose = function() closeSkinStudio() end,
+    onPlay = function(v)
+      closeSkinStudio()
+      Importer = nil
+      bootGame(v or version)
+    end,
+  })
+end
+
+function closeSkinStudio()
+  if Studio and Studio.unload then Studio.unload() end
+  Studio = nil
+  Importer = studioHost
+  studioHost = nil
+  if Importer and Importer.resumeAfterOverlay then
+    Importer:resumeAfterOverlay()
+  end
+end
+
+function bootGame(version)
   -- The launcher hands us the chosen game (Red / Blue / Yellow / Gold);
   -- scripted and headless runs fall back to POKEPORT_VERSION, then Red.
   -- Set the active version and overlay its extracted cache BEFORE anything
@@ -272,11 +322,18 @@ local function bootGame(version)
 end
 
 function love.load(args)
-  HostDisplay.installPackagedBackend()
+  if not require("src.core.HostBootstrap").install() then
+    HostDisplay.installPackagedBackend()
+  end
   -- Before anything can shell out (update check, mod index, ROM picker),
   -- claim one hidden console on Windows so those children inherit it instead
   -- of each flashing their own cmd.exe window (#606).  No-op elsewhere.
   require("src.core.HostShell").hideHostConsole()
+
+  -- Hang gen1tls on love.system before mods boot.  Android already has tls*
+  -- from JNI; this is the desktop half.  No DLL / no FFI is fine -- ws://
+  -- rooms still work, wss:// just won't.
+  pcall(function() require("src.net.Gen1Tls").install() end)
 
   -- NX fused mounts are unreliable for the blue|yellow cache overlay: wrap
   -- the love loaders once so every generated-asset read falls back to the
@@ -428,6 +485,8 @@ function love.load(args)
     forceImport = forceImport,
     onEditSave = openEditor,
     onEditTouchControls = openTouchControlsEditor,
+    onOpenSkinStudio = require("src.ui.SkinStudio").available_desktop()
+      and openSkinStudio or nil,
   })
 end
 
@@ -438,6 +497,7 @@ function love.update(dt)
   NxDisplay.sync()
   if editorMode then return EditorApp.update(dt) end
   if TouchEditor then return TouchEditor.update(dt) end
+  if Studio then return Studio.update(dt) end
   if Importer then return Importer:update(dt) end
 
   -- Scripted runs (autopilot / POKEPORT_DRIVER) observe and act exactly
@@ -481,56 +541,69 @@ end
 
 function love.draw()
   if editorMode then
-    HostDisplay.beginFrame("editor", EditorApp)
-    local result = EditorApp.draw()
-    PlatformHooks.frameDrawn("editor", EditorApp)
-    HostDisplay.endFrame("editor", EditorApp)
-    return result
+    GameViewport.reset()
+    return HostDisplay.render("editor", EditorApp, function()
+      local result = EditorApp.draw()
+      PlatformHooks.frameDrawn("editor", EditorApp)
+      return result
+    end)
   end
   if TouchEditor then
-    HostDisplay.beginFrame("touch_editor", TouchEditor)
-    local result = TouchEditor.draw()
-    PlatformHooks.frameDrawn("touch_editor", TouchEditor)
-    HostDisplay.endFrame("touch_editor", TouchEditor)
+    GameViewport.reset()
+    return HostDisplay.render("touch_editor", TouchEditor, function()
+      local result = TouchEditor.draw()
+      PlatformHooks.frameDrawn("touch_editor", TouchEditor)
+      return result
+    end)
+  end
+  if Studio then
+    HostDisplay.beginFrame("skin_studio", Studio)
+    local result = Studio.draw()
+    HostDisplay.endFrame("skin_studio", Studio)
     return result
   end
   if Importer then
-    HostDisplay.beginFrame("launcher", Importer)
-    local result = Importer:draw()
-    PlatformHooks.frameDrawn("launcher", Importer)
-    HostDisplay.endFrame("launcher", Importer)
-    return result
-  end
-  if not Game then return end
-
-  HostDisplay.beginFrame("game", Game)
-  Game:draw()
-  PlatformHooks.frameDrawn("game", Game)
-  -- frame capture requested by a driver
-  if Game.capturePath then
-    local path = Game.capturePath
-    Game.capturePath = nil
-    love.graphics.captureScreenshot(function(imagedata)
-      local fd = imagedata:encode("png")
-      local f = io.open(path, "wb")
-      if f then
-        f:write(fd:getString())
-        f:close()
-      end
+    GameViewport.reset()
+    return HostDisplay.render("launcher", Importer, function()
+      local result = Importer:draw()
+      PlatformHooks.frameDrawn("launcher", Importer)
+      return result
     end)
   end
-  HostDisplay.endFrame("game", Game)
+  if not Game then
+    GameViewport.reset()
+    return
+  end
+
+  return HostDisplay.render("game", Game, function()
+    Game:draw()
+    PlatformHooks.frameDrawn("game", Game)
+    -- frame capture requested by a driver
+    if Game.capturePath then
+      local path = Game.capturePath
+      Game.capturePath = nil
+      love.graphics.captureScreenshot(function(imagedata)
+        local fd = imagedata:encode("png")
+        local f = io.open(path, "wb")
+        if f then
+          f:write(fd:getString())
+          f:close()
+        end
+      end)
+    end
+  end)
 end
 
 function love.keypressed(key, scancode, isrepeat)
   if editorMode then return EditorApp.keypressed(key) end
   if TouchEditor then return TouchEditor.keypressed(key) end
+  if Studio then return Studio.keypressed(key) end
   if Importer then return Importer:keypressed(key) end
   Game:keypressed(key)
 end
 
 function love.keyreleased(key)
-  if editorMode or TouchEditor then return end
+  if editorMode or TouchEditor or Studio then return end
   if Importer then return end
   Game:keyreleased(key)
 end
@@ -679,6 +752,7 @@ end
 -- direction's key-up can be delivered to the OS instead of the game while
 -- unfocused, so reset input on either transition rather than trust it.
 function love.focus(f)
+  HostLifecycle.focus(f)
   if editorMode or TouchEditor then return end
   if Importer then
     require("src.core.Input"):reset()
@@ -690,6 +764,7 @@ end
 
 -- v is true when the window becomes visible again, false on minimize.
 function love.visible(v)
+  HostLifecycle.visible(v)
   if editorMode or TouchEditor then return end
   if Importer then
     require("src.core.Input"):reset()
@@ -759,6 +834,7 @@ function love.wheelmoved(x, y)
     return
   end
   if TouchEditor then return end
+  if Studio then return Studio.wheelmoved(x, y) end
   if Importer then return end
   Game:wheelmoved(x, y)
 end
@@ -796,6 +872,7 @@ function love.mousepressed(x, y, button, istouch)
     if love.system.getOS() == "Android" then return end
     return TouchEditor.mousepressed(x, y, button)
   end
+  if Studio then return Studio.mousepressed(x, y, button) end
   if Importer then
     -- love.touchpressed already forwards the primary touch into FlexLove for
     -- scroll. LÖVE ALSO synthesizes a mouse press for that same touch; if both
@@ -830,6 +907,7 @@ function love.mousereleased(x, y, button, istouch)
     if love.system.getOS() == "Android" then return end
     return TouchEditor.mousereleased(x, y, button)
   end
+  if Studio then return Studio.mousereleased(x, y, button) end
   if Importer then return end
   if editorMode and EditorApp.mousereleased then
     return EditorApp.mousereleased(x, y, button)
@@ -847,6 +925,7 @@ function love.mousemoved(x, y, dx, dy, istouch)
     if love.system.getOS() == "Android" then return end
     return TouchEditor.mousemoved(x, y)
   end
+  if Studio then return Studio.mousemoved(x, y) end
   if editorMode or Importer then return end
   if mouseTouch then
     if Game and love.mouse.isDown(1) then Game:touchmoved("mouse", x, y) end
@@ -857,6 +936,7 @@ end
 
 function love.textinput(text)
   if TouchEditor then return end
+  if Studio then return Studio.textinput(text) end
   if Importer then return Importer:textinput(text) end
   if editorMode and EditorApp.textinput then
     return EditorApp.textinput(text)
@@ -896,11 +976,14 @@ function love.quit()
   -- docs/modding.md's core.quit_to_launcher entry) may veto returning to
   -- this Lua launcher via that hook. Vanilla behavior (used when no mod
   -- claims the hook) is exactly the condition below.
+  local terminalHostExit = HostLifecycle.mustExit()
   local wouldReturnToLauncher = PlatformHooks.quitToLauncher(function()
-    return Game and not Importer and not quitToLauncher and not scripted
+    return not terminalHostExit and Game and not Importer
+      and not quitToLauncher and not scripted
       and not launchedIntoGame
   end)
   if wouldReturnToLauncher then
+    HostLifecycle.handoff("launcher")
     quitToLauncher = true
     -- Tell the fresh boot to ignore any boot-straight-into-a-game option this
     -- once, so the restart really does land in the launcher (#887).  A failed
@@ -909,6 +992,7 @@ function love.quit()
     require("src.core.HostShell").restart()
     return true -- abort this quit; the restart lands back in the launcher
   end
+  HostLifecycle.shutdown()
   pcall(function()
     require("src.core.DiscordPresence").shutdown()
   end)
@@ -934,6 +1018,7 @@ function love.filedropped(file)
   if editorMode and EditorApp and EditorApp.filedropped then
     return EditorApp.filedropped(file)
   end
+  if Studio then return Studio.filedropped(file) end
   if Importer then Importer:filedropped(file) end
 end
 
@@ -942,6 +1027,29 @@ local function pacingEnabled()
   if os.getenv("POKEPORT_DRIVER") then return false end
   if os.getenv("POKEPORT_IMPORT_ONLY") == "1" then return false end
   return true
+end
+
+-- Horizon OS can send LÖVE a quit event while DocumentsUI is closing its
+-- temporary panel.  The picker result has already been copied into our save
+-- directory at that point, so treating that transient event as an app quit
+-- loses the pending import before RomImporter can consume it.  Defer only
+-- this exact Android/Safe-Access-Framework handoff; ordinary quit events keep
+-- their existing behaviour.
+local function shouldDeferAndroidSafQuit()
+  if not (love.system and love.system.getOS() == "Android") then return false end
+  if not (Importer and love.filesystem) then return false end
+  -- `focus(true)` can run once before GameActivity finishes copying the URI.
+  -- Keep the guard for the whole native-picker handoff, rather than only the
+  -- short interval where the directory poll has its pending bit armed.
+  -- The activity can enqueue its shutdown before pickFile returns to Lua.
+  -- safPickerActive is armed before that call and stays armed until the
+  -- delivered result is processed, so it is the authoritative handoff gate.
+  if Importer.safPickerActive then return true end
+  if not Importer.pickPending then return false end
+  return love.filesystem.getInfo("picked_mod.zip", "file") ~= nil
+    or love.filesystem.getInfo("picked_rom.gb", "file") ~= nil
+    or love.filesystem.getInfo("picked_save.sav", "file") ~= nil
+    or love.filesystem.getInfo("pick_error.flag", "file") ~= nil
 end
 
 function love.run()
@@ -964,7 +1072,9 @@ function love.run()
       love.event.pump()
       for name, a, b, c, d, e, f in love.event.poll() do
         if name == "quit" then
-          if not love.quit or not love.quit() then
+          if shouldDeferAndroidSafQuit() then
+            print("POKEPORT_SAF_QUIT_DEFERRED")
+          elseif not love.quit or not love.quit() then
             -- Android keeps the process and its task alive after LOVE's own
             -- teardown, so the relaunched task re-enters an activity whose
             -- native main already returned; end the process outright once the

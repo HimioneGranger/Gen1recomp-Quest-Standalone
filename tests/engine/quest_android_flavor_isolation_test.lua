@@ -24,8 +24,13 @@ local questMake = read("mobile/android/love/src/jni/questxr_bridge/Android.mk")
 local questNative = read(
   "mobile/android/love/src/jni/questxr_bridge/questxr_bridge.c")
 local questDisplay = read("src/host/android/QuestOpenXRDisplay.lua")
+local questAdapter = read("src/quest/compat/HostAdapterV1.lua")
 local questManifest = read(
   "mobile/android/app/src/questVr/AndroidManifest.xml")
+
+check(questManifest:find('android:name="SDL_ENV.POKEPORT_QUEST_PROFILE"', 1, true) and
+      questManifest:find('android:value="1"', 1, true),
+  "Quest flavor selects its Lua product profile without panel FFI")
 
 check(app:find("questVrImplementation", 1, true),
   "OpenXR loader dependency is scoped to questVr")
@@ -44,8 +49,19 @@ check(love:find("arguments 'QUEST_XR=1'", 1, true),
   "only the questVr library flavor enables native XR compilation")
 check(not activity:find("Quest", 1, true) and not activity:find("OpenXR", 1, true),
   "shared GameActivity has no Quest/OpenXR references")
+check(activity:find("protected String getHostModule()", 1, true) and
+      activity:find('return "";', 1, true),
+  "standard Android returns no host adapter")
 check(questActivity:find('return new String[] { "questxr" };', 1, true),
   "Quest activity opts into its separate native library")
+check(questActivity:find("protected String getHostModule()", 1, true) and
+      questActivity:find('return "src.quest.compat.HostAdapterV1";', 1, true),
+  "Quest activity selects the exact API v1 host adapter")
+check(questAdapter:find("apiVersion = 1", 1, true) and
+      questAdapter:find("QuestOpenXRDisplay", 1, true) and
+      not questAdapter:find("ImportHost", 1, true) and
+      not questAdapter:find("HostLifecycle", 1, true),
+  "first Quest adapter installs only the existing display backend")
 check(questActivity:find("protected void onHostDestroy()", 1, true) and
       questActivity:find("nativeQuestXrDestroy();", 1, true),
   "Quest activity releases the native host from the generic destroy hook")
@@ -76,6 +92,11 @@ check(questNative:find("if (!frame.shouldRender)", 1, true),
 check(questNative:find("XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING", 1, true) and
       questNative:find("const int room_anchor_enabled = 1", 1, true),
   "launcher anchoring follows Quest recenter events")
+check(questNative:find("XR_REFERENCE_SPACE_TYPE_LOCAL", 1, true) and
+      questNative:find("XR_REFERENCE_SPACE_TYPE_VIEW", 1, true) and
+      not questNative:find("space_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE", 1, true) and
+      not questNative:find("xrRequestBoundaryVisibilityMETA", 1, true),
+  "Quest host creates local/view tracking only and never requests a Guardian boundary mode")
 check(not questNative:find("eglTerminate(display)", 1, true),
   "Quest handoff does not terminate SDL/Love's process-wide EGL display")
 check(questNative:find("uniform vec4 focusRect", 1, true) and

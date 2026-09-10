@@ -131,4 +131,25 @@ T.same(Checkpoint.inspect(game), {
   canCapture = true, canRestore = true, kind = "overworld",
 }, "settled overworld remains supported")
 
+-- drainHold gates capture (see the refused() case above) exactly because it
+-- marks an HP bar mid-animation.  Once stepHPDrain settles the bar it must
+-- let go of that gate too, or the very first drain of a battle leaves the
+-- checkpoint contract refused for everything after it.
+do
+  local game3, _, battle3 = makeGame()
+  battle3.enemy.mon.hp = battle3.enemy.mon.hp - 5
+  local frames = 0
+  while battle3:stepHPDrain() and frames < 10000 do
+    frames = frames + 1
+  end
+  T.eq(battle3.enemy.shownHP, battle3.enemy.mon.hp,
+    "the HP bar settles on the new total")
+  T.eq(battle3.enemy.drainHold, nil,
+    "drainHold releases the checkpoint gate once the bar finishes draining")
+  local capability = Checkpoint.inspect(game3)
+  T.check(capability.canCapture == true,
+    "a checkpoint is capturable again after the drain settles: "
+      .. tostring(capability.reason))
+end
+
 T.finish()

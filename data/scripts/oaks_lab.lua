@@ -246,9 +246,17 @@ return {
   -- the table sprites; re-entering the lab applies the same HideObject
   -- the gift script now does (OaksLab.asm OakGivesPokedex).
   onEnter = function(game, ow)
-    if not (game.save.flags and game.save.flags.EVENT_GOT_POKEDEX) then
-      return
+    local flags = game.save.flags or {}
+    if flags.EVENT_GOT_STARTER and not flags.EVENT_BATTLED_RIVAL_IN_OAKS_LAB then
+      local rival = ow:npcByIndex(1)
+      if rival then
+        rival.cellX = flags.EVENT_CHOSE_CHARMANDER and 7
+          or flags.EVENT_CHOSE_SQUIRTLE and 8 or 6
+        rival.cellY = 4
+        rival.px, rival.py = rival.cellX * 16, rival.cellY * 16
+      end
     end
+    if not flags.EVENT_GOT_POKEDEX then return end
     local Commands = require("src.script.Commands")
     local ctx = { save = game.save, game = game, overworld = ow }
     Commands.hide_object(ctx, "OAKS_LAB", "OAKSLAB_POKEDEX1")
@@ -286,6 +294,7 @@ return {
       -- fanfare for the taunt/challenge exchange, same as the Yellow port
       -- (oaks_lab_yellow.lua); it was silently dropped here (#596).
       local rows = {
+        { "face_player_dir", "up" },
         { "stop_music" },
         { "play_music", "Music_MeetRival" },
         { "show_text", "_OaksLabRivalIllTakeYouOnText" },         -- 1
@@ -309,28 +318,19 @@ return {
       local base = #rows
       local party = flags.EVENT_CHOSE_BULBASAUR and 3
                     or flags.EVENT_CHOSE_SQUIRTLE and 2 or 1
+      table.insert(rows, { "save_end_battle_text", "_OaksLabRivalIPickedTheWrongPokemonText" })
       table.insert(rows, { "start_battle", "trainer", "OPP_RIVAL1", party })
       -- OaksLabRivalEndBattleScript: heal + flag on win or loss; no blackout
       table.insert(rows, { "heal_party" })
       table.insert(rows, { "set_flag", "EVENT_BATTLED_RIVAL_IN_OAKS_LAB" })
-      -- OaksLabRivalEndBattleScript: on WIN, print the "picked the wrong
-      -- POKéMON!" gloat, then BOTH win and loss print the shared exit line
-      -- _OaksLabRivalSmellYouLaterText ("OK! I'll make my POKéMON fight to
-      -- toughen it up!\012<PLAYER>! Gramps! Smell you later!") before Blue
-      -- marches out.  A loss skips only the gloat (that taunt was already
-      -- shown in-battle via Rival1WinText), never the exit line (#231).  The
-      -- jump_if_false convergence point is the exit line: base+6 indexes the
-      -- SmellYouLater row below, so WIN falls IPicked -> SmellYouLater and
-      -- LOSS jumps straight to SmellYouLater (both then walk-out + hide).
       table.insert(rows, { "jump_if_false", base + 6 })
-      table.insert(rows, { "show_text", "_OaksLabRivalIPickedTheWrongPokemonText" })
       table.insert(rows, { "show_text", "_OaksLabRivalSmellYouLaterText" })
       -- OaksLabRivalStartsExitScript: parting shot, rival exit fanfare, then
       -- walk out past the player.  The fanfare was dropped here (#683) -- the
       -- parcel scene above already plays Music_MeetRival on both arrival and
       -- departure (lines 144-146), and this exit should match (#596).
       table.insert(rows, { "stop_music" })
-      table.insert(rows, { "play_music", "Music_MeetRival" })
+      table.insert(rows, { "play_music", "Music_MeetRival", { start = "rival" } })
       table.insert(rows, { "move_npc_to", 1, 4, 11 })
       table.insert(rows, { "hide_object", "OAKS_LAB", "OAKSLAB_RIVAL" })
       table.insert(rows, { "play_music", "Music_OaksLab" })

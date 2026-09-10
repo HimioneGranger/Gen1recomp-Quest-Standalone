@@ -49,6 +49,7 @@ local DATA_MODULES = {
   charmap    = { "src.save_convert.data.charmap",   "src/save_convert/data/charmap.lua" },
   eventFlags = { "src.save_convert.data.event_flags", "src/save_convert/data/event_flags.lua" },
   toggleObjects = { "src.save_convert.data.toggle_objects", "src/save_convert/data/toggle_objects.lua" },
+  hiddenItems = { "src.save_convert.data.hidden_items", "src/save_convert/data/hidden_items.lua" },
 }
 
 local OPTIONAL_MODULES = { tilesets = true, audio = true }
@@ -63,6 +64,10 @@ local OPTIONAL_MODULES = { tilesets = true, audio = true }
 local YELLOW_EVENT_FLAGS = {
   "src.save_convert.data.event_flags_yellow",
   "src/save_convert/data/event_flags_yellow.lua",
+}
+local YELLOW_HIDDEN_ITEMS = {
+  "src.save_convert.data.hidden_items_yellow",
+  "src/save_convert/data/hidden_items_yellow.lua",
 }
 
 local function loadTable(requirePath, filePath)
@@ -133,6 +138,8 @@ local function ensureData(gameVersion)
       if name ~= "charmap" then
         if name == "eventFlags" and gameVersion == "yellow" then
           spec = YELLOW_EVENT_FLAGS -- Yellow's bit numbering differs (#838)
+        elseif name == "hiddenItems" and gameVersion == "yellow" then
+          spec = YELLOW_HIDDEN_ITEMS
         end
         local mod = loadCacheTable(gameVersion, spec[2])
         if not mod then

@@ -62,6 +62,7 @@ launcher = {
   keypressed = function(_, key) launcherKeys[#launcherKeys + 1] = key end,
 }
 check(type(backend) == "table", "test factory returns a backend")
+eq(backend.apiVersion, 1, "Quest display backend uses HostDisplay API v1")
 eq(backend.beginFrame, nil, "adapter does not invent a beginFrame policy")
 -- HostDisplay learns the active draw subject from a completed frame. Seed the
 -- launcher once before its next update, matching LÖVE's update/draw cadence.
@@ -114,7 +115,11 @@ eq(captures[2][3], 0, "disabled focus border has no width")
 eq(captures[2][4], 0, "disabled focus border has no height")
 backend:endFrame("game", {})
 eq(pointers[#pointers][3], 0, "gameplay hides the launcher pointer")
+eq(#captures, 3,
+  "the first completed game frame retires the cached loading panel immediately")
 backend:endFrame("launcher", launcher)
+eq(#captures, 4,
+  "the first completed launcher frame also retires stale game presentation")
 
 local pressed, released = {}, {}
 local oldPressed, oldReleased = love.keypressed, love.keyreleased

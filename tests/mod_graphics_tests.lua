@@ -285,6 +285,7 @@ local map = {
                              "mods/aqua/w3.png" } },
               } },
   blockAt = function() return 0 end,
+  isGrassCell = function() return false end,
 }
 local renderer = TileRenderer.new(map)
 check(#renderer.anims == 1, "a declared animatedTiles entry builds one anim")
@@ -308,6 +309,7 @@ local sea = TileRenderer.new({
               tilesPerRow = 16, blocks = { waterTiles },
               animation = "TILEANIM_WATER" },
   blockAt = function() return 0 end,
+  isGrassCell = function() return false end,
 })
 check(#sea.anims == 1, "an OVERWORLD tileset animates its water with no record edit")
 check(#sea.anims[1].textures == 8, "the water entry builds 8 shifted variants")
@@ -358,17 +360,56 @@ local picData = {
 }
 local battle = setmetatable({ data = picData }, BattleState)
 
+local savedColors = PaletteFX.mode
+PaletteFX.setMode("og")
+check(not PaletteFX.honorsTrueColor(),
+      "a forced monochrome mode does not honor trueColor art")
 local shaded = battle:speciesSprite("SHADED", false)
 local r, g, b = shaded.data:getPixel(0, 0)
 -- r = 0.4 lands in shade bucket 2 (> 0.17), the palette's third color
 check(r == 0 and g == 0 and b == 1,
       "a 4-shade pic is palette-quantized onto its shade bucket")
 
+local monoFull = battle:speciesSprite("FULLCOLOR", false)
+r, g, b = monoFull.data:getPixel(0, 0)
+check(r == 0 and g == 0 and b == 1,
+      "a trueColor pic is quantized in a non-color display mode")
+
+PaletteFX.setMode("redpp")
+check(PaletteFX.honorsTrueColor(),
+      "ADVANCED honors trueColor art")
 local full = battle:speciesSprite("FULLCOLOR", false)
 r, g, b = full.data:getPixel(0, 0)
 check(math.abs(r - 0.4) < 1e-6 and math.abs(g - 0.7) < 1e-6
       and math.abs(b - 0.9) < 1e-6,
       "a trueColor pic keeps a pixel no 4-shade palette contains")
+
+-- trainers.trueColor is the same opt-out on a class portrait
+BattleState.invalidate()
+local trainerPicData = {
+  trainers = {
+    SHADED = { pic = "assets/generated/battle/front/shaded.png" },
+    FULLCOLOR = { pic = "assets/generated/battle/front/full.png",
+                  trueColor = true },
+    REUSED = { basePic = "FULLCOLOR" },
+  },
+  palettes = { palettes = { MEWMON = monPalette }, pokemon = {} },
+}
+local shadedTrainer = BattleState.trainerSprite(trainerPicData,
+  trainerPicData.trainers.SHADED)
+r, g, b = shadedTrainer.data:getPixel(0, 0)
+check(not (math.abs(r - 0.4) < 1e-6 and math.abs(g - 0.7) < 1e-6
+      and math.abs(b - 0.9) < 1e-6),
+      "a 4-shade trainer pic is palette-quantized onto the active palette")
+local fullTrainer = BattleState.trainerSprite(trainerPicData,
+  trainerPicData.trainers.FULLCOLOR)
+r, g, b = fullTrainer.data:getPixel(0, 0)
+check(math.abs(r - 0.4) < 1e-6 and math.abs(g - 0.7) < 1e-6
+      and math.abs(b - 0.9) < 1e-6,
+      "a trueColor trainer pic keeps a pixel no 4-shade palette contains")
+check(BattleState.trainerTrueColor(trainerPicData,
+        trainerPicData.trainers.REUSED) == true,
+      "a basePic reuse inherits the base portrait's trueColor flag")
 
 -- ------- trueColor: the colors == false zone sentinel
 
@@ -568,6 +609,7 @@ local litMap = {
   def = { width = 2, height = 2, tileset = "AQUA", borderBlock = 0 },
   tileset = aquaDef,
   blockAt = function() return 0 end,
+  isGrassCell = function() return false end,
 }
 local litRenderer = TileRenderer.new(litMap)
 
@@ -599,6 +641,7 @@ check(#PaletteFX.trueColorRects("world") == 0,
       "the same tileset without the flag reports nothing")
 Renderer:endWorldPass()
 Renderer:endFrame({ PaletteFX.whole(GRAYS) }, fullWorldZones())
+PaletteFX.setMode(savedColors)
 
 -- ------- font pages and charmap ordering
 
@@ -643,6 +686,11 @@ check(Font.draw("\227\129\130", 0, 0) == 6,
 
 -- ------- palettes registry consumption
 
+-- Quest defaults to ADVANCED, whose global pack intentionally overrides a
+-- record-local species map. Exercise the local registry contract in SGB mode,
+-- then restore the stronger Quest default before the RED++ checks below.
+local registryMode = PaletteFX.mode
+PaletteFX.setMode("gbc")
 local palData = { palettes = { palettes = { MODMON = monPalette },
                                pokemon = { TESTMON = "MODMON" } } }
 check(PaletteFX.pal(palData, "MODMON") == monPalette,
@@ -651,6 +699,7 @@ check(PaletteFX.monPal(palData, "TESTMON") == monPalette,
       "a pokemon:<species> mapping steers monPal")
 check(PaletteFX.monPal(palData, "UNKNOWN") == nil,
       "an unmapped species falls through to MEWMON (absent here)")
+PaletteFX.setMode(registryMode)
 
 -- RED++ pack: per-species SuperPalettes from data/palettes_gbc.lua
 local prevMode = PaletteFX.mode
@@ -986,6 +1035,33 @@ local fallback = BattleTransition.new({ stack = stack }, nil, {})
 check(fallback.style == "doublecircle",
       "a hook naming an unregistered style falls back to the vanilla bits")
 Runtime.install(Events.new(), Hooks.new(), {})
+
+-- ------- gated final-output ownership
+
+local outputHooks = Hooks.new()
+Runtime.install(Events.new(), outputHooks, {})
+local outputCalls, outputContext = 0, nil
+outputHooks:wrap("render.output", function(nextLink, context)
+  outputCalls, outputContext = outputCalls + 1, context
+  return true
+end, 0, "test")
+outputHooks:wrap("render.output_enabled", function() return false end, 0, "test")
+Renderer:init()
+Renderer.presentCanvas = nil
+Renderer:beginFrame(false)
+Renderer:endFrame(nil, nil)
+check(outputCalls == 0 and Renderer.presentCanvas == nil,
+      "a disabled output hook leaves the direct render path untouched")
+
+outputHooks:wrap("render.output_enabled", function() return true end, 10, "test")
+Renderer:init()
+Renderer.presentCanvas = nil
+Renderer:beginFrame(false)
+Renderer:endFrame(nil, nil)
+check(outputCalls == 1 and outputContext and outputContext.canvas,
+      "an enabled output hook receives the finished frame")
+check(outputContext and outputContext.generation == 1,
+      "the output context identifies the active generation")
 
 -- ------- asset transforms
 

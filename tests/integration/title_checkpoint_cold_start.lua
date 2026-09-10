@@ -8,11 +8,16 @@ local function quote(value)
   return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
+local function execOk(cmd)
+  local status = os.execute(cmd)
+  return status == 0 or status == true
+end
+
 local function full(path) return root .. "/" .. path end
 
 local fs = {}
 function fs.createDirectory(path)
-  return os.execute("mkdir -p " .. quote(full(path))) == 0
+  return execOk("mkdir -p " .. quote(full(path)))
 end
 function fs.write(path, body)
   local parent = path:match("^(.*)/[^/]+$")
@@ -34,7 +39,7 @@ function fs.remove(path)
   return true
 end
 function fs.getInfo(path)
-  if os.execute("test -d " .. quote(full(path))) == 0 then
+  if execOk("test -d " .. quote(full(path))) then
     return { type = "directory" }
   end
   local handle = io.open(full(path), "rb")
@@ -77,10 +82,11 @@ local function writeProbe()
   fs.write("mods/cold_start_probe/manifest.json",
     '{"id":"cold_start_probe","name":"cold start probe","version":"1.0.0",'
       .. '"entry":"main.lua","api":2,"profile":"content"}')
+  -- mod.exports, not _G: a mod's globals are its own (src/mods/Sandbox.lua)
   fs.write("mods/cold_start_probe/main.lua", [[
 return function(mod)
-  _G.COLD_STORAGE = mod.storage
-  _G.COLD_CHECKPOINTS = mod.checkpoints
+  mod.exports.storage = mod.storage
+  mod.exports.checkpoints = mod.checkpoints
 end
 ]])
 end
@@ -130,11 +136,12 @@ if phase == "capture" then
   local game = runtime(SaveData.newGame({ version = "red" }), false)
   loader.game = game
   assert(loader:load({}) == true)
-  assert(_G.COLD_STORAGE:write(game, "history/index", { newest = "q0001" }))
-  local checkpoint = assert(_G.COLD_CHECKPOINTS:capture(game))
-  assert(_G.COLD_STORAGE:write(game, "history/q0001", checkpoint))
+  local probe = assert(loader.exports.cold_start_probe)
+  assert(probe.storage:write(game, "history/index", { newest = "q0001" }))
+  local checkpoint = assert(probe.checkpoints:capture(game))
+  assert(probe.storage:write(game, "history/q0001", checkpoint))
   local id = assert(game.save.meta.playthroughId)
-  assert(_G.COLD_CHECKPOINTS:ensureNormalSave(game, checkpoint))
+  assert(probe.checkpoints:ensureNormalSave(game, checkpoint))
   local normal = assert(SaveData.load("red"))
   assert(normal.meta.playthroughId == id)
   fs.write("cold-start-witness.lua", SaveSerializer.encode({ playthroughId = id }))
@@ -144,15 +151,16 @@ else
   title.save.options = { volume = 7, bindings = {} }
   loader.game = title
   assert(loader:load({}) == true)
-  local selected = assert(_G.COLD_STORAGE:selected(title))
+  local probe = assert(loader.exports.cold_start_probe)
+  local selected = assert(probe.storage:selected(title))
   local witness = assert(SaveSerializer.decode(assert(fs.read("cold-start-witness.lua"))))
   assert(selected:context().playthroughId == witness.playthroughId)
   assert(selected:read("history/index").newest == "q0001")
   local checkpoint = assert(selected:read("history/q0001"))
-  assert(_G.COLD_CHECKPOINTS:resume(title, checkpoint))
+  assert(probe.checkpoints:resume(title, checkpoint))
   assert(title.save.meta.playthroughId == witness.playthroughId)
   assert(title.save.options.volume == 7)
-  assert(SaveSerializer.encode(_G.COLD_CHECKPOINTS:capture(title))
+  assert(SaveSerializer.encode(probe.checkpoints:capture(title))
     == SaveSerializer.encode(checkpoint))
   local normal = assert(SaveData.load("red"))
   assert(normal.meta.playthroughId == witness.playthroughId)

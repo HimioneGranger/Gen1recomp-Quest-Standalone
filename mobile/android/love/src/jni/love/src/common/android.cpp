@@ -191,6 +191,34 @@ void vibrate(double seconds)
 	env->DeleteLocalRef(activity);
 }
 
+std::string getHostModule()
+{
+	JNIEnv *env = (JNIEnv*) SDL_AndroidGetJNIEnv();
+	jclass activity = env->FindClass("org/love2d/android/GameActivity");
+	jmethodID method = env->GetStaticMethodID(activity, "getHostModuleName",
+		"()Ljava/lang/String;");
+	if (method == nullptr)
+	{
+		env->ExceptionClear();
+		env->DeleteLocalRef(activity);
+		return "";
+	}
+	jstring result = (jstring) env->CallStaticObjectMethod(activity, method);
+	std::string module;
+	if (result != nullptr)
+	{
+		const char *chars = env->GetStringUTFChars(result, nullptr);
+		if (chars != nullptr)
+		{
+			module = chars;
+			env->ReleaseStringUTFChars(result, chars);
+		}
+		env->DeleteLocalRef(result);
+	}
+	env->DeleteLocalRef(activity);
+	return module;
+}
+
 // The directory physfs actually mounted as the save dir, or "" before the
 // filesystem module is up.  GameActivity must copy SAF picks HERE: its own
 // getExternalFilesDir(null) recomputation can disagree with the mounted

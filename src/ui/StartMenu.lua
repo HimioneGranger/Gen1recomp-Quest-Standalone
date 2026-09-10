@@ -34,7 +34,8 @@ function StartMenu.new(game)
 
   -- POKéMON is always listed (draw_start_menu.asm prints it even with
   -- an empty party; selecting it then just no-ops)
-  table.insert(items, { label = Strings("POKéMON"), onSelect = function()
+  table.insert(items, { label = Strings("POKéMON"),
+    keepOpen = #game.save.party == 0, onSelect = function()
     if #game.save.party == 0 then return end
     Screens.push(game, "PartyMenu", { onCancel = reopen })
   end })

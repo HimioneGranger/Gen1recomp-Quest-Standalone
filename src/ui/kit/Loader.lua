@@ -44,6 +44,11 @@ local SCRIM_A = 0.82
 -- Returns true when the cancel button was activated this frame.
 function Loader.overlay(m, spec)
   if not spec then return false end
+  if spec.questLoading then
+    Kit.blockClicks = true
+    require("src.ui.kit.QuestLoadingScreen").draw(m, spec)
+    return false
+  end
   local G = love and love.graphics
   local W, H = m.W, m.H
 

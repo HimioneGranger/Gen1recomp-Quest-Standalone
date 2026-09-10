@@ -162,6 +162,32 @@ do
     "modScope follows the PER_VERSION_MODS switch")
 end
 
+do
+  -- First launch after per-game controls shipped: preserve every old answer
+  -- and make the old implicit defaults explicit for the installed set.
+  local opts = {
+    mods = { old_on = true, old_off = false },
+    modsByVersion = { gold = { old_on = false } },
+  }
+  check(SaveData.migrateModEnablement(opts, {
+    { id = "old_on" }, { id = "old_off" }, { id = "implicit" },
+    { id = "lab", experimental = true },
+  }), "legacy mod state is migrated once")
+  check(opts.modsByVersionMigrated, "the migration is marked complete")
+  eq(SaveData.modEnabled(opts, "old_on", "red"), true,
+    "an old enabled mod is enabled for Red")
+  eq(SaveData.modEnabled(opts, "old_on", "gold"), false,
+    "an already-stored preview answer is preserved")
+  eq(SaveData.modEnabled(opts, "old_off", "blue"), false,
+    "an old disabled mod stays disabled for every game")
+  eq(SaveData.modEnabled(opts, "implicit", "yellow"), true,
+    "an old implicit default is enabled for every game")
+  eq(SaveData.modEnabled(opts, "lab", "red"), false,
+    "an experimental mod keeps its existing opt-in default")
+  check(not SaveData.migrateModEnablement(opts, { { id = "newer" } }),
+    "a later mod install does not rerun the legacy migration")
+end
+
 -- ------- a profile carries the per-game half of a setup
 
 do

@@ -1100,6 +1100,7 @@ mod.content.tokens:register("CLOCK", function(game) return "12" end)
 | `paletteSource` | string | no |
 | `parties` | list of list of {level, species} | yes |
 | `pic` | file path | no |
+| `trueColor` | boolean | no |
 
 ```lua
 mod.content.trainers:patch("OPP_BROCK", { baseMoney = 99 })
