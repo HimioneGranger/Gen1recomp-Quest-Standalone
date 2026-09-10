@@ -99,5 +99,5 @@ dependencies {
     // Khronos' official Android OpenXR loader. The flavor-scoped native bridge
     // resolves it at runtime; the AAR also contributes the loader's required
     // global Android manifest declarations.
-    questVrImplementation 'org.khronos.openxr:openxr_loader_for_android:1.1.62'
+    questVrImplementation 'org.khronos.openxr:openxr_loader_for_android:1.1.63'
 }
