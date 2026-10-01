@@ -140,6 +140,11 @@ function SwitchDiagnostics.logLuaError(msg)
   if not filesystem then return nil end
 
   local text = redactString(tostring(msg or "unknown error"))
+  -- Android app-private storage is not readable through ADB on a retail Quest.
+  -- Send the same already-redacted error to logcat through LÖVE's stdout path,
+  -- so a Diagnostic build can identify a Lua failure without exposing ROM or
+  -- save bytes. This does not change error handling or recovery behaviour.
+  print("POKEPORT_LUA_ERROR " .. text)
   local existing = filesystem.read(ERROR_LOG) or ""
   if #existing > ERROR_LOG_MAX then
     filesystem.write(ERROR_LOG_ROTATED, existing)

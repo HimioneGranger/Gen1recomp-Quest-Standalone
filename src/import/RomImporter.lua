@@ -1690,6 +1690,7 @@ end
 
 function RomImporter:_finishModWork(ok, text, done)
   self.modWorker, self.modProgress = nil, nil
+  self.safPickerActive = nil
   if ok then pcall(self._refreshMods, self) end
   self.modNotice = { ok = ok, text = text }
   if done then done(ok) end
@@ -1861,12 +1862,17 @@ function RomImporter:chooseMod()
       end)
       return
     end
+    -- Arm this before opening DocumentsUI. Horizon OS can queue LÖVE's quit
+    -- event synchronously while pickFile is still on the stack; arming after
+    -- it returns leaves no opportunity for main.lua to preserve the app.
+    self.pickPending = true
+    self.safPickerActive = true
+    self.pickTimer = 0
     if not pickFile("mod") then
+      self.pickPending = nil
+      self.safPickerActive = nil
       self.modNotice = { ok = false,
         text = "Could not open the file picker. Copy a mod .zip via USB." }
-    else
-      self.pickPending = true
-      self.pickTimer = 0
     end
     return
   end
@@ -2336,14 +2342,25 @@ function RomImporter:update(dt)
   if self.modWorker then
     local started = love.timer.getTime()
     repeat
-      local ok, workerError = coroutine.resume(self.modWorker)
+      -- A successful mod worker can finish through _finishModWork, which
+      -- clears self.modWorker before control returns here. Keep the running
+      -- coroutine in a local variable so the completion path never calls
+      -- coroutine.status(nil) after an Android picker return.
+      local modWorker = self.modWorker
+      local ok, workerError = coroutine.resume(modWorker)
       if not ok then
-        print(debug.traceback(self.modWorker, tostring(workerError)))
+        print(debug.traceback(modWorker, tostring(workerError)))
         self.modWorker, self.modProgress = nil, nil
         self.modNotice = { ok = false, text = "Mod import failed: " .. tostring(workerError) }
         break
       end
-      if coroutine.status(self.modWorker) == "dead" then
+      -- _finishModWork may clear the field from inside the coroutine. Stop
+      -- this frame immediately in that case; another repeat would otherwise
+      -- resume nil after a successful install.
+      if self.modWorker ~= modWorker then
+        break
+      end
+      if coroutine.status(modWorker) == "dead" then
         self.modWorker = nil
         break
       end
